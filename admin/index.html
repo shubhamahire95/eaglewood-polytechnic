@@ -1,0 +1,278 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eaglewood OS — Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="dashboard.css">
+</head>
+
+<body data-theme="light" data-sidebar="expanded">
+    <div class="erp-shell">
+        <aside class="erp-sidebar" id="sidebar">
+            <div class="sidebar-brand">
+                <button id="sidebarCollapse" class="icon-btn" type="button" aria-label="Collapse sidebar">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+                </button>
+                <a href="index.html" class="brand-link">
+                    <img src="../assets/images/logo.jpg" alt="Eaglewood">
+                    <div class="brand-copy">
+                        <strong>Eaglewood OS</strong>
+                        <span>Institute ERP / CMS</span>
+                    </div>
+                </a>
+                <button id="sidebarClose" class="icon-btn mobile-only" type="button" aria-label="Close sidebar">×</button>
+            </div>
+
+            <div class="sidebar-search-wrap">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <input id="sidebarSearch" type="search" placeholder="Search modules..." aria-label="Search modules">
+            </div>
+
+            <nav id="adminNav" class="erp-nav" aria-label="Admin navigation"></nav>
+
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="logout-btn" type="button">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    <span>Logout</span>
+                </button>
+            </div>
+        </aside>
+
+        <div id="sidebarOverlay" class="sidebar-overlay"></div>
+
+        <div class="erp-main">
+            <header class="erp-topbar">
+                <div class="topbar-left">
+                    <button id="menuToggle" class="icon-btn mobile-only" aria-label="Open menu">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+                    </button>
+                    <div class="topbar-title-block">
+                        <p class="eyebrow">Eaglewood Polytechnic Institute</p>
+                        <h1 id="pageTitle">Dashboard</h1>
+                    </div>
+                </div>
+
+                <div class="topbar-center">
+                    <button id="commandBtn" class="global-search-btn" type="button">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                        <span>Search or jump to module...</span>
+                        <kbd>Ctrl K</kbd>
+                    </button>
+                </div>
+
+                <div class="topbar-right">
+                    <div class="quick-create-wrap">
+                        <button id="quickCreateBtn" class="btn-accent" type="button">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                            <span>Create</span>
+                        </button>
+                        <div id="quickCreateMenu" class="dropdown-menu" hidden></div>
+                    </div>
+
+                    <button id="notificationBtn" class="icon-btn has-badge" type="button" aria-label="Notifications" data-count="0">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                    </button>
+
+                    <div class="status-cluster" aria-label="System status">
+                        <span id="dbStatus" class="status-chip online" title="Supabase">DB</span>
+                        <span id="storageStatus" class="status-chip" title="Storage">—</span>
+                        <span id="liveClock" class="status-chip muted"></span>
+                    </div>
+
+                    <button id="themeToggle" class="icon-btn" type="button" aria-label="Toggle theme">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+                    </button>
+
+                    <div class="profile-chip">
+                        <span id="adminAvatar">A</span>
+                        <div>
+                            <strong id="adminName">Admin</strong>
+                            <small id="currentDate"></small>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div id="pendingBar" class="pending-bar" hidden></div>
+
+            <main class="erp-content">
+                <section id="dashboardView" class="view active">
+                    <div class="dash-hero glass-card">
+                        <div>
+                            <p class="eyebrow accent">Institute CMS</p>
+                            <h2>Operations overview</h2>
+                            <p class="dash-lead">Live status from Supabase — content, admissions, inquiries, and system health. No visitor analytics.</p>
+                        </div>
+                        <div class="dash-hero-meta">
+                            <span id="dashGreeting"></span>
+                            <span id="dashRefreshed" class="muted"></span>
+                        </div>
+                    </div>
+
+                    <div class="overview-grid" id="overviewCards" aria-live="polite"></div>
+
+                    <div class="glass-card dash-panel">
+                        <div class="card-head">
+                            <div>
+                                <p class="eyebrow">Shortcuts</p>
+                                <h3>Quick Actions</h3>
+                            </div>
+                        </div>
+                        <div class="quick-actions-grid" id="quickActions"></div>
+                    </div>
+
+                    <div class="dash-charts-row">
+                        <div class="glass-card">
+                            <div class="card-head">
+                                <div>
+                                    <p class="eyebrow">Activity</p>
+                                    <h3>Recent Changes</h3>
+                                </div>
+                                <button type="button" class="text-link" data-key="updates">View updates</button>
+                            </div>
+                            <div id="recentChanges" class="activity-list"></div>
+                        </div>
+                        <div class="glass-card">
+                            <div class="card-head">
+                                <div>
+                                    <p class="eyebrow">Infrastructure</p>
+                                    <h3>Database Health</h3>
+                                </div>
+                            </div>
+                            <div id="databaseHealth" class="health-stack"></div>
+                        </div>
+                    </div>
+
+                    <div class="status-overview-grid" id="statusCards" aria-live="polite"></div>
+
+                    <div class="dashboard-grid dash-feed-grid">
+                        <div class="glass-card">
+                            <div class="card-head">
+                                <div>
+                                    <p class="eyebrow">Website</p>
+                                    <h3>Latest Notices</h3>
+                                </div>
+                                <button type="button" class="text-link" data-key="notices">View all</button>
+                            </div>
+                            <div id="latestNotices" class="list-stack"></div>
+                        </div>
+                        <div class="glass-card">
+                            <div class="card-head">
+                                <div>
+                                    <p class="eyebrow">Admissions</p>
+                                    <h3>Latest Admissions</h3>
+                                </div>
+                                <button type="button" class="text-link" data-key="admissions">View all</button>
+                            </div>
+                            <div id="latestAdmissions" class="list-stack"></div>
+                        </div>
+                        <div class="glass-card">
+                            <div class="card-head">
+                                <div>
+                                    <p class="eyebrow">Forms</p>
+                                    <h3>Pending Inquiries</h3>
+                                </div>
+                                <button type="button" class="text-link" data-key="inquiries">View all</button>
+                            </div>
+                            <div id="pendingInquiries" class="list-stack"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="moduleView" class="view">
+                    <div class="module-header glass-card">
+                        <div class="module-header-copy">
+                            <p class="eyebrow" id="moduleKicker">Content module</p>
+                            <h2 id="moduleTitle">Module</h2>
+                        </div>
+                        <div class="module-header-actions">
+                            <input id="globalSearch" type="search" placeholder="Search records..." aria-label="Search records">
+                            <button id="exportCsvBtn" class="btn-ghost" type="button" hidden>Export</button>
+                            <button id="addRecordBtn" class="btn-primary" type="button">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                                Add New
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="moduleContext" class="module-context"></div>
+
+                    <div class="module-toolbar glass-card">
+                        <div class="toolbar-left">
+                            <select id="statusFilter" aria-label="Filter by status">
+                                <option value="">All status</option>
+                                <option value="published">Published</option>
+                                <option value="draft">Draft</option>
+                                <option value="new">New</option>
+                                <option value="read">Read</option>
+                            </select>
+                            <select id="sortFilter" aria-label="Sort records">
+                                <option value="newest">Newest first</option>
+                                <option value="oldest">Oldest first</option>
+                                <option value="order">Display order</option>
+                            </select>
+                        </div>
+                        <div class="toolbar-right">
+                            <span id="recordCount" class="record-count"></span>
+                            <button id="bulkPublishBtn" class="btn-ghost" type="button" hidden>Bulk Publish</button>
+                        </div>
+                    </div>
+
+                    <div class="glass-card module-panel">
+                        <div id="moduleTable" class="table-wrap"></div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <dialog id="editorDialog" class="editor-dialog">
+        <form id="editorForm" method="dialog">
+            <div class="dialog-head">
+                <div>
+                    <p class="eyebrow" id="dialogKicker">Editor</p>
+                    <h3 id="dialogTitle">Edit Record</h3>
+                </div>
+                <button class="icon-btn dialog-close" value="cancel" type="button" aria-label="Close">×</button>
+            </div>
+            <div id="editorFields" class="editor-fields"></div>
+            <div class="dialog-foot">
+                <span id="autosaveStatus" class="autosave-status"></span>
+                <div class="dialog-actions">
+                    <button class="btn-ghost" value="cancel" type="button" id="cancelEditBtn">Cancel</button>
+                    <button class="btn-primary" value="default" type="submit">Save Changes</button>
+                </div>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="confirmDialog" class="confirm-dialog">
+        <div>
+            <p class="eyebrow">Confirm action</p>
+            <h3 id="confirmTitle">Are you sure?</h3>
+            <p id="confirmMessage">This action cannot be undone.</p>
+            <div class="dialog-actions">
+                <button id="confirmCancel" class="btn-ghost" type="button">Cancel</button>
+                <button id="confirmOk" class="btn-danger" type="button">Confirm</button>
+            </div>
+        </div>
+    </dialog>
+
+    <dialog id="commandDialog" class="command-dialog">
+        <div class="command-inner">
+            <input id="commandSearch" type="search" placeholder="Jump to module or action...">
+            <div id="commandResults" class="command-results"></div>
+        </div>
+    </dialog>
+
+    <div id="toastRegion" class="toast-region" aria-live="polite"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module" src="dashboard.js"></script>
+</body>
+
+</html>

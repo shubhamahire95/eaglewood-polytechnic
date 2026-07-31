@@ -1,0 +1,13 @@
+{
+  "name": "eaglewood-polytechnic",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "audit:supabase": "node scripts/audit-supabase.js",
+    "db:migrate": "node scripts/run-migrations.js",
+    "db:build": "node scripts/build-run-all-migrations.js"
+  },
+  "devDependencies": {
+    "pg": "^8.22.0"
+  }
+}

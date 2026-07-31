@@ -1,0 +1,154 @@
+/* Eaglewood — Inner Pages Premium Polish */
+
+.page-title {
+  padding: clamp(48px, 6vw, 72px) 0 clamp(28px, 4vw, 40px);
+  background: linear-gradient(180deg, rgba(15, 118, 110, .06), transparent);
+}
+
+.page-title h1 {
+  font-size: clamp(28px, 4vw, 42px);
+  letter-spacing: -.02em;
+}
+
+.breadcrumb {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  color: #64748b;
+  margin-top: 10px;
+}
+
+.breadcrumb a {
+  color: #0f766e;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.section {
+  padding: clamp(40px, 5vw, 64px) 0;
+}
+
+.section-soft {
+  background: linear-gradient(180deg, #f8fafc, #fff);
+}
+
+.content-copy h2,
+.section-title {
+  font-size: clamp(22px, 3vw, 30px);
+  line-height: 1.2;
+  color: #0f172a;
+}
+
+.section-lead,
+.content-copy p {
+  color: #64748b;
+  line-height: 1.7;
+  font-size: 15px;
+}
+
+.card,
+.fact-panel,
+.scholar-card,
+.admission-step,
+.contact-item {
+  border-radius: 20px !important;
+  transition: transform .28s ease, box-shadow .28s ease, border-color .28s ease;
+}
+
+.card:hover,
+.fact-panel:hover,
+.scholar-card:hover,
+.admission-step:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 18px 48px rgba(15, 118, 110, .12) !important;
+}
+
+.check-list li,
+.compact-list li {
+  line-height: 1.65;
+}
+
+.media-panel img {
+  border-radius: 20px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, .1);
+}
+
+.cta {
+  background: linear-gradient(135deg, #073d46, #0f766e);
+  color: #fff;
+  padding: clamp(36px, 5vw, 56px) 0;
+}
+
+.cta h2 {
+  color: #fff;
+}
+
+.cta p {
+  color: rgba(255, 255, 255, .85);
+}
+
+.faq-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.faq-item {
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .05);
+}
+
+.faq-item h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  color: #0f172a;
+}
+
+.faq-item p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #64748b;
+}
+
+.highlight-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.highlight-stat {
+  padding: 20px;
+  border-radius: 18px;
+  text-align: center;
+  background: rgba(255, 255, 255, .9);
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, .06);
+}
+
+.highlight-stat strong {
+  display: block;
+  font-size: 24px;
+  color: #0f766e;
+}
+
+.highlight-stat span {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .highlight-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .highlight-stats {
+    grid-template-columns: 1fr;
+  }
+}

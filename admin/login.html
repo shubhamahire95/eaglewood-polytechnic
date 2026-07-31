@@ -1,0 +1,102 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+
+    <title>Admin Login | Eaglewood Polytechnic</title>
+
+    <link rel="stylesheet" href="login.css">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+
+</head>
+
+<body>
+
+    <div class="overlay"></div>
+
+    <div class="login-container">
+
+        <div class="left">
+
+            <h1>Eaglewood Polytechnic</h1>
+
+            <p>
+                College Management Platform
+            </p>
+
+            <span>
+                Secure institute CMS for content, admissions, media, and AI assistant.
+            </span>
+
+        </div>
+
+        <div class="right">
+
+            <div class="card">
+
+                <img src="../assets/images/logo.jpg" class="logo" alt="Eaglewood logo">
+
+                <h2>Sign in to Eaglewood OS</h2>
+
+                <p id="msg"></p>
+
+                <div class="input-box">
+
+                    <input id="email" type="email" placeholder="Email Address">
+
+                </div>
+
+                <div class="input-box">
+
+                    <input id="password" type="password" placeholder="Password">
+
+                    <span id="togglePassword">Show</span>
+
+                </div>
+
+                <label class="remember">
+
+                    <input type="checkbox">
+
+                    Remember me
+
+                </label>
+
+                <button id="loginBtn">
+
+                    Login
+
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module" src="../assets/js/auth.js"></script>
+
+    <script>
+
+        const toggle = document.getElementById("togglePassword");
+
+        const pass = document.getElementById("password");
+
+        toggle.onclick = () => {
+
+            pass.type = pass.type === "password" ? "text" : "password";
+
+        }
+
+    </script>
+
+</body>
+
+</html>
+

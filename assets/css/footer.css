@@ -1,0 +1,385 @@
+/* ==========================================================================
+   EAGLEWOOD FOOTER — compact premium layout (epi-ft namespace)
+   Isolated from legacy .site-footer rules in style.css
+   ========================================================================== */
+
+.epi-ft {
+  --epi-ft-max: min(1180px, calc(100% - 36px));
+  --epi-ft-text: rgba(232, 244, 243, 0.94);
+  --epi-ft-muted: rgba(186, 214, 211, 0.8);
+  --epi-ft-accent: #7dd3c7;
+  --epi-ft-gold: #e8c547;
+  --epi-ft-glass: rgba(255, 255, 255, 0.07);
+  --epi-ft-border: rgba(255, 255, 255, 0.1);
+
+  position: relative;
+  color: var(--epi-ft-text);
+  font-size: 13px;
+  line-height: 1.45;
+  background: linear-gradient(158deg, #02181c 0%, #073a42 46%, #0a2540 100%);
+  border-radius: 22px 22px 0 0;
+  border-top: 1px solid var(--epi-ft-border);
+  box-shadow: 0 -10px 40px rgba(2, 24, 28, 0.32);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.epi-ft__ambient {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 50% 70% at 8% 0%, rgba(232, 197, 71, 0.1), transparent 55%),
+    radial-gradient(ellipse 45% 60% at 92% 6%, rgba(20, 184, 166, 0.12), transparent 50%);
+}
+
+.epi-ft__inner {
+  position: relative;
+  z-index: 1;
+  width: var(--epi-ft-max);
+  margin-inline: auto;
+}
+
+/* —— Main row —— */
+.epi-ft__main {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.75fr) minmax(0, 0.95fr);
+  gap: clamp(16px, 2.5vw, 32px);
+  align-items: start;
+  padding: 22px 0 16px;
+}
+
+.epi-ft__heading {
+  margin: 0 0 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--epi-ft-accent);
+}
+
+.epi-ft__brand-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.epi-ft__brand-link:hover {
+  opacity: 0.92;
+}
+
+.epi-ft__brand-link img {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  object-fit: cover;
+}
+
+.epi-ft__brand-text {
+  min-width: 0;
+}
+
+.epi-ft__brand-link strong {
+  display: block;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.epi-ft__tagline {
+  display: block;
+  margin-top: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--epi-ft-muted);
+}
+
+.epi-ft__quick-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.epi-ft__quick-list a {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--epi-ft-muted);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.epi-ft__quick-list a:hover {
+  color: #fff;
+}
+
+.epi-ft__contact-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.epi-ft__contact-list a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--epi-ft-muted);
+  text-decoration: none;
+}
+
+.epi-ft__contact-list a:hover {
+  color: var(--epi-ft-gold);
+}
+
+.epi-ft__contact-list svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.epi-ft__social {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.epi-ft__social a {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--epi-ft-glass);
+  border: 1px solid var(--epi-ft-border);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.epi-ft__social a svg {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+}
+
+.epi-ft__social a:hover {
+  transform: translateY(-1px);
+  background: rgba(232, 197, 71, 0.15);
+}
+
+/* —— Slim bottom strip —— */
+.epi-ft__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 10px 0 12px;
+  border-top: 1px solid var(--epi-ft-border);
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.epi-ft__bar-left {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  min-width: 0;
+  flex: 1 1 200px;
+}
+
+.epi-ft__copyright,
+.epi-ft__developer {
+  margin: 0;
+  font-size: 11px;
+  color: var(--epi-ft-muted);
+}
+
+.epi-ft__developer strong {
+  color: var(--epi-ft-accent);
+  font-weight: 700;
+}
+
+.epi-ft__developer a {
+  color: var(--epi-ft-text);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.epi-ft__developer a:hover {
+  color: var(--epi-ft-accent);
+  text-decoration: underline;
+}
+
+.epi-ft__bar-mid {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0;
+}
+
+.epi-ft__legal a {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--epi-ft-muted);
+  text-decoration: none;
+}
+
+.epi-ft__legal a + a::before {
+  content: "·";
+  margin: 0 8px;
+  color: rgba(255, 255, 255, 0.22);
+  pointer-events: none;
+}
+
+.epi-ft__legal a:hover {
+  color: #fff;
+}
+
+.epi-ft__back-top {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  background: var(--epi-ft-glass);
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.epi-ft__back-top svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.epi-ft__back-top:hover {
+  background: rgba(125, 211, 199, 0.16);
+  transform: translateY(-1px);
+}
+
+/* WhatsApp — small float */
+.epi-ft-wa {
+  position: fixed;
+  left: max(16px, env(safe-area-inset-left));
+  bottom: max(18px, env(safe-area-inset-bottom));
+  z-index: 1100;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  text-decoration: none;
+  background: linear-gradient(135deg, #25d366, #128c4a);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 6px 18px rgba(37, 211, 102, 0.28);
+  transition: bottom 0.25s ease, transform 0.25s ease;
+}
+
+.epi-ft-wa svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+
+.epi-ft-wa:hover {
+  transform: translateY(-2px) scale(1.03);
+}
+
+body.footer-visible .epi-ft-wa,
+body.footer-visible .ew-ai {
+  bottom: calc(max(18px, env(safe-area-inset-bottom)) + var(--epi-ft-float-offset, 0px));
+}
+
+a.whatsapp,
+button.back-top,
+a.mobile-apply {
+  display: none !important;
+}
+
+@media (max-width: 860px) {
+  .epi-ft__main {
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+
+  .epi-ft__brand {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 600px) {
+  .epi-ft {
+    border-radius: 18px 18px 0 0;
+  }
+
+  .epi-ft__inner {
+    --epi-ft-max: min(1180px, calc(100% - 28px));
+  }
+
+  .epi-ft__main {
+    grid-template-columns: 1fr;
+    text-align: center;
+    padding-top: 18px;
+  }
+
+  .epi-ft__brand-link,
+  .epi-ft__contact-list a {
+    justify-content: center;
+  }
+
+  .epi-ft__social {
+    justify-content: center;
+  }
+
+  .epi-ft__bar {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 12px 0 14px;
+  }
+
+  .epi-ft__bar-left {
+    justify-content: center;
+    flex: none;
+  }
+
+  .epi-ft-wa {
+    width: 42px;
+    height: 42px;
+  }
+
+  .epi-ft-wa svg {
+    width: 20px;
+    height: 20px;
+  }
+}
