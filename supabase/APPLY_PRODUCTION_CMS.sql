@@ -1,0 +1,3 @@
+-- Eaglewood Polytechnic — Production CMS fix
+-- Run supabase/APPLY_ALL_PRODUCTION.sql in Supabase Dashboard → SQL Editor (one-time).
+-- That file deploys legacy admin writes, bootstrap_cms_default_content(), seed_cms_as_admin(), and seeds all tables.

@@ -40,7 +40,7 @@ insert into public.facilities (title, slug, description, image_url, icon, displa
 ('Sports', 'sports', 'Activities that build teamwork and discipline.', 'assets/images/boys-volleyball.jpg', 'trophy', 5, true),
 ('Computer Lab', 'computer-lab', 'Computer systems for programming and digital practice.', 'assets/images/computer-lab.jpg', 'monitor', 6, true),
 ('Auditorium', 'auditorium', 'A shared space for seminars, presentations and academic events.', 'assets/images/annual-gathering.jpg', 'mic', 7, true),
-('Cafeteria', 'cafeteria', 'Refreshment space for students and staff.', 'assets/images/campus-life.jpg', 'coffee', 8, true)
+('Cafeteria', 'cafeteria', 'Refreshment space for students and staff.', 'assets/images/dining-hall.jpg', 'coffee', 8, true)
 on conflict do nothing;
 
 insert into public.notices (title, description, notice_date, priority, important, is_new, display_order, published) values

@@ -72,17 +72,25 @@ export async function probeRpcCapabilities({ force = false } = {}) {
     }
 }
 
+export function markRpcDeployed(name, deployed) {
+    const caps = loadCache() || {};
+    caps[name] = deployed === true;
+    saveCache(caps);
+    return caps;
+}
+
 /** Called after successful production SQL deploy. */
 export function markAllRpcsDeployed() {
     const caps = {
         verify_legacy_admin: true,
-        create_legacy_admin_session: false,
-        validate_legacy_admin_session: false,
-        revoke_legacy_admin_session: false,
-        destroy_legacy_admin_session: false,
+        is_admin: true,
+        get_admin_login_route: true,
+        create_legacy_admin_session: true,
+        validate_legacy_admin_session: true,
+        revoke_legacy_admin_session: true,
+        destroy_legacy_admin_session: true,
         bootstrap_cms_default_content: false,
         seed_cms_as_admin: false,
-        get_admin_login_route: true,
         bootstrap_admin_auth_links: false,
     };
     saveCache(caps);

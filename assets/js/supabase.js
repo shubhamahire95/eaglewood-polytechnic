@@ -1,5 +1,5 @@
 import CONFIG from "./config.js";
-import { probeRpcCapabilities, isRpcDeployed, clearRpcCapabilities } from "./rpc-capabilities.js";
+import { probeRpcCapabilities, isRpcDeployed, clearRpcCapabilities, markRpcDeployed } from "./rpc-capabilities.js";
 
 const SUPABASE_URL = "https://rhqmquaojetmzdznbevz.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_fUfSHGs4xC7ut470YywOuw_ire40q8v";
@@ -17,11 +17,54 @@ const LEGACY_CREDS_KEY = "ew_admin_legacy_creds";
 const LOCAL_ADMIN_SESSION_KEY = "ew_local_admin_session";
 const AUTH_STORAGE_KEY = CONFIG.auth?.storageKey || "ew-supabase-auth";
 const CMS_SYNC_KEY = "ew_cms_updated_at";
+const WRITE_PROBE_KEY = "ew_admin_write_probe";
+const WRITE_PROBE_TTL_MS = 10 * 60 * 1000;
 const LEGACY_SESSION_HEADER = "x-legacy-admin-session";
 const ADMIN_EMAIL_HEADER = "x-admin-email";
 const ADMIN_PASSWORD_HEADER = "x-admin-password";
 
 const PUBLIC_INSERT_TABLES = new Set(["inquiries", "admissions", "contacts"]);
+
+/** Tables that include a display_order column (form tables do not). */
+export const TABLES_WITH_DISPLAY_ORDER = new Set([
+    "settings",
+    "home_slides",
+    "updates",
+    "notices",
+    "principal_message",
+    "courses",
+    "departments",
+    "faculty",
+    "facilities",
+    "placements",
+    "gallery",
+    "ai_knowledge_base",
+    "ai_prompts",
+    "footer_blocks",
+    "media_library",
+]);
+
+export function tableHasDisplayOrder(table) {
+    return TABLES_WITH_DISPLAY_ORDER.has(table);
+}
+
+/** PostgREST order clause — never use display_order on tables without that column. */
+export function restOrderQuery(table) {
+    if (tableHasDisplayOrder(table)) {
+        return "order=display_order.asc.nullslast&order=created_at.desc";
+    }
+    return "order=created_at.desc";
+}
+
+/** Anon/public REST headers only — no admin credentials or user JWT. */
+export function buildPublicAuthHeaders(extra = {}) {
+    return {
+        apikey: SUPABASE_PUBLISHABLE_KEY,
+        Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+        "Content-Type": "application/json",
+        ...extra,
+    };
+}
 
 const EMAIL_NOT_CONFIRMED_MESSAGE =
     "Your administrator account has not been confirmed yet. "
@@ -202,8 +245,8 @@ function getClientHeaderFingerprint() {
     return `${getLegacySessionToken() || ""}:${creds?.email || ""}:${creds?.password || ""}`;
 }
 
-/** Build REST headers for admin writes — always includes session + email/password when available. */
-function buildAdminAuthHeaders(extra = {}) {
+/** Build REST headers for admin writes — single auth path for REST + storage. */
+export function buildAdminAuthHeaders(extra = {}) {
     const headers = {
         apikey: SUPABASE_PUBLISHABLE_KEY,
         Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
@@ -218,6 +261,52 @@ function buildAdminAuthHeaders(extra = {}) {
         headers[ADMIN_PASSWORD_HEADER] = creds.password;
     }
     return headers;
+}
+
+function isJwtAuthError(error) {
+    const status = Number(error?.status || error?.statusCode || 0);
+    const code = String(error?.code || "");
+    const msg = String(error?.message || "").toLowerCase();
+    return status === 401 || code === "PGRST301" || msg.includes("jwt");
+}
+
+/** Drop stale Supabase Auth JWTs that cause 401 on REST (legacy admin uses publishable key only). */
+export async function ensureCleanRestAuth() {
+    purgeSupabaseAuthStorage();
+    try {
+        if (window[CLIENT_KEY]?.auth) {
+            await window[CLIENT_KEY].auth.signOut({ scope: "local" });
+        }
+    } catch {
+        /* ignore */
+    }
+    await refreshSupabaseClient();
+}
+
+/** Admin SELECT via PostgREST fetch — uses legacy header auth, never a stale user JWT. */
+async function adminRestSelect(table, { publishedOnly = false, limit = 250 } = {}) {
+    let url = `${SUPABASE_URL}/rest/v1/${table}?select=*&limit=${limit}`;
+    if (publishedOnly) url += "&published=eq.true";
+    url += `&${restOrderQuery(table)}`;
+    const res = await fetch(url, { headers: buildAdminAuthHeaders() });
+    const text = await res.text();
+    let data = null;
+    try {
+        data = text ? JSON.parse(text) : null;
+    } catch {
+        data = null;
+    }
+    if (!res.ok) {
+        return {
+            ok: false,
+            data: [],
+            reason: isJwtAuthError({ status: res.status, message: data?.message, code: data?.code })
+                ? "auth"
+                : (res.status === 401 || res.status === 403 || String(data?.code) === "42501" ? "permission" : "error"),
+            error: { message: data?.message || text, code: data?.code, status: res.status },
+        };
+    }
+    return { ok: true, data: Array.isArray(data) ? data : [] };
 }
 
 /** Admin table write via PostgREST fetch — guarantees auth headers on every request. */
@@ -253,6 +342,173 @@ async function adminRestRequest(method, table, { payload, match, prefer } = {}) 
         return { ok: true, data: data[0] ?? null };
     }
     return { ok: true, data };
+}
+
+const CMS_STORAGE_BUCKET = CONFIG.cms?.storageBucket || "cms";
+
+/** Public URL for a CMS storage object path. */
+export function getCmsStoragePublicUrl(path) {
+    const clean = String(path || "").replace(/^\/+/, "");
+    return `${SUPABASE_URL}/storage/v1/object/public/${CMS_STORAGE_BUCKET}/${clean}`;
+}
+
+function encodeStoragePath(path) {
+    return String(path || "")
+        .split("/")
+        .filter(Boolean)
+        .map((part) => encodeURIComponent(part))
+        .join("/");
+}
+
+function parseStorageError(status, text, data) {
+    const message = data?.message || data?.error || text || "Storage request failed";
+    const code = data?.code || data?.statusCode || "";
+    const lower = String(message).toLowerCase();
+    const permission = status === 401 || status === 403
+        || lower.includes("policy")
+        || lower.includes("row-level security")
+        || lower.includes("accessdenied")
+        || code === "AccessDenied";
+    return { message, code, status, permission };
+}
+
+/** Upload file to CMS storage via REST with admin auth headers. */
+export async function adminStorageUpload(path, file, { upsert = false } = {}) {
+    if (!(await prepareAdminWriteRequest())) {
+        return { ok: false, reason: "permission", error: { message: "Admin session required" } };
+    }
+    const encoded = encodeStoragePath(path);
+    const url = `${SUPABASE_URL}/storage/v1/object/${CMS_STORAGE_BUCKET}/${encoded}`;
+    const headers = buildAdminAuthHeaders({
+        "Content-Type": file?.type || "application/octet-stream",
+        "Cache-Control": "3600",
+    });
+    if (upsert) headers["x-upsert"] = "true";
+    delete headers.Prefer;
+
+    try {
+        const res = await fetch(url, { method: "POST", headers, body: file });
+        const text = await res.text();
+        let data = null;
+        try { data = text ? JSON.parse(text) : null; } catch { data = { message: text }; }
+        if (!res.ok) {
+            const err = parseStorageError(res.status, text, data);
+            return { ok: false, reason: err.permission ? "permission" : "error", error: err };
+        }
+        return { ok: true, path, publicUrl: getCmsStoragePublicUrl(path), data };
+    } catch (err) {
+        return { ok: false, reason: "network", error: { message: err?.message || "Network error" } };
+    }
+}
+
+/** Remove file(s) from CMS storage via REST with admin auth headers. */
+export async function adminStorageRemove(paths) {
+    if (!(await prepareAdminWriteRequest())) {
+        return { ok: false, reason: "permission", error: { message: "Admin session required" } };
+    }
+    const list = (Array.isArray(paths) ? paths : [paths]).filter(Boolean);
+    if (!list.length) return { ok: true };
+
+    const headers = buildAdminAuthHeaders({ "Content-Type": "application/json" });
+    delete headers.Prefer;
+
+    try {
+        for (const path of list) {
+            const encoded = encodeStoragePath(path);
+            const url = `${SUPABASE_URL}/storage/v1/object/${CMS_STORAGE_BUCKET}/${encoded}`;
+            const res = await fetch(url, { method: "DELETE", headers });
+            if (!res.ok && res.status !== 404) {
+                const text = await res.text();
+                let data = null;
+                try { data = text ? JSON.parse(text) : null; } catch { data = { message: text }; }
+                const err = parseStorageError(res.status, text, data);
+                return { ok: false, reason: err.permission ? "permission" : "error", error: err };
+            }
+        }
+        return { ok: true };
+    } catch (err) {
+        return { ok: false, reason: "network", error: { message: err?.message || "Network error" } };
+    }
+}
+
+function loadWriteProbeCache() {
+    try {
+        const raw = sessionStorage.getItem(WRITE_PROBE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed?.at || Date.now() - parsed.at > WRITE_PROBE_TTL_MS) {
+            sessionStorage.removeItem(WRITE_PROBE_KEY);
+            return null;
+        }
+        if (parsed.fingerprint !== getClientHeaderFingerprint()) return null;
+        return parsed.result ?? null;
+    } catch {
+        return null;
+    }
+}
+
+function saveWriteProbeCache(result) {
+    try {
+        sessionStorage.setItem(WRITE_PROBE_KEY, JSON.stringify({
+            at: Date.now(),
+            fingerprint: getClientHeaderFingerprint(),
+            result,
+        }));
+    } catch {
+        /* ignore */
+    }
+}
+
+/** Clear cached write-permission probe (login, logout, after migration). */
+export function clearAdminWriteProbeCache() {
+    try {
+        sessionStorage.removeItem(WRITE_PROBE_KEY);
+    } catch {
+        /* ignore */
+    }
+}
+
+/** Lightweight permission check — calls is_admin() RPC with admin headers (no table writes). */
+async function fetchIsAdminViaRpc() {
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/is_admin`, {
+            method: "POST",
+            headers: buildAdminAuthHeaders(),
+            body: "{}",
+        });
+        if (!res.ok) {
+            return { ok: false, admin: false, status: res.status };
+        }
+        const text = (await res.text()).trim().toLowerCase();
+        return { ok: true, admin: text === "true" };
+    } catch {
+        return { ok: false, admin: false };
+    }
+}
+
+/** Probe whether admin credentials pass RLS (cached; never INSERTs probe rows). */
+export async function probeAdminWriteAccess(options = {}) {
+    const { force = false } = options;
+    if (!(await prepareAdminWriteRequest())) {
+        return { ok: false, reason: "no_credentials" };
+    }
+    if (!force) {
+        const cached = loadWriteProbeCache();
+        if (cached) return cached;
+    }
+    const rpc = await fetchIsAdminViaRpc();
+    if (rpc.ok && rpc.admin) {
+        const result = { ok: true };
+        saveWriteProbeCache(result);
+        return result;
+    }
+    const result = {
+        ok: false,
+        reason: "permission",
+        error: { message: "is_admin() returned false" },
+    };
+    saveWriteProbeCache(result);
+    return result;
 }
 
 /** Notify open public pages that CMS data changed (cross-tab sync). */
@@ -392,6 +648,7 @@ export function resetCmsStatus() {
     tableStatus.clear();
     clearCmsQueryCache();
     clearRpcCapabilities();
+    clearAdminWriteProbeCache();
 }
 
 function loadSchemaCaps() {
@@ -822,6 +1079,7 @@ async function tryLegacyPasswordLogin(email, password) {
     }
 
     createLocalAdminSession(verified.admin, email, password);
+    clearAdminWriteProbeCache();
     await syncWriteClient();
     return { ok: true, admin: verified.admin, devLegacy: true };
 }
@@ -903,6 +1161,7 @@ export async function signInWithAdminAuth(email, password) {
 export async function signOutAdmin() {
     localStorage.removeItem("admin");
     clearLegacyAuthArtifacts();
+    clearAdminWriteProbeCache();
     purgeSupabaseAuthStorage();
     await refreshSupabaseClient();
 }
@@ -1002,6 +1261,18 @@ export async function safeFetch(table, builder, fallback = [], cacheKey = "") {
 
             const { data, error, count } = await query;
             if (error) {
+                if (isJwtAuthError(error)) {
+                    await ensureCleanRestAuth();
+                    let retryQuery = supabase.from(table);
+                    if (typeof builder === "function") retryQuery = builder(retryQuery);
+                    else retryQuery = retryQuery.select(builder || "*");
+                    const retry = await retryQuery;
+                    if (!retry.error) {
+                        tableStatus.set(table, "ok");
+                        const rows = retry.data ?? fallback;
+                        return { data: rows, ok: true, count: typeof retry.count === "number" ? retry.count : rows?.length };
+                    }
+                }
                 if (isMissingTableError(error)) {
                     tableStatus.set(table, "missing");
                     return { data: fallback, ok: false, reason: "missing_table" };
@@ -1095,19 +1366,38 @@ export async function safeInsert(table, payload) {
     }
 }
 
-/** Public form submissions — no admin session required. */
+/** Public form submissions — no admin session required. Uses isolated REST (no admin headers). */
 export async function safePublicInsert(table, payload) {
     if (!PUBLIC_INSERT_TABLES.has(table)) {
         return { data: null, ok: false, reason: "not_configured" };
     }
     if (!(await requireCmsReady())) return { data: null, ok: false, reason: "not_configured" };
     try {
-        const { data, error } = await supabase.from(table).insert(payload).select().maybeSingle();
-        if (error) {
-            if (isPermissionError(error)) return { data: null, ok: false, reason: "permission" };
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+            method: "POST",
+            headers: buildPublicAuthHeaders({ Prefer: "return=representation" }),
+            body: JSON.stringify(payload),
+        });
+        const text = await res.text();
+        let data = null;
+        try {
+            data = text ? JSON.parse(text) : null;
+        } catch {
+            data = null;
+        }
+        if (!res.ok) {
+            const code = String(data?.code || "");
+            const msg = String(data?.message || "").toLowerCase();
+            if (res.status === 401 || res.status === 403 || code === "42501" || msg.includes("policy")) {
+                return { data: null, ok: false, reason: "permission" };
+            }
+            if (code === "PGRST301" || msg.includes("jwt")) {
+                return { data: null, ok: false, reason: "auth" };
+            }
             return { data: null, ok: false, reason: "error" };
         }
-        return { data, ok: true };
+        const row = Array.isArray(data) ? data[0] : data;
+        return { data: row, ok: true };
     } catch {
         return { data: null, ok: false, reason: "network" };
     }
@@ -1162,23 +1452,66 @@ export async function safeAdminSelect(table, builder, fallback = null) {
     if (!CMS_TABLES.has(table)) return { data: fallback, ok: false, reason: "not_configured" };
     if (!(await requireCmsReady())) return { data: fallback, ok: false, reason: "not_configured" };
     if (!cmsAdminMode && isPartialCms() && table !== "admins") return { data: fallback, ok: false, reason: "not_configured" };
-    if (cmsAdminMode && loadLegacyCredentials()) {
+
+    const creds = loadLegacyCredentials();
+    if (cmsAdminMode && creds?.email && creds?.password) {
+        await ensureCleanRestAuth();
         await syncWriteClient();
+        const rest = await adminRestSelect(table, { publishedOnly: false, limit: 250 });
+        if (rest.ok) {
+            tableStatus.set(table, "ok");
+            return { data: rest.data ?? fallback, ok: true };
+        }
+        if (rest.reason === "auth") {
+            await ensureCleanRestAuth();
+            const retry = await adminRestSelect(table, { publishedOnly: false, limit: 250 });
+            if (retry.ok) {
+                tableStatus.set(table, "ok");
+                return { data: retry.data ?? fallback, ok: true };
+            }
+        }
+        if (rest.reason === "permission") {
+            return { data: fallback ?? [], ok: false, reason: "permission" };
+        }
     }
+
     try {
+        await ensureCleanRestAuth();
         let query = supabase.from(table);
         if (typeof builder === "function") query = builder(query);
         else query = query.select(builder || "*");
         const { data, error } = await query;
         if (error) {
+            if (isJwtAuthError(error)) {
+                await ensureCleanRestAuth();
+                let retryQuery = supabase.from(table);
+                if (typeof builder === "function") retryQuery = builder(retryQuery);
+                else retryQuery = retryQuery.select(builder || "*");
+                const retry = await retryQuery;
+                if (!retry.error) {
+                    tableStatus.set(table, "ok");
+                    return { data: retry.data ?? fallback, ok: true };
+                }
+            }
             if (isMissingTableError(error)) return { data: fallback, ok: false, reason: "missing_table" };
             if (isPermissionError(error)) return { data: fallback, ok: false, reason: "permission" };
             return { data: fallback, ok: false, reason: "error" };
         }
+        tableStatus.set(table, "ok");
         return { data: data ?? fallback, ok: true };
     } catch {
         return { data: fallback, ok: false, reason: "network" };
     }
+}
+
+/** @deprecated Use cms-import / direct REST — RPC removed. */
+export async function invokeBootstrapCmsDefaultContent() {
+    return { ok: false, reason: "missing_rpc" };
+}
+
+/** @deprecated Use cms-import / direct REST — RPC removed. */
+export async function invokeSeedCmsAsAdmin() {
+    return { ok: false, reason: "missing_rpc" };
 }
 
 /** RPC helper — never throws; skips network when RPC is known missing. */
@@ -1244,20 +1577,30 @@ export async function ensureAdminWriteSessionOnLoad() {
 
 /** Explain why admin UI may be read-only despite appearing signed in. */
 export async function getAdminWriteCapability() {
-    if (await ensureAdminWriteSession()) {
+    if (!(await ensureAdminWriteSession())) {
+        return {
+            canWrite: false,
+            reason: "no_credentials",
+            message: "Sign in again to continue.",
+        };
+    }
+    const probe = await probeAdminWriteAccess();
+    if (probe.ok) {
         return { canWrite: true };
     }
     return {
         canWrite: false,
-        reason: "no_credentials",
-        message: "Sign in again to continue.",
+        reason: probe.reason || "permission",
+        message: mapCrudReason(probe.reason),
     };
 }
 
 export function mapCrudReason(reason) {
     if (!reason || reason === "not_configured") return "CMS is not configured.";
     if (reason === "missing_table") return "This module is not available yet.";
-    if (reason === "permission") return "Could not save. Sign in again with your admin password.";
+    if (reason === "permission") {
+        return "Database writes are blocked. Run npm run cms:fix (requires SUPABASE_DB_URL in .env.local), then sign in again.";
+    }
     if (reason === "missing_rpc") return "Could not complete this action.";
     if (reason === "no_credentials") return "Sign in again to continue.";
     if (reason === "network") return "Network error. Try again.";

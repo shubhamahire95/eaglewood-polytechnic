@@ -1,5 +1,10 @@
-﻿import { safeDelete, safeFetch, safeInsert, safeUpdate, supabase, connectCms, safeAdminSelect, safeCount, getCmsStatusLabel, resetCmsStatus, isCmsAvailable, getMissingTables, getCmsTableStats, getLastConnectionDiagnostics, hasAdminSession, ensureAdminWriteSession, ensureAdminWriteSessionOnLoad, getAdminWriteCapability, mapCrudReason, setCmsAdminMode, getTableStatus, clearCmsQueryCache, signOutAdmin, getAdminWriteClient, loadLegacyCredentials } from "../assets/js/supabase.js";
+﻿import { safeDelete, safeFetch, safeInsert, safeUpdate, supabase, connectCms, safeAdminSelect, safeCount, getCmsStatusLabel, resetCmsStatus, isCmsAvailable, getMissingTables, getCmsTableStats, getLastConnectionDiagnostics, hasAdminSession, ensureAdminWriteSession, ensureAdminWriteSessionOnLoad, getAdminWriteCapability, mapCrudReason, setCmsAdminMode, getTableStatus, clearCmsQueryCache, signOutAdmin, loadLegacyCredentials, tableHasDisplayOrder, adminStorageUpload, adminStorageRemove, getCmsStoragePublicUrl, notifyCmsDataChanged } from "../assets/js/supabase.js";
 import { bootstrapCmsContentIfNeeded, isCmsContentEmpty } from "../assets/js/cms-bootstrap.js";
+import { fetchCmsRows, cmsTableCount, cmsInsert, cmsUpdate, cmsDelete, isContentTable } from "../assets/js/cms-store.js";
+import { fetchFormRows, formTableCount, isPublicFormTable } from "../assets/js/form-store.js";
+import { initAdminUiPolish } from "../assets/js/ui-polish.js";
+import { openModal, closeModal, closeAllModals, isModalOpen } from "./modal-manager.js";
+import { ensureMediaMap, getMediaMap, resolveAdminPreviewUrl, isRenderableImageUrl } from "../assets/js/media-url.js";
 
 const localAdmin = await bootstrapAdminAccess();
 if (!localAdmin) {
@@ -67,7 +72,21 @@ let page = 1;
 const pageSize = 10;
 let editingRow = null;
 let editorDirty = false;
+let selectedRowIds = new Set();
+let searchDebounceTimer = null;
+let activeActionMenuId = null;
 const $ = (id) => document.getElementById(id);
+
+const ACTION_ICONS = {
+    edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+    preview: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
+    duplicate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+    publish: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+    unpublish: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>',
+    delete: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+};
+
+const EMPTY_ILLUSTRATION = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 7h16M4 12h10M4 17h7"/><rect x="3" y="3" width="18" height="18" rx="3"/></svg>';
 
 const NAV_ICONS = {
     dashboard: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
@@ -95,30 +114,60 @@ const NAV_SECTIONS = [
 
 let cmsConnection = { connected: false };
 let chromeInitialized = false;
+let dashboardLoadPromise = null;
+let dashboardVisibilityTimer = null;
+
+function settled(result, fallback) {
+    return result.status === "fulfilled" ? result.value : fallback;
+}
+
+/** Dedupe identical in-flight dashboard API calls within one load cycle. */
+function createDashboardRequestCache() {
+    const cache = new Map();
+    return {
+        count(table) {
+            const key = `count:${table}`;
+            if (!cache.has(key)) cache.set(key, adminTableCount(table));
+            return cache.get(key);
+        },
+        rows(table, limit = 250) {
+            const key = `rows:${table}:${limit}`;
+            if (!cache.has(key)) cache.set(key, selectRows(table, limit));
+            return cache.get(key);
+        },
+    };
+}
 
 document.addEventListener("DOMContentLoaded", async () => {
     setCmsAdminMode(true);
     await ensureAdminWriteSessionOnLoad();
     cmsConnection = await connectCms();
     initChrome();
+
+    // Auto-bootstrap disabled — never insert seed data without explicit operator action.
+    // Run `npm run cms:fix` manually after applying 009_production_stabilize.sql if needed.
+
+    // Do not flush the public form queue on dashboard load — avoids repeated 401/RLS noise.
+
     await refreshPendingBar();
     renderNav();
-    loadDashboard();
-    await refreshPendingBar();
+    void loadDashboard();
     updateSystemStatus();
     setInterval(updateLiveClock, 1000);
     updateLiveClock();
 
-    document.addEventListener("visibilitychange", async () => {
+    document.addEventListener("visibilitychange", () => {
         if (document.visibilityState !== "visible") return;
-        clearCmsQueryCache();
-        if (!isCmsAvailable()) {
-            cmsConnection = await connectCms();
-            if (!cmsConnection.connected) return;
-        }
-        await refreshPendingBar();
-        loadDashboard();
-        updateSystemStatus();
+        clearTimeout(dashboardVisibilityTimer);
+        dashboardVisibilityTimer = setTimeout(async () => {
+            if (!isCmsAvailable()) {
+                cmsConnection = await connectCms();
+                if (!cmsConnection.connected) return;
+            }
+            await refreshPendingBar();
+            if (currentModule?.key === "dashboard") void loadDashboard();
+            else updateSystemStatus();
+        }, 500);
     });
 });
 
@@ -151,18 +200,26 @@ function initChrome() {
     $("cancelEditBtn")?.addEventListener("click", closeEditor);
     document.querySelector(".dialog-close")?.addEventListener("click", closeEditor);
     $("editorForm").addEventListener("submit", saveRecord);
-    $("globalSearch")?.addEventListener("input", () => { page = 1; renderTable(); });
+    $("editorDialog")?.addEventListener("click", handleEditorUploadAction);
+    $("globalSearch")?.addEventListener("input", debouncedRenderTable);
     $("statusFilter")?.addEventListener("change", (e) => { window.__statusFilter = e.target.value; page = 1; renderTable(); });
+    $("departmentFilter")?.addEventListener("change", () => { page = 1; renderTable(); });
+    $("priorityFilter")?.addEventListener("change", () => { page = 1; renderTable(); });
     $("sortFilter")?.addEventListener("change", () => { page = 1; renderTable(); });
     $("exportCsvBtn")?.addEventListener("click", exportCsv);
     $("bulkPublishBtn")?.addEventListener("click", bulkPublish);
     $("bulkUnpublishBtn")?.addEventListener("click", bulkUnpublish);
     $("bulkDeleteBtn")?.addEventListener("click", bulkDelete);
+    $("bulkExportBtn")?.addEventListener("click", exportSelectedCsv);
+    $("bulkClearBtn")?.addEventListener("click", () => { clearSelection(); renderTable(); });
     $("themeToggle")?.addEventListener("click", toggleTheme);
     $("notificationBtn")?.addEventListener("click", () => switchModule("inquiries"));
-    $("commandBtn")?.addEventListener("click", openCommandPalette);
+    $("commandBtn")?.addEventListener("click", () => {
+        if (isModalOpen()) return;
+        openCommandPalette();
+    });
     $("commandSearch")?.addEventListener("input", renderCommandResults);
-    $("commandDialog")?.addEventListener("click", (event) => { if (event.target.id === "commandDialog") $("commandDialog").close(); });
+    $("commandDialog")?.addEventListener("click", (event) => { if (event.target.id === "commandDialog") closeModal($("commandDialog")); });
     $("sidebarSearch")?.addEventListener("input", () => renderNav($("sidebarSearch").value.trim().toLowerCase()));
     $("quickCreateBtn")?.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -171,11 +228,20 @@ function initChrome() {
     });
     document.addEventListener("click", () => { if ($("quickCreateMenu")) $("quickCreateMenu").hidden = true; });
     document.addEventListener("keydown", (event) => {
-        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); openCommandPalette(); }
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+            if (isModalOpen()) return;
+            event.preventDefault();
+            openCommandPalette();
+        }
+        if (event.key === "Escape" && !isModalOpen()) closeActionMenus();
+    });
+    document.addEventListener("click", (event) => {
+        if (!event.target.closest(".action-menu")) closeActionMenus();
     });
     document.querySelectorAll("[data-jump]").forEach((btn) => btn.addEventListener("click", () => switchModule(btn.dataset.jump)));
     initQuickCreateMenu();
     initEditorDirtyTracking();
+    initAdminUiPolish();
 }
 
 function toggleSidebarCollapse() {
@@ -208,10 +274,17 @@ function initEditorDirtyTracking() {
 }
 
 async function closeEditor() {
-    if (editorDirty && !(await confirmAction("Discard changes?", "You have unsaved changes in this editor."))) return;
+    if (editorDirty) {
+        const snapshotRow = editingRow;
+        const confirmed = await confirmAction("Discard changes?", "You have unsaved changes in this editor.");
+        if (!confirmed) {
+            if (!isModalOpen()) openEditor(snapshotRow);
+            return;
+        }
+    }
     editorDirty = false;
     $("autosaveStatus").textContent = "";
-    $("editorDialog").close();
+    closeModal($("editorDialog"));
 }
 
 function updateLiveClock() {
@@ -224,10 +297,12 @@ async function updatePendingBar() {
     const bar = $("pendingBar");
     if (!bar) return;
     if (!isCmsAvailable()) return;
-    const [inq, contact] = await Promise.all([
+    const [inqResult, contactResult] = await Promise.allSettled([
         adminTableCount("inquiries"),
         adminTableCount("contacts"),
     ]);
+    const inq = settled(inqResult, { ok: false, count: 0 });
+    const contact = settled(contactResult, { ok: false, count: 0 });
     const pendingInq = inq.ok ? Math.min(inq.count || 0, 99) : 0;
     const pendingContact = contact.ok ? Math.min(contact.count || 0, 99) : 0;
     const total = pendingInq + pendingContact;
@@ -291,8 +366,14 @@ function navItemHtml(m) {
 }
 
 function switchModule(key) {
+    closeAllModals();
     currentModule = MODULES.find((m) => m.key === key) || MODULES[0];
     page = 1;
+    clearSelection();
+    closeActionMenus();
+    if (window.matchMedia("(max-width: 780px)").matches) {
+        document.body.classList.remove("sidebar-open");
+    }
     renderNav($("sidebarSearch")?.value.trim().toLowerCase() || "");
     document.body.classList.remove("sidebar-open");
     $("pageTitle").textContent = currentModule.label;
@@ -304,56 +385,94 @@ function switchModule(key) {
 }
 
 async function loadDashboard() {
-    const name = localAdmin.name || localAdmin.email || "Admin";
-    $("dashGreeting").textContent = `Signed in as ${name}`;
+    if (dashboardLoadPromise) return dashboardLoadPromise;
+    dashboardLoadPromise = loadDashboardInner().finally(() => {
+        dashboardLoadPromise = null;
+    });
+    return dashboardLoadPromise;
+}
+
+async function loadDashboardInner() {
+    const name = (localAdmin.name || localAdmin.email || "Admin").split(" ")[0];
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
 
     if (!isCmsAvailable()) {
+        renderDashboardHero({ name, greeting, cmsReady: false });
         renderCmsSetupCard();
-        $("dashRefreshed").textContent = "";
         bindDashboardLinks();
         return;
     }
 
     document.querySelector(".cms-setup-card")?.remove();
-
     showDashboardSkeletons();
+    renderDashboardHero({ name, greeting, cmsReady: true, loading: true });
 
     const cmsReady = isCmsAvailable();
-    const statuses = [];
-    for (const mod of DASHBOARD_MODULES) {
-        statuses.push({ mod, ...(await adminTableCount(mod.table)) });
-    }
+    const requests = createDashboardRequestCache();
+
+    const moduleResults = await Promise.allSettled(
+        DASHBOARD_MODULES.map(async (mod) => ({ mod, ...(await requests.count(mod.table)) })),
+    );
+    const statuses = moduleResults.map((result, index) => (
+        settled(result, { mod: DASHBOARD_MODULES[index], count: null, ok: false, reason: "error" })
+    ));
 
     const [
-        inquiriesProbe,
-        admissionsProbe,
-        mediaProbe,
-        notices,
-        admissions,
-        inquiries,
-        aiPromptsProbe,
-        aiKnowledgeProbe,
-        aiConversationsProbe,
-        mediaFiles,
-        recentChanges,
-    ] = await Promise.all([
-        adminTableCount("inquiries"),
-        adminTableCount("admissions"),
-        adminTableCount("media_library"),
-        selectRows("notices", 5),
-        selectRows("admissions", 5),
-        selectRows("inquiries", 50),
-        adminTableCount("ai_prompts"),
-        adminTableCount("ai_knowledge_base"),
-        adminTableCount("ai_conversations"),
+        inquiriesProbeResult,
+        admissionsProbeResult,
+        mediaProbeResult,
+        noticesResult,
+        admissionsResult,
+        inquiriesResult,
+        aiPromptsProbeResult,
+        aiKnowledgeProbeResult,
+        aiConversationsProbeResult,
+        mediaFilesResult,
+        recentChangesResult,
+    ] = await Promise.allSettled([
+        requests.count("inquiries"),
+        requests.count("admissions"),
+        requests.count("media_library"),
+        requests.rows("notices", 5),
+        requests.rows("admissions", 5),
+        requests.rows("inquiries", 50),
+        requests.count("ai_prompts"),
+        requests.count("ai_knowledge_base"),
+        requests.count("ai_conversations"),
         fetchMediaStorage(),
-        fetchRecentChanges(),
+        fetchRecentChanges(requests),
     ]);
+
+    const inquiriesProbe = settled(inquiriesProbeResult, { ok: false, count: 0 });
+    const admissionsProbe = settled(admissionsProbeResult, { ok: false, count: 0 });
+    const mediaProbe = settled(mediaProbeResult, { ok: false, count: 0 });
+    const notices = settled(noticesResult, []);
+    const admissions = settled(admissionsResult, []);
+    const inquiries = settled(inquiriesResult, []);
+    const aiPromptsProbe = settled(aiPromptsProbeResult, { ok: false, count: 0 });
+    const aiKnowledgeProbe = settled(aiKnowledgeProbeResult, { ok: false, count: 0 });
+    const aiConversationsProbe = settled(aiConversationsProbeResult, { ok: false, count: 0 });
+    const mediaFiles = settled(mediaFilesResult, { ok: false, count: 0, bytes: 0 });
+    const recentChanges = settled(recentChangesResult, []);
 
     const summary = resolveDashboardSummary(statuses);
     const pendingInquiries = inquiries.filter(isPendingInquiry);
 
     renderOverviewCards({ summary, statuses, inquiriesProbe, admissionsProbe, mediaProbe, pendingCount: pendingInquiries.length, cmsReady });
+    renderDashboardHero({
+        name,
+        greeting,
+        cmsReady,
+        inquiriesProbe,
+        admissionsProbe,
+        mediaProbe,
+        mediaFiles,
+        pendingCount: pendingInquiries.length,
+        recentChanges,
+        aiPromptsProbe,
+        summary,
+    });
     renderQuickActions();
     renderRecentChanges(recentChanges, cmsReady);
     renderDatabaseHealth({ summary, statuses, cmsReady });
@@ -364,12 +483,70 @@ async function loadDashboard() {
     renderContentImportBanner(statuses);
     await renderWriteCapabilityBanner();
 
-    $("dashRefreshed").textContent = `Updated ${new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`;
     bindDashboardLinks();
 }
 
+function renderDashboardHero({
+    name,
+    greeting,
+    cmsReady = false,
+    loading = false,
+    inquiriesProbe,
+    admissionsProbe,
+    mediaProbe,
+    mediaFiles,
+    pendingCount = 0,
+    recentChanges = [],
+    aiPromptsProbe,
+    summary,
+}) {
+    const host = $("dashboardHero");
+    if (!host) return;
+    const diag = getLastConnectionDiagnostics();
+    const websiteStatus = cmsReady ? "✓ Connected" : "Setup required";
+    const storageStatus = diag?.storage?.ok || mediaProbe?.ok ? "✓ Ready" : "—";
+    const aiStatus = aiPromptsProbe?.ok && (aiPromptsProbe.count || 0) > 0 ? "✓ Active" : aiPromptsProbe?.ok ? "Configured" : "—";
+    const todayActivity = recentChanges.filter((item) => {
+        const when = new Date(item.when || 0);
+        const now = new Date();
+        return when.toDateString() === now.toDateString();
+    }).length;
+    const lastSync = new Date().toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
+    host.innerHTML = `
+        <div class="dash-hero-premium__inner">
+            <div>
+                <img class="dash-hero-premium__logo" src="../assets/images/logo.jpg" alt="Eaglewood Polytechnic Institute" width="72" height="72">
+                <p class="eyebrow" style="opacity:.85;margin:0">${loading ? "Loading dashboard…" : "Institute CMS"}</p>
+                <h2>${esc(greeting)}, ${esc(name)} 👋</h2>
+                <p class="dash-hero-premium__lead">Welcome back. Manage website content, admissions, and institute operations from one place.</p>
+                <div class="dash-hero-premium__chips">
+                    <span class="dash-hero-chip">Website ${esc(websiteStatus)}</span>
+                    <span class="dash-hero-chip">Storage ${esc(storageStatus)}</span>
+                    <span class="dash-hero-chip">AI ${esc(aiStatus)}</span>
+                    <span class="dash-hero-chip">Pending Admissions ${esc(String(admissionsProbe?.count || 0))}</span>
+                    <span class="dash-hero-chip">Pending Inquiries ${esc(String(pendingCount))}</span>
+                    <span class="dash-hero-chip">Today's Activity ${esc(String(todayActivity))}</span>
+                    <span class="dash-hero-chip">Last Sync ${esc(lastSync)}</span>
+                </div>
+                <div class="dash-hero-premium__actions">
+                    <button type="button" data-hero-key="notices">+ New Notice</button>
+                    <button type="button" data-hero-key="admissions">Review Admissions</button>
+                    <button type="button" data-hero-key="media_library">Upload Media</button>
+                    <button type="button" data-hero-key="settings">Settings</button>
+                </div>
+            </div>
+            <div class="dash-hero-premium__meta">
+                <div><strong>${esc(localAdmin.name || localAdmin.email || "Admin")}</strong></div>
+                <div>CMS v2 · ${cmsReady ? `${summary?.configured || 0} modules` : "Offline"}</div>
+                <div>${mediaFiles?.totalBytes ? formatBytes(mediaFiles.totalBytes) + " storage" : (mediaProbe?.count ? `${mediaProbe.count} media files` : "Storage empty")}</div>
+            </div>
+        </div>`;
+    host.querySelectorAll("[data-hero-key]").forEach((btn) => btn.addEventListener("click", () => switchModule(btn.dataset.heroKey)));
+}
+
 function showDashboardSkeletons() {
-    $("overviewCards").innerHTML = Array.from({ length: 4 }, () => `<div class="overview-card skeleton"></div>`).join("");
+    $("overviewCards").innerHTML = Array.from({ length: 8 }, () => `<div class="overview-card skeleton"></div>`).join("");
     $("quickActions").innerHTML = `<div class="skeleton"></div>`.repeat(4);
     ["recentChanges", "databaseHealth", "statusCards", "latestNotices", "latestAdmissions", "pendingInquiries"].forEach((id) => {
         const el = $(id);
@@ -432,49 +609,33 @@ function bindDashboardLinks() {
 }
 
 function renderOverviewCards({ summary, statuses, inquiriesProbe, admissionsProbe, mediaProbe, pendingCount, cmsReady }) {
-    const configured = summary.configured;
-    const reachable = statuses.filter((s) => s.ok).length;
-    const missing = statuses.filter((s) => s.reason === "missing_table").length;
+    const countFor = (table) => statuses.find((s) => s.mod.table === table)?.count ?? 0;
     const cards = [
-        {
-            label: "Configured Modules",
-            value: cmsReady ? String(configured) : String(reachable),
-            meta: cmsReady
-                ? `${statuses.length} CMS modules tracked`
-                : (missing ? `${missing} table(s) missing — run migration` : `${reachable}/${statuses.length} modules reachable`),
-            tone: cmsReady && configured > 0 ? "ok" : cmsReady ? "neutral" : reachable > 0 ? "warn" : "setup",
-        },
-        {
-            label: "Pending Inquiries",
-            value: inquiriesProbe.ok ? String(pendingCount) : "—",
-            meta: inquiriesProbe.ok ? (pendingCount ? "Awaiting response" : "No pending inquiries") : unavailableMeta(inquiriesProbe),
-            tone: pendingCount > 0 ? "warn" : inquiriesProbe.ok ? "ok" : "setup",
-        },
-        {
-            label: "Admission Forms",
-            value: admissionsProbe.ok ? String(admissionsProbe.count || 0) : "—",
-            meta: admissionsProbe.ok
-                ? ((admissionsProbe.count || 0) ? "Submitted applications" : "No applications yet")
-                : unavailableMeta(admissionsProbe),
-            tone: admissionsProbe.ok && (admissionsProbe.count || 0) > 0 ? "ok" : "neutral",
-        },
-        {
-            label: "Media Assets",
-            value: mediaProbe.ok ? String(mediaProbe.count || 0) : "—",
-            meta: mediaProbe.ok
-                ? ((mediaProbe.count || 0) ? "Files in media library" : "Library is empty")
-                : unavailableMeta(mediaProbe),
-            tone: mediaProbe.ok && (mediaProbe.count || 0) > 0 ? "ok" : "neutral",
-        },
+        { label: "Notices", value: countFor("notices"), meta: "Important announcements", tone: "ok", key: "notices" },
+        { label: "Courses", value: countFor("courses"), meta: "Academic programs", tone: "ok", key: "courses" },
+        { label: "Admissions", value: admissionsProbe.ok ? (admissionsProbe.count || 0) : 0, meta: "Today's applications", tone: "neutral", key: "admissions" },
+        { label: "Gallery", value: countFor("gallery"), meta: "Campus photos", tone: "ok", key: "gallery" },
+        { label: "Facilities", value: countFor("facilities"), meta: "Infrastructure items", tone: "ok", key: "facilities" },
+        { label: "Pending Inquiries", value: inquiriesProbe.ok ? pendingCount : 0, meta: pendingCount ? "Awaiting response" : "Inbox clear", tone: pendingCount > 0 ? "warn" : "ok", key: "inquiries" },
+        { label: "Media", value: mediaProbe.ok ? (mediaProbe.count || 0) : 0, meta: "Library assets", tone: "neutral", key: "media_library" },
+        { label: "Modules", value: cmsReady ? (summary?.configured || 0) : statuses.filter((s) => s.ok).length, meta: "CMS modules configured", tone: cmsReady ? "ok" : "setup", key: "dashboard" },
     ];
 
-    $("overviewCards").innerHTML = cards.map((card) => `
-        <article class="overview-card tone-${card.tone}">
+    $("overviewCards").innerHTML = cards.map((card, index) => `
+        <article class="overview-card tone-${card.tone}" data-key="${card.key}" role="button" tabindex="0">
+            <div class="overview-icon">${NAV_ICONS.cms}</div>
             <p class="overview-label">${esc(card.label)}</p>
-            <p class="overview-value">${esc(card.value)}</p>
+            <p class="overview-value" data-counter="${card.value}">0</p>
             <p class="overview-meta muted">${esc(card.meta)}</p>
+            <div class="mini-chart" aria-hidden="true">${[40, 65, 50, 80, 55, 70, 45].map((h, i) => `<span style="height:${h - (index % 3) * 5}%"></span>`).join("")}</div>
         </article>
     `).join("");
+    $("overviewCards").querySelectorAll(".overview-card[data-key]").forEach((card) => {
+        const go = () => { if (card.dataset.key !== "dashboard") switchModule(card.dataset.key); };
+        card.addEventListener("click", go);
+        card.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); go(); } });
+    });
+    $("overviewCards").querySelectorAll("[data-counter]").forEach((el) => animateCounter(el, Number(el.dataset.counter) || 0));
 }
 
 function renderQuickActions() {
@@ -498,8 +659,9 @@ function renderQuickActions() {
     `).join("");
 }
 
-async function fetchRecentChanges() {
+async function fetchRecentChanges(requests = null) {
     if (!isCmsAvailable()) return [];
+    const cache = requests || createDashboardRequestCache();
     const tables = [
         { table: "updates", label: "Update", titleKey: "title" },
         { table: "notices", label: "Notice", titleKey: "title" },
@@ -508,8 +670,8 @@ async function fetchRecentChanges() {
         { table: "inquiries", label: "Inquiry", titleKey: "name" },
         { table: "contacts", label: "Contact", titleKey: "name" },
     ];
-    const batches = await Promise.all(tables.map(async ({ table, label, titleKey }) => {
-        const rows = await selectRows(table, 4);
+    const batches = await Promise.allSettled(tables.map(async ({ table, label, titleKey }) => {
+        const rows = await cache.rows(table, 4);
         return rows.map((row) => ({
             table,
             label,
@@ -518,7 +680,11 @@ async function fetchRecentChanges() {
             status: row.status || (row.published === false ? "draft" : "published"),
         }));
     }));
-    return batches.flat().sort((a, b) => new Date(b.when || 0) - new Date(a.when || 0)).slice(0, 8);
+    return batches
+        .map((result) => settled(result, []))
+        .flat()
+        .sort((a, b) => new Date(b.when || 0) - new Date(a.when || 0))
+        .slice(0, 8);
 }
 
 function renderRecentChanges(items, cmsReady) {
@@ -578,11 +744,6 @@ function bindContentImportActions() {
         copyBtn.dataset.bound = "1";
         copyBtn.hidden = true;
     }
-}
-
-async function renderWriteCapabilityBanner() {
-    const bar = $("pendingBar");
-    if (bar) bar.hidden = true;
 }
 
 async function importDefaultWebsiteContent() {
@@ -763,15 +924,33 @@ function unavailableMeta(probe) {
 }
 
 function emptyState(message) {
-    return `<p class="empty-state">${esc(message)}</p>`;
+    return `<div class="empty-illustration">${EMPTY_ILLUSTRATION}<p>${esc(message)}</p></div>`;
 }
 
 async function adminTableCount(table) {
+    if (isContentTable(table)) {
+        return cmsTableCount(table);
+    }
+    if (isPublicFormTable(table)) {
+        return formTableCount(table);
+    }
     const result = await safeCount(table, `admin:count:${table}`);
     if (result.ok) {
         return { count: result.count ?? 0, ok: true };
     }
     return { count: null, ok: false, reason: result.reason || "error" };
+}
+
+async function writeInsert(table, payload) {
+    return isContentTable(table) ? cmsInsert(table, payload) : safeInsert(table, payload);
+}
+
+async function writeUpdate(table, payload, match) {
+    return isContentTable(table) ? cmsUpdate(table, payload, match) : safeUpdate(table, payload, match);
+}
+
+async function writeDelete(table, match) {
+    return isContentTable(table) ? cmsDelete(table, match) : safeDelete(table, match);
 }
 
 function formatBytes(bytes) {
@@ -817,10 +996,14 @@ async function loadModule() {
     $("moduleKicker").textContent = currentModule.group || "CMS Module";
     $("moduleTitle").textContent = currentModule.label;
     $("exportCsvBtn").hidden = !currentModule.export;
-    $("bulkPublishBtn").hidden = !currentModule.fields?.some((f) => f.includes("published"));
-    $("bulkUnpublishBtn").hidden = $("bulkPublishBtn").hidden;
+    const canPublish = currentModule.fields?.some((f) => f.includes("published"));
+    $("bulkPublishBtn").hidden = !canPublish;
+    $("bulkUnpublishBtn").hidden = !canPublish;
     $("bulkDeleteBtn").hidden = Boolean(currentModule.readonly);
+    $("bulkExportBtn").hidden = !currentModule.export;
     $("addRecordBtn").style.display = currentModule.readonly ? "none" : "";
+    clearSelection();
+    syncModuleFilters();
     $("moduleTable").innerHTML = skeletonTable();
     renderModuleContext();
 
@@ -844,6 +1027,7 @@ async function loadModule() {
         return;
     }
     rows = await selectRows(currentModule.table, 250, false);
+    syncModuleFilters();
     renderTable();
 }
 
@@ -896,6 +1080,14 @@ function renderModuleContext() {
     target.innerHTML = `<div class="context-card"><div><p class="eyebrow">${esc(currentModule.group || "Module")}</p><h3>${esc(currentModule.label)}</h3><p>Manage records, publishing state, and metadata from Supabase.</p></div><div>${items.map((item) => `<span>${item}</span>`).join("")}</div></div>`;
 }
 async function selectRows(table, limit = 250, publishedOnly = false) {
+    if (isPublicFormTable(table)) {
+        const result = await fetchFormRows(table, { admin: true, limit });
+        return result.data || [];
+    }
+    if (isContentTable(table)) {
+        const result = await fetchCmsRows(table, { admin: true, publishedOnly, limit });
+        return result.data || [];
+    }
     const result = await safeAdminSelect(table, (q) => {
         let query = q.select("*").limit(limit);
         if (publishedOnly) query = query.eq("published", true);
@@ -920,45 +1112,403 @@ async function selectRows(table, limit = 250, publishedOnly = false) {
     return [];
 }
 
+function debouncedRenderTable() {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => { page = 1; renderTable(); }, 220);
+}
+
+let storageImageMap = {};
+
+async function refreshStorageImageMap() {
+    await ensureMediaMap();
+    storageImageMap = getMediaMap();
+    return storageImageMap;
+}
+
+void refreshStorageImageMap();
+
+function resolvePreviewUrl(url) {
+    return resolveAdminPreviewUrl(url, storageImageMap);
+}
+
+function animateCounter(el, target) {
+    const duration = 900;
+    const start = performance.now();
+    const from = 0;
+    const tick = (now) => {
+        const progress = Math.min(1, (now - start) / duration);
+        const value = Math.round(from + (target - from) * (1 - Math.pow(1 - progress, 3)));
+        el.textContent = String(value);
+        if (progress < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+}
+
+function bindPreviewImages(root = document) {
+    root.querySelectorAll(".preview-shell img.preview").forEach((img) => {
+        refreshPreviewImage(img);
+    });
+}
+
+function refreshPreviewImage(img) {
+    const shell = img.closest(".preview-shell");
+    const loading = shell?.querySelector(".preview-loading");
+    const fallback = shell?.querySelector(".preview-fallback");
+    const retryBtn = shell?.querySelector("[data-retry-preview]");
+
+    const showError = () => {
+        shell?.classList.add("is-error");
+        shell?.classList.remove("is-loaded");
+        if (loading) loading.hidden = true;
+        if (fallback) fallback.hidden = false;
+    };
+
+    const showLoaded = () => {
+        shell?.classList.add("is-loaded");
+        shell?.classList.remove("is-error");
+        if (loading) loading.hidden = true;
+        if (fallback) fallback.hidden = true;
+    };
+
+    const load = () => {
+        shell?.classList.remove("is-error", "is-loaded");
+        if (loading) loading.hidden = false;
+        if (fallback) fallback.hidden = true;
+
+        const raw = img.getAttribute("data-src") || img.getAttribute("src") || "";
+        if (!raw) return showError();
+
+        const resolved = resolvePreviewUrl(raw);
+        if (!resolved) return showError();
+
+        const finalize = () => {
+            if (img.complete && img.naturalWidth > 0) showLoaded();
+            else if (img.complete) showError();
+        };
+
+        img.onload = showLoaded;
+        img.onerror = showError;
+        if (retryBtn) {
+            retryBtn.onclick = (event) => {
+                event.preventDefault();
+                load();
+            };
+        }
+
+        if (img.getAttribute("src") !== resolved) {
+            img.src = resolved;
+        }
+        finalize();
+    };
+
+    load();
+}
+
+function ensureUploadPlaceholder(zone) {
+    let placeholder = zone.querySelector(".upload-placeholder");
+    if (!placeholder) {
+        placeholder = document.createElement("div");
+        placeholder.className = "upload-placeholder";
+        placeholder.innerHTML = "<strong>Drag image here</strong><span>OR</span><span class=\"btn-ghost upload-browse-btn\">Browse</span>";
+        const fileInput = zone.querySelector("input[type=file]");
+        zone.insertBefore(placeholder, fileInput || null);
+    }
+    placeholder.classList.remove("hide");
+    return placeholder;
+}
+
+function ensureUploadActions(zone, fieldName) {
+    let actions = zone.querySelector(".upload-actions");
+    if (!actions) {
+        actions = document.createElement("div");
+        actions.className = "upload-actions";
+        zone.appendChild(actions);
+    }
+    actions.innerHTML = `<button type="button" class="btn-ghost" data-replace-upload="${fieldName}">Replace image</button><button type="button" class="btn-danger" data-clear-upload="${fieldName}">Delete image</button>`;
+    return actions;
+}
+
+function setUploadPreview(zone, url, fieldName, fieldType = "image") {
+    if (!zone) return;
+    const shell = zone.querySelector(".preview-shell");
+    const img = zone.querySelector(".preview");
+    const hidden = zone.querySelector(`input[name="${fieldName}"]`);
+    const showImage = Boolean(url) && isRenderableImageUrl(url, fieldType);
+
+    if (showImage && shell && img) {
+        shell.classList.remove("hide");
+        img.setAttribute("data-src", url);
+        img.removeAttribute("src");
+        zone.classList.add("has-preview");
+        zone.querySelector(".upload-placeholder")?.classList.add("hide");
+        ensureUploadActions(zone, fieldName);
+        refreshPreviewImage(img);
+        return;
+    }
+
+    shell?.classList.add("hide");
+    zone.classList.remove("has-preview");
+    if (hidden && !hidden.dataset.pendingUpload) {
+        ensureUploadPlaceholder(zone);
+    }
+}
+
+function handleEditorUploadAction(event) {
+    const clearBtn = event.target.closest("[data-clear-upload]");
+    if (clearBtn) {
+        event.preventDefault();
+        const field = clearBtn.dataset.clearUpload;
+        const zone = clearBtn.closest(".upload-zone");
+        const hidden = zone?.querySelector(`input[name="${field}"]`);
+        const fileInput = zone?.querySelector(`[data-upload-for="${field}"]`);
+        if (hidden) {
+            hidden.value = "";
+            delete hidden.dataset.pendingUpload;
+            delete hidden.dataset.fileName;
+        }
+        if (fileInput) fileInput.value = "";
+        zone?.querySelector(".preview-shell")?.classList.add("hide");
+        zone?.querySelector(".upload-actions")?.replaceChildren();
+        zone?.classList.remove("has-preview");
+        ensureUploadPlaceholder(zone);
+        editorDirty = true;
+        return;
+    }
+
+    const replaceBtn = event.target.closest("[data-replace-upload]");
+    if (replaceBtn) {
+        event.preventDefault();
+        const field = replaceBtn.dataset.replaceUpload;
+        replaceBtn.closest(".upload-zone")?.querySelector(`[data-upload-for="${field}"]`)?.click();
+    }
+}
+
+function getSearchQuery() {
+    return ($("globalSearch")?.value || "").trim().toLowerCase();
+}
+
+function highlightMatch(text) {
+    const raw = String(text ?? "");
+    const query = getSearchQuery();
+    if (!query) return esc(raw);
+    const lower = raw.toLowerCase();
+    const idx = lower.indexOf(query);
+    if (idx < 0) return esc(raw);
+    return `${esc(raw.slice(0, idx))}<mark>${esc(raw.slice(idx, idx + query.length))}</mark>${esc(raw.slice(idx + query.length))}`;
+}
+
+function getRowTitle(row) {
+    return row.title || row.name || row.student_name || row.question || row.key || row.block_key || `Record #${row.id}`;
+}
+
+function getRowImage(row) {
+    for (const key of ["image_url", "photo_url", "department_image_url", "company_logo_url", "thumbnail_url", "hod_photo_url", "file_url"]) {
+        if (row[key]) return row[key];
+    }
+    return "";
+}
+
+function hasPublishField() {
+    return currentModule.fields?.some((f) => f.includes("published"));
+}
+
+function getSelectedRows() {
+    const filtered = filterRows(rows);
+    return filtered.filter((r) => selectedRowIds.has(String(r.id)));
+}
+
+function clearSelection() {
+    selectedRowIds.clear();
+    updateBulkBar();
+}
+
+function toggleRowSelection(id, checked) {
+    const sid = String(id);
+    if (checked) selectedRowIds.add(sid);
+    else selectedRowIds.delete(sid);
+    updateBulkBar();
+}
+
+function updateBulkBar() {
+    const bar = $("bulkBar");
+    if (!bar) return;
+    const count = selectedRowIds.size;
+    bar.hidden = count === 0;
+    const countEl = $("bulkCount");
+    if (countEl) countEl.textContent = `${count} Selected`;
+}
+
+function syncModuleFilters() {
+    const deptFilter = $("departmentFilter");
+    const priorityFilter = $("priorityFilter");
+    const hasDept = currentModule.fields?.some((f) => f.startsWith("department"));
+    const hasPriority = currentModule.fields?.some((f) => f.includes("priority"));
+    if (deptFilter) {
+        deptFilter.hidden = !hasDept;
+        if (hasDept) {
+            const departments = [...new Set(rows.map((r) => r.department).filter(Boolean))].sort();
+            const current = deptFilter.value;
+            deptFilter.innerHTML = `<option value="">All departments</option>${departments.map((d) => `<option value="${esc(d)}">${esc(d)}</option>`).join("")}`;
+            deptFilter.value = current;
+        }
+    }
+    if (priorityFilter) priorityFilter.hidden = !hasPriority;
+}
+
+function closeActionMenus() {
+    document.querySelectorAll(".action-menu-dropdown").forEach((menu) => { menu.hidden = true; });
+    document.querySelectorAll(".action-menu-trigger").forEach((btn) => btn.setAttribute("aria-expanded", "false"));
+    activeActionMenuId = null;
+}
+
+function renderActionMenu(row) {
+    const hasPublish = hasPublishField();
+    const published = row.published !== false;
+    return `<div class="action-menu" data-action-menu="${row.id}">
+        <button type="button" class="action-menu-trigger" aria-label="Actions for ${esc(getRowTitle(row))}" aria-haspopup="true" aria-expanded="false" data-menu-toggle="${row.id}">⋮</button>
+        <div class="action-menu-dropdown" hidden>
+            <button type="button" data-edit="${row.id}">${ACTION_ICONS.edit} Edit</button>
+            <button type="button" data-preview="${row.id}">${ACTION_ICONS.preview} Preview</button>
+            <button type="button" data-dup="${row.id}">${ACTION_ICONS.duplicate} Duplicate</button>
+            ${hasPublish ? `<button type="button" data-toggle="${row.id}">${published ? ACTION_ICONS.unpublish : ACTION_ICONS.publish} ${published ? "Unpublish" : "Publish"}</button>` : ""}
+            <button type="button" class="danger" data-delete="${row.id}">${ACTION_ICONS.delete} Delete</button>
+        </div>
+    </div>`;
+}
+
+function renderEmptyIllustration() {
+    const label = currentModule.label || "record";
+    return `<div class="empty-illustration">${EMPTY_ILLUSTRATION}<h3>No ${esc(label)} yet</h3><p>Create your first ${esc(label.toLowerCase())}. Published items appear on the public website automatically.</p><button class="btn-primary" type="button" id="emptyAddBtn">+ Create ${esc(label)}</button></div>`;
+}
+
+function renderTableRow(row) {
+    const image = getRowImage(row);
+    const title = getRowTitle(row);
+    const published = row.published !== false;
+    const updated = formatDate(row.updated_at || row.created_at);
+    const status = row.status || (published ? "published" : "draft");
+    const tone = published === false || status === "draft" ? "badge-warn" : status === "pending" ? "badge-pending" : "badge-ok";
+    const selected = selectedRowIds.has(String(row.id));
+    return `<tr class="${row._queued ? "row-queued" : ""} ${selected ? "is-selected" : ""}" data-row-id="${row.id}">
+        <td class="col-check"><input class="row-check" type="checkbox" data-select="${row.id}" ${selected ? "checked" : ""} aria-label="Select ${esc(title)}"></td>
+        <td class="col-image">${image ? `<img class="thumb" src="${esc(resolvePreviewUrl(image))}" alt="" loading="lazy" onerror="this.style.opacity='0.35'">` : `<span class="thumb-placeholder" aria-hidden="true">◌</span>`}</td>
+        <td class="row-title-cell">${highlightMatch(title)}</td>
+        <td class="hide-tablet"><span class="status-pill ${tone}">${esc(row._queued ? `${status} · queued` : status)}</span></td>
+        <td class="col-published hide-mobile"><span class="${published ? "published-yes" : "published-no"}">${published ? "Published ✓" : "Draft"}</span></td>
+        <td class="col-updated hide-tablet">${esc(updated)}</td>
+        <td class="col-actions">${renderActionMenu(row)}</td>
+    </tr>`;
+}
+
+function renderMobileCard(row) {
+    const image = getRowImage(row);
+    const title = getRowTitle(row);
+    const published = row.published !== false;
+    const updated = formatDate(row.updated_at || row.created_at);
+    const priority = row.priority ? `Priority: ${row.priority}` : "";
+    const selected = selectedRowIds.has(String(row.id));
+    return `<article class="record-card ${selected ? "is-selected" : ""}" data-row-id="${row.id}">
+        <label class="record-card__check"><input class="row-check" type="checkbox" data-select="${row.id}" ${selected ? "checked" : ""}><span class="muted">Select</span></label>
+        ${image ? `<img class="thumb" src="${esc(resolvePreviewUrl(image))}" alt="" loading="lazy" onerror="this.style.opacity='0.35'">` : `<span class="thumb-placeholder" aria-hidden="true">◌</span>`}
+        <div>
+            <div class="mobile-card-title row-title-cell">${highlightMatch(title)}</div>
+            <div class="record-card__meta">
+                <span class="${published ? "published-yes" : "published-no"}">${published ? "Published ✓" : "Draft"}</span>
+                <span>${esc(updated)}</span>
+                ${priority ? `<span>${esc(priority)}</span>` : ""}
+            </div>
+        </div>
+        ${renderActionMenu(row)}
+    </article>`;
+}
+
+function bindTableInteractions(data) {
+    $("moduleTable").querySelectorAll("[data-menu-toggle]").forEach((btn) => btn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const id = btn.dataset.menuToggle;
+        const menu = btn.parentElement.querySelector(".action-menu-dropdown");
+        const open = menu.hidden;
+        closeActionMenus();
+        if (open) {
+            menu.hidden = false;
+            btn.setAttribute("aria-expanded", "true");
+            activeActionMenuId = id;
+        }
+    }));
+    $("moduleTable").querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", () => { closeActionMenus(); openEditor(rows.find((r) => String(r.id) === b.dataset.edit)); }));
+    $("moduleTable").querySelectorAll("[data-preview]").forEach((b) => b.addEventListener("click", () => { closeActionMenus(); previewRecord(b.dataset.preview); }));
+    $("moduleTable").querySelectorAll("[data-toggle]").forEach((b) => b.addEventListener("click", () => { closeActionMenus(); togglePublished(b.dataset.toggle); }));
+    $("moduleTable").querySelectorAll("[data-dup]").forEach((b) => b.addEventListener("click", () => { closeActionMenus(); duplicateRecord(b.dataset.dup); }));
+    $("moduleTable").querySelectorAll("[data-delete]").forEach((b) => b.addEventListener("click", () => { closeActionMenus(); deleteRecord(b.dataset.delete); }));
+    $("moduleTable").querySelectorAll("[data-select]").forEach((input) => input.addEventListener("change", (event) => {
+        event.stopPropagation();
+        toggleRowSelection(input.dataset.select, input.checked);
+        renderTable();
+    }));
+    const selectAll = $("moduleTable").querySelector("[data-select-all]");
+    selectAll?.addEventListener("change", (event) => {
+        data.forEach((row) => toggleRowSelection(row.id, event.target.checked));
+        renderTable();
+    });
+    $("prevPage")?.addEventListener("click", () => { page--; renderTable(); });
+    $("nextPage")?.addEventListener("click", () => { page++; renderTable(); });
+}
+
 function renderTable() {
     const filtered = filterRows(rows);
     const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
     page = Math.min(page, totalPages);
     const data = filtered.slice((page - 1) * pageSize, page * pageSize);
+    const start = filtered.length ? (page - 1) * pageSize + 1 : 0;
+    const end = Math.min(page * pageSize, filtered.length);
     $("recordCount") && ($("recordCount").textContent = `${filtered.length} record${filtered.length === 1 ? "" : "s"}`);
     if (!data.length) {
-        $("moduleTable").innerHTML = `<div class="empty-state setup-state"><strong>No content yet</strong><p>Create your first ${esc(currentModule.label)} record. Published items appear on the public website automatically.</p><button class="btn-primary" type="button" id="emptyAddBtn">Create New</button></div>`;
+        $("moduleTable").innerHTML = renderEmptyIllustration();
         $("emptyAddBtn")?.addEventListener("click", () => openEditor());
+        updateBulkBar();
         return;
     }
-    const keys = visibleKeys(data[0]);
-    const hasPublish = currentModule.fields?.some((f) => f.includes("published"));
-    const canReorder = hasDisplayOrder(currentModule.table);
-    $("moduleTable").innerHTML = `<table class="data-table"><thead><tr>${canReorder ? "<th>Order</th>" : ""}${keys.map((k) => `<th>${label(k)}</th>`).join("")}<th>Actions</th></tr></thead><tbody>${data.map((row) => `<tr>${canReorder ? `<td class="reorder-cell"><button class="mini-btn" data-move-up="${row.id}" title="Move up">↑</button><button class="mini-btn" data-move-down="${row.id}" title="Move down">↓</button><span class="muted">${esc(String(row.display_order ?? ""))}</span></td>` : ""}${keys.map((k) => cell(row, k)).join("")}<td><div class="table-actions">
-        <button class="mini-btn" data-edit="${row.id}">Edit</button>
-        <button class="mini-btn" data-preview="${row.id}">Preview</button>
-        ${hasPublish ? `<button class="mini-btn" data-toggle="${row.id}">${row.published ? "Unpublish" : "Publish"}</button>` : ""}
-        <button class="mini-btn" data-dup="${row.id}">Duplicate</button>
-        <button class="mini-btn danger" data-delete="${row.id}">Delete</button>
-    </div></td></tr>`).join("")}</tbody></table>
-    <div class="pagination"><button class="mini-btn" id="prevPage" ${page === 1 ? "disabled" : ""}>Prev</button><span>Page ${page} of ${totalPages}</span><button class="mini-btn" id="nextPage" ${page === totalPages ? "disabled" : ""}>Next</button></div>`;
-    $("moduleTable").querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", () => openEditor(rows.find((r) => String(r.id) === b.dataset.edit))));
-    $("moduleTable").querySelectorAll("[data-preview]").forEach((b) => b.addEventListener("click", () => previewRecord(b.dataset.preview)));
-    $("moduleTable").querySelectorAll("[data-move-up]").forEach((b) => b.addEventListener("click", () => reorderRecord(b.dataset.moveUp, -1)));
-    $("moduleTable").querySelectorAll("[data-move-down]").forEach((b) => b.addEventListener("click", () => reorderRecord(b.dataset.moveDown, 1)));
-    $("moduleTable").querySelectorAll("[data-toggle]").forEach((b) => b.addEventListener("click", () => togglePublished(b.dataset.toggle)));
-    $("moduleTable").querySelectorAll("[data-dup]").forEach((b) => b.addEventListener("click", () => duplicateRecord(b.dataset.dup)));
-    $("moduleTable").querySelectorAll("[data-delete]").forEach((b) => b.addEventListener("click", () => deleteRecord(b.dataset.delete)));
-    $("prevPage")?.addEventListener("click", () => { page--; renderTable(); });
-    $("nextPage")?.addEventListener("click", () => { page++; renderTable(); });
+    const allSelected = data.length > 0 && data.every((row) => selectedRowIds.has(String(row.id)));
+    $("moduleTable").innerHTML = `
+    <div class="desktop-table-wrap table-scroll">
+        <table class="data-table compact-table">
+            <thead>
+                <tr>
+                    <th class="col-check"><input class="row-check" type="checkbox" data-select-all ${allSelected ? "checked" : ""} aria-label="Select all on page"></th>
+                    <th class="col-image">Image</th>
+                    <th>Title</th>
+                    <th class="hide-tablet">Status</th>
+                    <th class="hide-mobile">Published</th>
+                    <th class="hide-tablet">Updated</th>
+                    <th class="col-actions">Actions</th>
+                </tr>
+            </thead>
+            <tbody>${data.map((row) => renderTableRow(row)).join("")}</tbody>
+        </table>
+    </div>
+    <div class="mobile-card-list">${data.map((row) => renderMobileCard(row)).join("")}</div>
+    <div class="pagination modern">
+        <span class="pagination-info">${filtered.length ? `Showing ${start}–${end} of ${filtered.length}` : "No records"}</span>
+        <div class="pagination-controls">
+            <button class="btn-ghost" id="prevPage" type="button" ${page === 1 ? "disabled" : ""}>Previous</button>
+            <span class="muted">Page ${page} / ${totalPages}</span>
+            <button class="btn-ghost" id="nextPage" type="button" ${page === totalPages ? "disabled" : ""}>Next</button>
+        </div>
+    </div>`;
+    bindTableInteractions(data);
+    updateBulkBar();
 }
 
 function filterRows(source) {
-    const q = ($("globalSearch")?.value || "").trim().toLowerCase();
+    const q = getSearchQuery();
     const status = window.__statusFilter || $("statusFilter")?.value || "";
+    const department = $("departmentFilter")?.value || "";
+    const priority = $("priorityFilter")?.value || "";
     const sort = $("sortFilter")?.value || "newest";
     let result = source.filter((row) => {
         if (q && !JSON.stringify(row).toLowerCase().includes(q)) return false;
+        if (department && String(row.department || "") !== department) return false;
+        if (priority && String(row.priority || "") !== priority) return false;
         if (!status) return true;
         if (status === "published") return row.published !== false;
         if (status === "draft") return row.published === false;
@@ -966,7 +1516,7 @@ function filterRows(source) {
     });
     if (sort === "oldest") result = [...result].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
     else if (sort === "order") result = [...result].sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0));
-    else result = [...result].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    else result = [...result].sort((a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0));
     return result;
 }
 
@@ -978,54 +1528,151 @@ function visibleKeys(row) {
 
 function cell(row, key) {
     const value = row[key];
-    if (key.includes("image_url") || key.includes("photo_url")) return `<td>${value ? `<img class="thumb" src="${esc(value)}" alt="Preview">` : "-"}</td>`;
+    if (key.includes("image_url") || key.includes("photo_url")) return `<td>${value ? `<img class="thumb" src="${esc(resolvePreviewUrl(value))}" alt="Preview" loading="lazy" onerror="this.style.opacity='0.35'">` : "-"}</td>`;
     if (key.includes("pdf_url")) return `<td>${value ? `<a href="${esc(value)}" target="_blank">PDF</a>` : "-"}</td>`;
-    if (key === "status" || key === "published") return `<td><span class="status-pill ${value === false || value === "draft" ? "badge-warn" : ""}">${esc(String(value ?? "new"))}</span></td>`;
+    if (key === "status" || key === "published" || key === "reply_status" || key === "application_status") {
+        const tone = value === false || value === "draft" || value === "hidden" ? "badge-warn" : value === "pending" ? "badge-pending" : "badge-ok";
+        const label = row._queued ? `${value ?? "new"} · queued` : String(value ?? "new");
+        return `<td><span class="status-pill ${tone}">${esc(label)}</span></td>`;
+    }
     if (key === "created_at" || key === "date") return `<td><span class="muted">${formatDate(value)}</span></td>`;
     return `<td class="${key.includes("title") || key.includes("name") ? "row-title" : ""}">${esc(String(value ?? "")).slice(0, 140)}</td>`;
 }
 
 function openEditor(row = null) {
     if (!currentModule.fields?.length) return toast("This module is read-only.", true);
+    closeActionMenus();
+    if ($("quickCreateMenu")) $("quickCreateMenu").hidden = true;
     editingRow = row;
     editorDirty = false;
     $("dialogTitle").textContent = row ? `Edit ${currentModule.label}` : `Add ${currentModule.label}`;
     $("dialogKicker").textContent = currentModule.table;
     $("autosaveStatus").textContent = "";
-    $("editorFields").innerHTML = currentModule.fields.map((field) => renderField(field, row)).join("");
-    $("editorDialog").showModal();
-    $("editorFields").querySelectorAll("input[type=file]").forEach((input) => input.addEventListener("change", previewUpload));
-    bindRichTextTools();
-    bindDropZones();
+
+    void (async () => {
+        await refreshStorageImageMap();
+        $("editorFields").innerHTML = currentModule.fields.map((field) => renderField(field, row)).join("");
+        openModal($("editorDialog"), { onEscape: () => { void closeEditor(); } });
+        $("editorFields").querySelectorAll("input[type=file]").forEach((input) => {
+            input.addEventListener("change", (event) => {
+                void previewUpload(event).catch((err) => toast(err?.message || "Image preview failed.", true));
+            });
+        });
+        bindRichTextTools();
+        bindDropZones();
+        bindPreviewImages($("editorFields"));
+    })();
 }
 
 function renderField(def, row) {
     const [name, type = "text"] = def.split(":");
     const value = row?.[name] ?? defaultValue(name, type);
-    const full = ["rich", "json", "image", "file"].includes(type) || name === "value" ? " full" : "";
-    if (type === "rich") return `<label class="field${full}"><span>${label(name)}</span><div class="rich-tools"><button type="button" data-wrap="strong">B</button><button type="button" data-wrap="em">I</button></div><textarea name="${name}">${esc(value)}</textarea></label>`;
-    if (type === "json") return `<label class="field full"><span>${label(name)}</span><textarea name="${name}">${esc(typeof value === "object" ? JSON.stringify(value, null, 2) : value)}</textarea></label>`;
-    if (type === "image" || type === "file") return `<label class="field${full} upload-field"><span>${label(name)}</span>${value ? `<a href="${esc(value)}" target="_blank">Current file</a><img class="preview ${type === "file" ? "hide" : ""}" src="${esc(value)}" alt="Preview">` : `<img class="preview hide" alt="Preview">`}<input name="${name}" type="hidden" value="${esc(value)}"><input data-upload-for="${name}" type="file" accept="${type === "file" ? "application/pdf" : "image/*"}"><small>Drag/drop supported by browser file picker. Old Storage objects are deleted after replacement when they are in the cms bucket.</small></label>`;
-    if (["select", "selectCategory", "reply", "lead", "role", "userStatus", "priority", "applicationStatus", "paymentStatus", "mediaType"].includes(type)) return selectField(name, type, value);
-    if (type === "boolean") return `<label class="field"><span>${label(name)}</span><select name="${name}"><option value="true" ${value !== false ? "selected" : ""}>Publish / Yes</option><option value="false" ${value === false ? "selected" : ""}>Hide / No</option></select></label>`;
-    return `<label class="field${full}"><span>${label(name)}</span><input name="${name}" type="${type}" value="${esc(value)}"></label>`;
+    const fullWidth = ["rich", "json", "image", "file"].includes(type) || name === "value" || name === "description" || name === "message" || name.includes("description");
+    const pairClass = fullWidth ? " full" : " pair";
+    const required = ["name", "title", "student_name", "question", "key", "message"].includes(name);
+    const req = required ? '<span class="req" aria-label="required">*</span>' : "";
+    const labelHtml = `<span class="field-label">${label(name)}${req}</span>`;
+    if (type === "rich") {
+        return `<label class="field${pairClass}"><span class="editor-section">Content</span>${labelHtml}
+            <div class="rich-editor">
+                <div class="rich-toolbar">
+                    <button type="button" data-wrap="strong" title="Bold"><b>B</b></button>
+                    <button type="button" data-wrap="em" title="Italic"><i>I</i></button>
+                    <button type="button" data-wrap="u" title="Underline"><u>U</u></button>
+                    <button type="button" data-wrap="h2" title="Heading 2">H2</button>
+                    <button type="button" data-wrap="h3" title="Heading 3">H3</button>
+                    <button type="button" data-list="ul" title="Bullet list">• List</button>
+                    <button type="button" data-list="ol" title="Numbered list">1. List</button>
+                    <button type="button" data-link title="Link">Link</button>
+                    <button type="button" data-table title="Table">Table</button>
+                </div>
+                <textarea name="${name}" rows="8">${esc(value)}</textarea>
+            </div>
+            <small class="field-hint">Supports HTML formatting for rich content.</small>
+        </label>`;
+    }
+    if (type === "json") return `<label class="field full"><span class="editor-section">Structured data</span>${labelHtml}<textarea name="${name}" rows="8">${esc(typeof value === "object" ? JSON.stringify(value, null, 2) : value)}</textarea><small class="field-hint">Valid JSON object or array.</small></label>`;
+    if (type === "image" || type === "file") {
+        const accept = type === "file" ? "application/pdf,image/*" : "image/*";
+        const showPreview = Boolean(value) && isRenderableImageUrl(value, type);
+        const previewUrl = showPreview ? resolvePreviewUrl(value) : "";
+        return `<label class="field full upload-field dropzone">
+            <span class="editor-section">Media</span>
+            ${labelHtml}
+            <div class="upload-zone ${value ? "has-preview" : ""}">
+                <div class="preview-shell ${showPreview ? "" : "hide"}">
+                    <div class="preview-loading">Loading preview…</div>
+                    <img class="preview" data-src="${esc(value)}" ${previewUrl ? `src="${esc(previewUrl)}"` : ""} alt="Preview">
+                    <div class="preview-fallback" hidden>Preview unavailable<button type="button" class="btn-ghost" data-retry-preview>Retry</button></div>
+                </div>
+                ${!value ? `<div class="upload-placeholder"><strong>Drag image here</strong><span>OR</span><span class="btn-ghost upload-browse-btn">Browse</span></div>` : ""}
+                <input name="${name}" type="hidden" value="${esc(value)}">
+                <input data-upload-for="${name}" type="file" accept="${accept}">
+                <div class="upload-progress" hidden><span></span></div>
+                <div class="upload-actions">
+                    ${value ? `<button type="button" class="btn-ghost" data-replace-upload="${name}">Replace image</button><button type="button" class="btn-danger" data-clear-upload="${name}">Delete image</button>` : ""}
+                </div>
+            </div>
+            <small class="field-hint">Drag and drop or browse. Preview updates immediately.</small>
+        </label>`;
+    }
+    if (["select", "selectCategory", "reply", "lead", "role", "userStatus", "priority", "applicationStatus", "paymentStatus", "mediaType"].includes(type)) return selectField(name, type, value, labelHtml, pairClass);
+    if (type === "boolean") return `<label class="field pair"><span class="editor-section">Publishing</span>${labelHtml}<select name="${name}"><option value="true" ${value !== false ? "selected" : ""}>Publish / Yes</option><option value="false" ${value === false ? "selected" : ""}>Hide / No</option></select></label>`;
+    return `<label class="field${pairClass}">${labelHtml}<input name="${name}" type="${type === "number" ? "number" : type === "date" ? "date" : "text"}" value="${esc(value)}"></label>`;
 }
 
-function selectField(name, type, value) {
+function selectField(name, type, value, labelHtml = null, pairClass = " pair") {
     const sets = { select: ["published", "draft", "scheduled", "archived", "hidden"], selectCategory: ["Campus", "Labs", "Sports", "Events", "Workshops", "Industrial Visits", "Functions"], reply: ["pending", "replied", "follow-up", "archived"], lead: ["new", "assigned", "read", "approved", "rejected", "closed"], role: ["super_admin", "admin", "editor", "staff"], userStatus: ["active", "inactive", "suspended"], priority: ["low", "normal", "high", "urgent"], applicationStatus: ["new", "under_review", "approved", "rejected", "waitlisted"], paymentStatus: ["pending", "paid", "failed", "refunded"], mediaType: ["image", "video", "pdf", "document", "other"] };
-    return `<label class="field"><span>${label(name)}</span><select name="${name}">${sets[type].map((o) => `<option value="${o}" ${String(value) === o ? "selected" : ""}>${o}</option>`).join("")}</select></label>`;
+    const lbl = labelHtml || `<span class="field-label">${label(name)}</span>`;
+    return `<label class="field${pairClass}">${lbl}<select name="${name}">${sets[type].map((o) => `<option value="${o}" ${String(value) === o ? "selected" : ""}>${o}</option>`).join("")}</select></label>`;
 }
 
 function bindRichTextTools() {
     $("editorFields").querySelectorAll("[data-wrap]").forEach((button) => button.addEventListener("click", () => {
-        const textarea = button.closest(".field").querySelector("textarea");
+        const textarea = button.closest(".rich-editor")?.querySelector("textarea");
+        if (!textarea) return;
         const tag = button.dataset.wrap;
         const start = textarea.selectionStart;
         const end = textarea.selectionEnd;
         const text = textarea.value.slice(start, end) || "text";
         textarea.setRangeText(`<${tag}>${text}</${tag}>`, start, end, "end");
         textarea.focus();
+        editorDirty = true;
     }));
+    $("editorFields").querySelectorAll("[data-list]").forEach((button) => button.addEventListener("click", () => {
+        const textarea = button.closest(".rich-editor")?.querySelector("textarea");
+        if (!textarea) return;
+        const tag = button.dataset.list;
+        const start = textarea.selectionStart;
+        const text = textarea.value.slice(start, textarea.selectionEnd) || "Item";
+        textarea.setRangeText(`<${tag}><li>${text}</li></${tag}>`, start, textarea.selectionEnd, "end");
+        textarea.focus();
+        editorDirty = true;
+    }));
+    $("editorFields").querySelectorAll("[data-link]").forEach((button) => button.addEventListener("click", () => {
+        const textarea = button.closest(".rich-editor")?.querySelector("textarea");
+        if (!textarea) return;
+        const url = prompt("Enter URL", "https://");
+        if (!url) return;
+        const start = textarea.selectionStart;
+        const text = textarea.value.slice(start, textarea.selectionEnd) || "link";
+        textarea.setRangeText(`<a href="${url}">${text}</a>`, start, textarea.selectionEnd, "end");
+        textarea.focus();
+        editorDirty = true;
+    }));
+    $("editorFields").querySelectorAll("[data-table]").forEach((button) => button.addEventListener("click", () => {
+        const textarea = button.closest(".rich-editor")?.querySelector("textarea");
+        if (!textarea) return;
+        const start = textarea.selectionStart;
+        const table = "<table><tr><th>Header</th></tr><tr><td>Cell</td></tr></table>";
+        textarea.setRangeText(table, start, start, "end");
+        textarea.focus();
+        editorDirty = true;
+    }));
+}
+
+function bindUploadActions() {
+    /* handled via handleEditorUploadAction delegation on #editorDialog */
 }
 
 function bindDropZones() {
@@ -1040,16 +1687,43 @@ function bindDropZones() {
         });
     });
 }
+
 async function previewUpload(event) {
     const input = event.target;
     const file = input.files?.[0];
     if (!file) return;
     const field = input.dataset.uploadFor;
-    const hidden = input.parentElement.querySelector(`input[name="${field}"]`);
-    const preview = input.parentElement.querySelector(".preview");
-    if (preview && file.type.startsWith("image/")) { preview.src = URL.createObjectURL(file); preview.classList.remove("hide"); }
-    hidden.dataset.fileName = file.name;
-    hidden.dataset.pendingUpload = "true";
+    const zone = input.closest(".upload-zone");
+    const hidden = zone?.querySelector(`input[name="${field}"]`);
+    const progress = zone?.querySelector(".upload-progress");
+    const fieldDef = currentModule.fields.find((f) => f.split(":")[0] === field) || "";
+    const fieldType = fieldDef.split(":")[1] || "image";
+
+    if (file.type.startsWith("image/")) {
+        const objectUrl = URL.createObjectURL(file);
+        if (hidden) {
+            hidden.dataset.fileName = file.name;
+            hidden.dataset.pendingUpload = "true";
+        }
+        setUploadPreview(zone, objectUrl, field, fieldType);
+        zone?.querySelector(".upload-placeholder")?.classList.add("hide");
+    }
+    if (progress) {
+        progress.hidden = false;
+        const bar = progress.querySelector("span");
+        if (bar) {
+            bar.style.width = "20%";
+            requestAnimationFrame(() => { bar.style.width = "72%"; });
+            setTimeout(() => { bar.style.width = "100%"; }, 280);
+            setTimeout(() => { progress.hidden = true; bar.style.width = "0"; }, 1100);
+        }
+    }
+    if (hidden && !hidden.dataset.pendingUpload) {
+        hidden.dataset.fileName = file.name;
+        hidden.dataset.pendingUpload = "true";
+    }
+    editorDirty = true;
+    toast("Image ready — save to upload.", false, "success");
 }
 
 async function saveRecord(event) {
@@ -1058,113 +1732,168 @@ async function saveRecord(event) {
     const form = event.target;
     const allowed = new Set(currentModule.fields.map((f) => f.split(":")[0]));
     const payload = {};
-    for (const fieldDef of currentModule.fields) {
-        const [name, type = "text"] = fieldDef.split(":");
-        const hidden = form.querySelector(`input[name="${name}"][type="hidden"]`);
-        const control = form.querySelector(`[name="${name}"]`);
-        if (!control && !hidden) continue;
-
-        const hiddenPending = hidden?.dataset.pendingUpload === "true";
-        if (hiddenPending) {
-            const fileInput = form.querySelector(`[data-upload-for="${name}"]`);
-            const file = fileInput?.files?.[0];
-            payload[name] = await uploadFile(name, file, editingRow?.[name]);
-            if (currentModule.table === "media_library" && file && name === "file_url") {
-                payload.size_bytes = file.size;
-            }
-        } else if (type === "boolean") {
-            payload[name] = control.value === "true";
-        } else if (type === "number") {
-            payload[name] = Number(control.value || 0);
-        } else if (type === "json") {
-            try { payload[name] = JSON.parse(control.value); } catch { payload[name] = control.value || ""; }
-        } else {
-            payload[name] = control.value ?? "";
-        }
-    }
-
-    Object.keys(payload).forEach((key) => {
-        if (!allowed.has(key)) delete payload[key];
-    });
-
-    if (!editingRow?.id) {
-        if (allowed.has("status") && (!payload.status || payload.status === "draft")) payload.status = "published";
-        if (allowed.has("published") && payload.published !== false) payload.published = true;
-        if (allowed.has("display_order") && !Number(payload.display_order)) {
-            const maxOrder = rows.reduce((max, row) => Math.max(max, Number(row.display_order || 0)), 0);
-            payload.display_order = maxOrder + 1;
-        }
-    }
 
     try {
+        for (const fieldDef of currentModule.fields) {
+            const [name, type = "text"] = fieldDef.split(":");
+            const hidden = form.querySelector(`input[name="${name}"][type="hidden"]`);
+            const control = form.querySelector(`[name="${name}"]`);
+            if (!control && !hidden) continue;
+
+            const hiddenPending = hidden?.dataset.pendingUpload === "true";
+            if (hiddenPending) {
+                const fileInput = form.querySelector(`[data-upload-for="${name}"]`);
+                const file = fileInput?.files?.[0];
+                if (!file) throw new Error(`Select a file for ${label(name)}.`);
+                payload[name] = await uploadFile(name, file, editingRow?.[name]);
+                if (currentModule.table === "media_library" && name === "file_url") {
+                    payload.size_bytes = file.size;
+                }
+                if (hidden) {
+                    delete hidden.dataset.pendingUpload;
+                    hidden.dataset.fileName = "";
+                }
+            } else if (type === "boolean") {
+                payload[name] = control.value === "true";
+            } else if (type === "number") {
+                payload[name] = Number(control.value || 0);
+            } else if (type === "json") {
+                try { payload[name] = JSON.parse(control.value); } catch { payload[name] = control.value || ""; }
+            } else if (type === "image" || type === "file") {
+                payload[name] = hidden?.value ?? "";
+            } else {
+                payload[name] = control.value ?? "";
+            }
+        }
+
+        Object.keys(payload).forEach((key) => {
+            if (!allowed.has(key)) delete payload[key];
+        });
+
+        if (!editingRow?.id) {
+            if (allowed.has("status") && (!payload.status || payload.status === "draft")) payload.status = "published";
+            if (allowed.has("published") && payload.published !== false) payload.published = true;
+            if (allowed.has("display_order") && !Number(payload.display_order)) {
+                const maxOrder = rows.reduce((max, row) => Math.max(max, Number(row.display_order || 0)), 0);
+                payload.display_order = maxOrder + 1;
+            }
+        }
+
         let result;
         if (editingRow?.id) {
-            result = await safeUpdate(currentModule.table, payload, { id: editingRow.id });
+            result = await writeUpdate(currentModule.table, payload, { id: editingRow.id });
         } else {
-            result = await safeInsert(currentModule.table, payload);
+            result = await writeInsert(currentModule.table, payload);
         }
         if (!result.ok) throw new Error(mapCrudReason(result.reason));
+
         editorDirty = false;
         $("autosaveStatus").textContent = "Saved";
-        toast("Record saved successfully.");
-        $("editorDialog").close();
+        toast("Saved successfully.", false, "success");
+        clearCmsQueryCache();
+        notifyCmsDataChanged();
+        await refreshStorageImageMap();
+        closeModal($("editorDialog"));
         await loadModule();
+        if (currentModule?.key === "dashboard") await loadDashboard();
     } catch (err) {
-        toast(err?.message || `Could not save ${currentModule.label}.`, true);
+        const message = err?.message || `Could not save ${currentModule.label}.`;
+        toast(message, true);
+        $("autosaveStatus").textContent = "Save failed";
     }
+}
+
+async function renderWriteCapabilityBanner() {
+    const bar = $("pendingBar");
+    if (!bar) return;
+    const capability = await getAdminWriteCapability();
+    if (capability.canWrite) {
+        bar.hidden = true;
+        return;
+    }
+    bar.hidden = false;
+    bar.innerHTML = `<span class="count">${esc(capability.message || "Sign in again to enable saving.")}</span>`;
+}
+
+function storagePathFromPublicUrl(url) {
+    if (!url || typeof url !== "string") return "";
+    const marker = "/storage/v1/object/public/cms/";
+    const idx = url.indexOf(marker);
+    if (idx === -1) return "";
+    return decodeURIComponent(url.slice(idx + marker.length));
 }
 
 async function uploadFile(field, file, oldUrl) {
+    if (!file) throw new Error("No file selected.");
     if (!(await requireWriteSession())) throw new Error("Permission denied. Sign in again.");
-    const client = await getAdminWriteClient();
-    if (!client) throw new Error("Permission denied. Sign in again.");
     const folder = currentModule.folder || currentModule.key;
-    const ext = file.name.split(".").pop();
+    const ext = (file.name.split(".").pop() || "bin").toLowerCase();
     const path = `${folder}/${crypto.randomUUID()}.${ext}`;
-    const { error } = await client.storage.from("cms").upload(path, file, { cacheControl: "3600", upsert: false });
-    if (error) throw error;
-    const { data } = client.storage.from("cms").getPublicUrl(path);
-    await deleteOldStorageObject(oldUrl);
-    return data.publicUrl;
+    const result = await adminStorageUpload(path, file, { upsert: false });
+    if (!result.ok) {
+        throw new Error(result.error?.message || mapCrudReason(result.reason));
+    }
+    const oldPath = storagePathFromPublicUrl(oldUrl);
+    if (oldPath) {
+        const removed = await adminStorageRemove(oldPath);
+        if (!removed.ok) {
+            console.warn("[CMS] Could not remove previous file:", removed.error?.message);
+        }
+    }
+    await refreshStorageImageMap();
+    return result.publicUrl;
 }
 
 async function deleteOldStorageObject(url) {
-    if (!url || !url.includes("/storage/v1/object/public/cms/")) return;
-    const path = decodeURIComponent(url.split("/storage/v1/object/public/cms/")[1]);
+    const path = storagePathFromPublicUrl(url);
+    if (!path) return;
     try {
-        const client = await getAdminWriteClient();
-        if (client) await client.storage.from("cms").remove([path]);
-    } catch {}
+        const result = await adminStorageRemove(path);
+        if (!result.ok) {
+            console.warn("[CMS] Storage delete failed:", result.error?.message);
+        }
+    } catch (err) {
+        console.warn("[CMS] Storage delete error:", err?.message || err);
+    }
 }
 
 async function togglePublished(id) {
     if (!(await requireWriteSession())) return;
     const row = rows.find((r) => String(r.id) === String(id));
     if (!row) return;
-    const result = await safeUpdate(currentModule.table, { published: !row.published, status: !row.published ? "published" : "hidden" }, { id });
+    const result = await writeUpdate(currentModule.table, { published: !row.published, status: !row.published ? "published" : "hidden" }, { id });
     if (!result.ok) return toast(mapCrudReason(result.reason), true);
     clearCmsQueryCache();
-    toast(!row.published ? "Published." : "Unpublished.");
+    toast(!row.published ? "Published." : "Unpublished.", false, "success");
     await loadModule();
 }
 
 async function deleteRecord(id) {
     if (!(await requireWriteSession())) return;
     const row = rows.find((r) => String(r.id) === String(id));
-    if (!(await confirmAction("Delete record?", "This will permanently delete the selected record and related CMS storage files."))) return;
+    if (!(await confirmAction(`Delete ${currentModule.label.replace(/s$/, "")}?`, "This cannot be undone."))) return;
     try {
         for (const key of Object.keys(row || {})) if (key.endsWith("_url")) await deleteOldStorageObject(row[key]);
-        const result = await safeDelete(currentModule.table, { id });
+        const result = await writeDelete(currentModule.table, { id });
         if (!result.ok) throw new Error(mapCrudReason(result.reason));
         clearCmsQueryCache();
-        toast("Record deleted.");
+        toast("Deleted successfully.", false, "success");
         rows = rows.filter((r) => String(r.id) !== String(id));
         renderTable();
     } catch (err) { toast(err?.message || "Delete failed.", true); }
 }
 
 function exportCsv() {
-    const data = filterRows(rows);
+    exportRowsToCsv(filterRows(rows));
+}
+
+function exportSelectedCsv() {
+    const selected = getSelectedRows();
+    if (!selected.length) return toast("Select records to export.", true);
+    exportRowsToCsv(selected);
+}
+
+function exportRowsToCsv(data) {
     const keys = [...new Set(data.flatMap(Object.keys))];
     const csv = [keys.join(","), ...data.map((row) => keys.map((k) => csvCell(row[k])).join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -1176,7 +1905,7 @@ function exportCsv() {
     URL.revokeObjectURL(url);
 }
 
-function hasDisplayOrder(table) { return ["settings", "home_slides", "updates", "notices", "principal_message", "courses", "departments", "faculty", "facilities", "placements", "gallery", "ai_knowledge_base", "ai_prompts", "footer_blocks", "media_library"].includes(table); }
+function hasDisplayOrder(table) { return tableHasDisplayOrder(table); }
 function csvCell(value) { return `"${String(value ?? "").replace(/"/g, '""')}"`; }
 function showSkeleton(id, count) { $(id).innerHTML = Array.from({ length: count }, () => `<div class="skeleton"></div>`).join(""); }
 function skeletonTable() { return `<div class="skeleton table-skeleton"></div><div class="skeleton table-skeleton"></div><div class="skeleton table-skeleton"></div>`; }
@@ -1184,13 +1913,18 @@ function defaultValue(name, type) { if (type === "select") return "published"; i
 function formatDate(value) { return value ? new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "-"; }
 function label(key) { return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()); }
 function esc(value) { const div = document.createElement("div"); div.textContent = value ?? ""; return div.innerHTML; }
-function toast(message, error = false) {
+function toast(message, error = false, tone = "") {
     const region = $("toastRegion") || document.body;
     const el = document.createElement("div");
-    el.className = `toast ${error ? "error" : ""}`;
+    el.className = `toast ${error ? "error" : tone || "success"}`;
+    el.setAttribute("role", "status");
     el.textContent = message;
     region.appendChild(el);
-    setTimeout(() => el.remove(), 3200);
+    setTimeout(() => {
+        el.style.opacity = "0";
+        el.style.transform = "translateY(-6px)";
+        setTimeout(() => el.remove(), 220);
+    }, 3200);
 }
 
 function previewRecord(id) {
@@ -1232,8 +1966,8 @@ async function reorderRecord(id, direction) {
     const swapOrder = Number(swap.display_order ?? target);
     try {
         await Promise.all([
-            safeUpdate(currentModule.table, { display_order: swapOrder }, { id: current.id }),
-            safeUpdate(currentModule.table, { display_order: currentOrder }, { id: swap.id }),
+            writeUpdate(currentModule.table, { display_order: swapOrder }, { id: current.id }),
+            writeUpdate(currentModule.table, { display_order: currentOrder }, { id: swap.id }),
         ]);
         toast("Order updated.");
         await loadModule();
@@ -1255,7 +1989,7 @@ async function duplicateRecord(id) {
     copy.published = false;
     copy.status = "draft";
     try {
-        const result = await safeInsert(currentModule.table, copy);
+        const result = await writeInsert(currentModule.table, copy);
         if (!result.ok) throw new Error(mapCrudReason(result.reason));
         toast("Record duplicated.");
         await loadModule();
@@ -1266,13 +2000,15 @@ async function duplicateRecord(id) {
 
 async function bulkPublish() {
     if (!(await requireWriteSession())) return;
-    const draftRows = filterRows(rows).filter((r) => r.published === false);
-    if (!draftRows.length) return toast("No draft records to publish.");
-    if (!(await confirmAction("Bulk publish?", `Publish ${draftRows.length} draft record(s)?`))) return;
+    const targets = getSelectedRows().filter((r) => r.published === false);
+    if (!selectedRowIds.size) return toast("Select records to publish.", true);
+    if (!targets.length) return toast("No draft records in selection.", true);
+    if (!(await confirmAction("Publish selected?", `Publish ${targets.length} record(s)?`))) return;
     try {
-        await Promise.all(draftRows.map((r) => safeUpdate(currentModule.table, { published: true, status: "published" }, { id: r.id })));
+        await Promise.all(targets.map((r) => writeUpdate(currentModule.table, { published: true, status: "published" }, { id: r.id })));
         clearCmsQueryCache();
-        toast(`${draftRows.length} record(s) published.`);
+        toast(`${targets.length} record(s) published.`, false, "success");
+        clearSelection();
         await loadModule();
     } catch (err) {
         toast(err?.message || "Bulk publish failed.", true);
@@ -1281,14 +2017,16 @@ async function bulkPublish() {
 
 async function bulkUnpublish() {
     if (!(await requireWriteSession())) return;
-    if (!currentModule.fields?.some((f) => f.includes("published"))) return;
-    const publishedRows = filterRows(rows).filter((r) => r.published !== false);
-    if (!publishedRows.length) return toast("No published records to unpublish.");
-    if (!(await confirmAction("Bulk unpublish?", `Unpublish ${publishedRows.length} record(s)?`))) return;
+    if (!hasPublishField()) return;
+    if (!selectedRowIds.size) return toast("Select records to unpublish.", true);
+    const targets = getSelectedRows().filter((r) => r.published !== false);
+    if (!targets.length) return toast("No published records in selection.", true);
+    if (!(await confirmAction("Unpublish selected?", `Unpublish ${targets.length} record(s)?`))) return;
     try {
-        await Promise.all(publishedRows.map((r) => safeUpdate(currentModule.table, { published: false, status: "hidden" }, { id: r.id })));
+        await Promise.all(targets.map((r) => writeUpdate(currentModule.table, { published: false, status: "hidden" }, { id: r.id })));
         clearCmsQueryCache();
-        toast(`${publishedRows.length} record(s) unpublished.`);
+        toast(`${targets.length} record(s) unpublished.`, false, "success");
+        clearSelection();
         await loadModule();
     } catch (err) {
         toast(err?.message || "Bulk unpublish failed.", true);
@@ -1298,13 +2036,15 @@ async function bulkUnpublish() {
 async function bulkDelete() {
     if (!(await requireWriteSession())) return;
     if (currentModule.readonly) return;
-    const targets = filterRows(rows);
-    if (!targets.length) return toast("No records to delete.");
-    if (!(await confirmAction("Bulk delete?", `Permanently delete ${targets.length} record(s)?`))) return;
+    if (!selectedRowIds.size) return toast("Select records to delete.", true);
+    const targets = getSelectedRows();
+    if (!targets.length) return toast("No records to delete.", true);
+    if (!(await confirmAction(`Delete ${targets.length} record(s)?`, "This cannot be undone."))) return;
     try {
-        await Promise.all(targets.map((r) => safeDelete(currentModule.table, { id: r.id })));
+        await Promise.all(targets.map((r) => writeDelete(currentModule.table, { id: r.id })));
         clearCmsQueryCache();
-        toast(`${targets.length} record(s) deleted.`);
+        toast(`${targets.length} record(s) deleted.`, false, "success");
+        clearSelection();
         await loadModule();
     } catch (err) {
         toast(err?.message || "Bulk delete failed.", true);
@@ -1331,7 +2071,8 @@ function toggleTheme() {
 }
 
 function openCommandPalette() {
-    $("commandDialog").showModal();
+    if (isModalOpen()) return;
+    openModal($("commandDialog"), { onEscape: () => closeModal($("commandDialog")) });
     $("commandSearch").value = "";
     renderCommandResults();
     setTimeout(() => $("commandSearch").focus(), 30);
@@ -1341,7 +2082,7 @@ function renderCommandResults() {
     const q = ($("commandSearch")?.value || "").toLowerCase();
     const items = MODULES.filter((m) => m.key !== "dashboard" && (!q || `${m.label} ${m.group} ${m.table}`.toLowerCase().includes(q))).slice(0, 18);
     $("commandResults").innerHTML = items.map((m) => `<button type="button" data-key="${m.key}"><span>${m.icon}</span><strong>${m.label}</strong><small>${m.group || "CMS"}</small></button>`).join("") || `<p class="empty-state">No modules found.</p>`;
-    $("commandResults").querySelectorAll("button").forEach((button) => button.addEventListener("click", () => { $("commandDialog").close(); switchModule(button.dataset.key); }));
+    $("commandResults").querySelectorAll("button").forEach((button) => button.addEventListener("click", () => { closeModal($("commandDialog")); switchModule(button.dataset.key); }));
 }
 
 function confirmAction(title, message) {
@@ -1349,17 +2090,19 @@ function confirmAction(title, message) {
     if (!dialog) return Promise.resolve(confirm(message));
     $("confirmTitle").textContent = title;
     $("confirmMessage").textContent = message;
-    dialog.showModal();
+    $("confirmOk").textContent = title.toLowerCase().includes("delete") ? "Delete" : "Confirm";
     return new Promise((resolve) => {
-        const done = (value) => {
-            $("confirmCancel").removeEventListener("click", cancel);
-            $("confirmOk").removeEventListener("click", ok);
-            dialog.close();
+        let settled = false;
+        const finish = (value) => {
+            if (settled) return;
+            settled = true;
+            closeModal(dialog);
             resolve(value);
         };
-        const cancel = () => done(false);
-        const ok = () => done(true);
+        const cancel = () => finish(false);
+        const ok = () => finish(true);
         $("confirmCancel").addEventListener("click", cancel, { once: true });
         $("confirmOk").addEventListener("click", ok, { once: true });
+        openModal(dialog, { onEscape: cancel });
     });
 }

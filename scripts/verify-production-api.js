@@ -3,26 +3,20 @@
  * API-level production verification (no browser).
  * Tests admin header auth, CRUD, public form inserts, and seeded content.
  */
-const SUPABASE_URL = "https://rhqmquaojetmzdznbevz.supabase.co";
-const KEY = "sb_publishable_fUfSHGs4xC7ut470YywOuw_ire40q8v";
-const ADMIN_EMAIL = "admin@eaglewoodpoly.in";
-const ADMIN_PASSWORD = "admin123";
+import {
+    SUPABASE_URL,
+    DEFAULT_ADMIN_EMAIL,
+    DEFAULT_ADMIN_PASSWORD,
+    buildAdminAuthHeaders,
+    buildPublicAuthHeaders,
+    checkAdminWritePermission,
+} from "./lib/admin-rest.js";
 
-const ADMIN_HEADERS = {
-    apikey: KEY,
-    Authorization: `Bearer ${KEY}`,
-    "Content-Type": "application/json",
-    "x-admin-email": ADMIN_EMAIL,
-    "x-admin-password": ADMIN_PASSWORD,
+const ADMIN_HEADERS = buildAdminAuthHeaders(DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD, {
     Prefer: "return=representation",
-};
+});
 
-const PUBLIC_HEADERS = {
-    apikey: KEY,
-    Authorization: `Bearer ${KEY}`,
-    "Content-Type": "application/json",
-    Prefer: "return=representation",
-};
+const PUBLIC_HEADERS = buildPublicAuthHeaders({ Prefer: "return=representation" });
 
 const CONTENT_TABLES = [
     "home_slides", "principal_message", "updates", "notices", "courses",
@@ -72,10 +66,17 @@ async function main() {
     const login = await fetch(`${SUPABASE_URL}/rest/v1/rpc/verify_legacy_admin`, {
         method: "POST",
         headers: PUBLIC_HEADERS,
-        body: JSON.stringify({ p_email: ADMIN_EMAIL, p_password: ADMIN_PASSWORD }),
+        body: JSON.stringify({ p_email: DEFAULT_ADMIN_EMAIL, p_password: DEFAULT_ADMIN_PASSWORD }),
     });
     if (!login.ok) failures.push(`verify_legacy_admin: ${login.status}`);
     else console.log("✓ Admin login RPC");
+
+    const permission = await checkAdminWritePermission();
+    if (!permission.admin) {
+        failures.push(`is_admin RPC: false (migration 010 not applied — run npm run cms:fix)`);
+    } else {
+        console.log("✓ Admin write permission (is_admin)");
+    }
 
     const principal = await adminInsert("principal_message", {
         name: "API Test Principal",
@@ -111,8 +112,11 @@ async function main() {
         headers: PUBLIC_HEADERS,
         body: "{}",
     });
-    if (bootstrap.status === 404) console.log("○ bootstrap_cms_default_content not deployed (expected — using direct seed)");
-    else console.log(`✓ Bootstrap RPC (${bootstrap.status})`);
+    if (bootstrap.status === 404) {
+        console.log("○ bootstrap RPC not used (admin REST seed)");
+    } else if (bootstrap.ok) {
+        console.log("✓ bootstrap_cms_default_content RPC (optional)");
+    }
 
     for (const table of CONTENT_TABLES) {
         const n = await count(table, table !== "settings");
@@ -122,10 +126,30 @@ async function main() {
     }
 
     const storage = await fetch(`${SUPABASE_URL}/storage/v1/bucket/cms`, {
-        headers: { apikey: KEY, Authorization: `Bearer ${KEY}` },
+        headers: buildPublicAuthHeaders(),
     });
     if (!storage.ok) failures.push(`storage bucket cms: ${storage.status}`);
     else console.log("✓ Storage bucket cms");
+
+    const storagePath = `probe/api-${Date.now()}.png`;
+    const upload = await fetch(`${SUPABASE_URL}/storage/v1/object/cms/${storagePath}`, {
+        method: "POST",
+        headers: {
+            ...ADMIN_HEADERS,
+            "Content-Type": "image/png",
+        },
+        body: Buffer.from("89504e470d0a1a0a", "hex"),
+    });
+    if (!upload.ok) {
+        const body = await upload.text();
+        failures.push(`storage upload: ${upload.status} ${body}`);
+    } else {
+        console.log("✓ Admin storage upload");
+        await fetch(`${SUPABASE_URL}/storage/v1/object/cms/${storagePath}`, {
+            method: "DELETE",
+            headers: ADMIN_HEADERS,
+        });
+    }
 
     if (failures.length) {
         console.log(`\nFAIL (${failures.length}):`);

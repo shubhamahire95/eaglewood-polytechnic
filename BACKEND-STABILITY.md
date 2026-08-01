@@ -38,29 +38,25 @@ cms: {
 },
 ```
 
-### 3. Create admin user
+### 3. Create admin user (Supabase Auth only)
 
-**Option A — Supabase Auth (required for CRUD)**
+1. **Authentication → Users → Add user** with email + password.
+2. Run **`supabase/fix_admin_login.sql`** in SQL Editor (confirms email + links `auth_user_id`).
 
-1. Authentication → Users → Add user (email + password)
-2. SQL Editor:
+Or with database URL:
 
-```sql
-INSERT INTO public.admins (email, name, auth_user_id, role, status)
-VALUES ('admin@eaglewoodpoly.in', 'Admin', 'PASTE_AUTH_UID', 'admin', 'active')
-ON CONFLICT (email) DO UPDATE
-SET auth_user_id = EXCLUDED.auth_user_id, status = 'active';
+```bash
+# Add SUPABASE_DB_URL to .env.local, then:
+node scripts/setup-admin-auth.js --email admin@eaglewoodpoly.in --password 'your-password'
 ```
 
-**Option B — Legacy password (login only)**
+Manual SQL (if needed):
 
 ```sql
-INSERT INTO public.admins (email, password, name, role, status)
-VALUES ('admin@eaglewoodpoly.in', 'your-password', 'Admin', 'admin', 'active')
-ON CONFLICT (email) DO NOTHING;
+UPDATE public.admins
+SET auth_user_id = 'PASTE_AUTH_UID', status = 'active'
+WHERE email = 'admin@eaglewoodpoly.in';
 ```
-
-Legacy login verifies via `verify_legacy_admin` RPC. If the same email/password exists in Supabase Auth, a session is created automatically for full CRUD.
 
 ### 4. Hard refresh
 
@@ -91,17 +87,28 @@ See `supabase/TABLES.md` for the full manifest.
 
 ## Auth architecture
 
-| Method | Login | CRUD |
-|--------|-------|------|
-| Supabase Auth | `signInWithPassword` | Yes (RLS via `is_admin()`) |
-| Legacy admins table | `verify_legacy_admin` RPC | Yes **if** same credentials work in Supabase Auth |
-| Legacy only (no Auth user) | RPC verify | No — create Auth user and link `auth_user_id` |
+**Supabase Auth only** — login uses `signInWithPassword`. The `admins` table stores profile, role, and status only.
 
-Migration `002` fixes:
+| Step | Method |
+|------|--------|
+| Login | `supabase.auth.signInWithPassword({ email, password })` |
+| Profile | `public.admins` where `auth_user_id = auth.user.id` and `status = 'active'` |
+| CRUD | RLS via `is_admin()` (matches `auth_user_id` or JWT email) |
+| Logout | `supabase.auth.signOut()` |
 
-- `is_admin()` matches by `auth_user_id` **or** JWT email
-- Legacy login without exposing admin rows to anon SELECT
-- `get_admin_login_route` auto-detects Auth vs legacy
+### Link admin to Auth user
+
+1. Create user in Supabase Dashboard → Authentication → Users
+2. SQL Editor:
+
+```sql
+INSERT INTO public.admins (email, name, auth_user_id, role, status)
+VALUES ('admin@eaglewoodpoly.in', 'Admin', 'PASTE_AUTH_USER_UUID', 'admin', 'active')
+ON CONFLICT (email) DO UPDATE
+SET auth_user_id = EXCLUDED.auth_user_id, status = 'active';
+```
+
+Sign in at `/admin/login.html` with the Auth email and password.
 
 ---
 

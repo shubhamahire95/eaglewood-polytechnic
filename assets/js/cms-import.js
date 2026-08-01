@@ -1,6 +1,6 @@
 /**
- * Import production CMS content into Supabase via direct REST inserts.
- * Requires admin login (verify_legacy_admin + x-admin-email / x-admin-password headers).
+ * Import production CMS content into Supabase via admin REST inserts only.
+ * Requires admin login (x-admin-email / x-admin-password headers + RLS fix applied).
  */
 import {
     safeInsert,
@@ -46,9 +46,20 @@ async function tableIsEmpty(table) {
     return result.ok && (result.count || 0) === 0;
 }
 
+const WRITE_BLOCKED_KEY = "ew_cms_writes_blocked";
+
 /** Insert seed rows via admin write session (legacy header auth). */
 export async function seedCmsViaDirectInsert() {
+    if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(WRITE_BLOCKED_KEY) === "1") {
+        return { ok: false, reason: "permission", skipped: true };
+    }
+
     if (!(await ensureAdminWriteSession())) {
+        try {
+            sessionStorage.setItem(WRITE_BLOCKED_KEY, "1");
+        } catch {
+            /* ignore */
+        }
         return { ok: false, reason: "permission" };
     }
 
@@ -71,6 +82,13 @@ export async function seedCmsViaDirectInsert() {
         for (const row of rows) {
             const result = await safeInsert(table, row);
             if (!result.ok) {
+                if (result.reason === "permission") {
+                    try {
+                        sessionStorage.setItem(WRITE_BLOCKED_KEY, "1");
+                    } catch {
+                        /* ignore */
+                    }
+                }
                 return { ok: false, reason: result.reason || "error", table, inserted };
             }
             inserted += 1;
@@ -87,7 +105,7 @@ export async function seedCmsViaDirectInsert() {
     return { ok: true, seeded: false, skipped: true, reason: "already_seeded", via: "direct_insert" };
 }
 
-/** Seed CMS content — direct REST inserts only (no bootstrap RPCs). */
+/** Seed CMS content — direct REST inserts only. */
 export async function importCmsContent({ force = false } = {}) {
     if (force) {
         try {

@@ -1,5 +1,7 @@
-import { safeFetch, safeInsert, isCmsAvailable } from "./supabase.js";
-import { renderFacultyPage, renderPlacementsPage } from "./pages-cms.js";
+import { safeFetch, isCmsAvailable } from "./supabase.js";
+import { renderFacultyPage, renderPlacementsPage, renderAboutPrincipal } from "./pages-cms.js";
+import { submitPublicForm } from "./form-store.js";
+import { fetchCmsRows } from "./cms-store.js";
 
 export async function initDynamicPages() {
     const page = location.pathname.split("/").pop() || "index.html";
@@ -7,6 +9,7 @@ export async function initDynamicPages() {
     if (page === "admission.html") await enhanceAdmissionPage();
     if (page === "faculty.html") await renderFacultyPage();
     if (page === "placements.html") await renderPlacementsPage();
+    if (page === "about.html") await renderAboutPrincipal();
 }
 
 async function enhanceContactPage() {
@@ -268,14 +271,15 @@ async function loadSettings() {
 }
 
 async function loadCourses() {
-    const result = await safeFetch("courses", (q) => q.select("title").eq("published", true).order("display_order", { ascending: true }), [
+    const result = await fetchCmsRows("courses", { admin: false, publishedOnly: true, limit: 50 });
+    const rows = result.data?.length ? result.data : [
         { title: "Civil Engineering" },
         { title: "Computer Engineering" },
         { title: "Electrical Engineering" },
         { title: "Artificial Intelligence" },
         { title: "AI & Machine Learning" },
-    ], "pages:courses");
-    return result.data || [];
+    ];
+    return rows;
 }
 
 function updateContactText(settings) {
@@ -333,7 +337,7 @@ function bindForm(id, table) {
             payload.reply_status = payload.reply_status || "pending";
         }
         try {
-            const result = await safeInsert(table, payload);
+            const result = await submitPublicForm(table, payload);
             if (!result.ok) {
                 if (result.reason === "not_configured") {
                     throw new Error("CMS not configured");
@@ -343,8 +347,12 @@ function bindForm(id, table) {
 
             const toastMessage = form.id === "home-inquiry-form"
                 ? "Inquiry submitted successfully. Our team will contact you shortly."
-                : "Application submitted successfully. Our team will contact you shortly.";
-            status.textContent = "Submitted successfully. Our admission team will contact you soon.";
+                : form.id === "contact-message-form"
+                    ? "Message sent successfully. Our team will respond soon."
+                    : "Application submitted successfully. Our team will contact you shortly.";
+            status.textContent = result.queued
+                ? "Submitted successfully. Our team will contact you soon."
+                : "Submitted successfully. Our admission team will contact you soon.";
             status.classList.add("success");
             showFormToast(toastMessage, "success");
 

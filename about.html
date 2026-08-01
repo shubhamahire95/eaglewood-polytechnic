@@ -17,13 +17,17 @@
     <link rel="canonical" href="https://www.eaglewoodpoly.in/about.html">
     <link rel="icon" href="assets/images/logo.jpg">
     <link rel="manifest" href="manifest.json">
+    <link rel="preload" href="assets/images/logo.jpg" as="image">
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/ai-assistant.css">
 </head>
 
 <body>
-    <div class="page-loader">
-        <div class="loader-mark">EPI</div>
+        <div class="page-loader" id="pageLoader" aria-live="polite" aria-busy="true">
+        <div class="loader-shell">
+            <div class="loader-ring" aria-hidden="true"></div>
+            <img class="loader-logo" src="assets/images/logo.jpg" alt="Eaglewood Polytechnic Institute" width="120" height="120" decoding="async" fetchpriority="high">
+        </div>
     </div><a class="skip-link" href="#main">Skip to content</a>
     <div data-site-header></div>
     <main id="main">
@@ -110,18 +114,18 @@
             </div>
         </section>
         <section class="section section-soft" id="principal">
-            <div class="container grid-2">
-                <div class="media-panel reveal"><img src="assets/images/campus.jpg"
-                        alt="Principal of Eaglewood Polytechnic Institute" loading="lazy"></div>
+            <div class="container grid-2" id="principal-about-root">
+                <div class="principal-about-portrait reveal">
+                    <div class="principal-about-frame">
+                        <div class="principal-about-ring" aria-hidden="true"></div>
+                        <div class="principal-about-fallback" aria-hidden="true">EP</div>
+                        <span class="principal-about-badge">Principal</span>
+                    </div>
+                </div>
                 <article class="content-copy reveal">
                     <p class="eyebrow">Leadership</p>
                     <h2>Principal's Message</h2>
-                    <p>At Eaglewood Polytechnic Institute, we are committed to disciplined learning, practical engineering
-                        education and student-centred mentoring. Our focus is to develop capable engineers who combine
-                        technical competence with professional ethics and confidence.</p>
-                    <p>Through modern laboratories, experienced faculty, industry interaction and a supportive campus
-                        environment, we guide every student toward academic excellence and career readiness.</p>
-                    <p><strong>Principal</strong><br>Eaglewood Polytechnic Institute</p>
+                    <p>Loading principal message…</p>
                 </article>
             </div>
         </section>
@@ -132,7 +136,7 @@
                     <h2 class="section-title">Eaglewood at a glance</h2>
                 </div>
                 <div class="highlight-stats reveal">
-                    <article class="highlight-stat"><strong>5+</strong><span>Engineering Departments</span></article>
+                    <article class="highlight-stat"><strong>4</strong><span>Engineering Departments</span></article>
                     <article class="highlight-stat"><strong>15+</strong><span>Laboratories & Workshops</span></article>
                     <article class="highlight-stat"><strong>100%</strong><span>Placement Guidance</span></article>
                     <article class="highlight-stat"><strong>24/7</strong><span>Secure Campus Environment</span></article>
@@ -177,7 +181,7 @@
                     <article class="faq-item">
                         <h3>What programmes does Eaglewood offer?</h3>
                         <p>Eaglewood offers diploma and degree engineering programmes in Civil, Computer, Electrical,
-                            Mechanical and AI & Machine Learning through MSBTE and DBATU affiliations.</p>
+                            Civil, Computer, Electrical and AI & Machine Learning through MSBTE and DBATU affiliations.</p>
                     </article>
                     <article class="faq-item">
                         <h3>How do I apply for admission?</h3>

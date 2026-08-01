@@ -1,0 +1,443 @@
+/**
+ * Eaglewood Admin — Design System (UI only)
+ * Buttons, forms, tables, dialogs, sidebar polish
+ */
+
+/* ── Buttons ─────────────────────────────────────────────────────────── */
+.btn-primary,
+.btn-secondary,
+.btn-danger,
+.btn-outline,
+.btn-success,
+.btn-ghost,
+.btn-accent,
+.mini-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 18px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  border: 1px solid transparent;
+  transition: transform .18s ease, box-shadow .18s ease, background .18s ease, border-color .18s ease, opacity .18s ease;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--brand), var(--brand2));
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(15, 118, 110, .22);
+}
+
+.btn-secondary {
+  background: var(--panel);
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--brand);
+  border-color: rgba(15, 118, 110, .35);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #059669, #10b981);
+  color: #fff;
+}
+
+.btn-danger,
+.mini-btn.danger {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  color: #fff;
+  border-color: transparent;
+}
+
+.btn-ghost {
+  background: var(--panel2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.btn-accent {
+  background: linear-gradient(135deg, #d4a017, #eab308);
+  color: #1f2937;
+}
+
+.btn-primary:hover:not(:disabled),
+.btn-secondary:hover:not(:disabled),
+.btn-outline:hover:not(:disabled),
+.btn-success:hover:not(:disabled),
+.btn-danger:hover:not(:disabled),
+.btn-ghost:hover:not(:disabled),
+.btn-accent:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(15, 35, 45, .12);
+}
+
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-outline:disabled,
+.btn-success:disabled,
+.btn-danger:disabled,
+.btn-ghost:disabled,
+.btn-accent:disabled,
+.mini-btn:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-primary.is-loading,
+.btn-secondary.is-loading {
+  position: relative;
+  color: transparent;
+  pointer-events: none;
+}
+
+.btn-primary.is-loading::after,
+.btn-secondary.is-loading::after {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, .35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: ds-spin .7s linear infinite;
+}
+
+@keyframes ds-spin { to { transform: rotate(360deg); } }
+
+/* ── Tables ──────────────────────────────────────────────────────────── */
+.table-scroll {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 0 0 20px 20px;
+}
+
+.data-table {
+  border-collapse: separate;
+  border-spacing: 0 6px;
+}
+
+.data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: color-mix(in srgb, var(--panel2) 94%, white);
+  backdrop-filter: blur(10px);
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.data-table tbody tr {
+  background: var(--panel);
+  box-shadow: 0 1px 0 var(--line);
+  transition: background .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+
+.data-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--panel2) 55%, var(--panel));
+}
+
+.data-table tbody tr:hover {
+  background: color-mix(in srgb, var(--brand) 6%, var(--panel));
+  box-shadow: 0 8px 22px rgba(15, 118, 110, .08);
+}
+
+.data-table tbody tr.is-selected {
+  background: color-mix(in srgb, var(--brand) 12%, var(--panel));
+  box-shadow: inset 3px 0 0 var(--brand);
+}
+
+.data-table tbody td:first-child {
+  border-radius: 12px 0 0 12px;
+}
+
+.data-table tbody td:last-child {
+  border-radius: 0 12px 12px 0;
+}
+
+.data-table td {
+  padding: 14px 16px;
+  vertical-align: middle;
+  border: none;
+}
+
+.table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+/* ── Editor dialog ───────────────────────────────────────────────────── */
+.editor-dialog {
+  width: min(820px, calc(100vw - 24px)) !important;
+  max-height: 90vh;
+  padding: 0;
+  border: 0;
+  border-radius: 24px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-dialog form,
+.editor-shell {
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  min-height: 0;
+}
+
+.editor-dialog .dialog-head,
+.editor-dialog .sticky-head {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--panel) 92%, white);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+  padding: 20px 24px;
+}
+
+.editor-dialog .editor-body,
+.editor-dialog .editor-fields {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+  max-height: none;
+  padding: 22px 24px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-content: start;
+}
+
+.editor-dialog .dialog-foot,
+.editor-dialog .sticky-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--panel) 94%, white);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line);
+  padding: 16px 24px;
+}
+
+.editor-section {
+  grid-column: 1 / -1;
+  margin: 4px 0 2px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--brand);
+}
+
+.field-label,
+.field > span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.field .req {
+  color: var(--danger);
+}
+
+.field-hint {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.field input,
+.field textarea,
+.field select {
+  width: 100%;
+  min-height: 44px;
+  max-width: 100%;
+}
+
+.field.is-invalid input,
+.field.is-invalid textarea,
+.field.is-invalid select {
+  border-color: rgba(220, 38, 38, .55);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, .08);
+}
+
+.field-error {
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.upload-zone {
+  display: grid;
+  gap: 10px;
+}
+
+.dropzone {
+  border: 2px dashed rgba(15, 118, 110, .28);
+  border-radius: 16px;
+  padding: 18px;
+  background: linear-gradient(180deg, rgba(15, 118, 110, .04), transparent);
+  transition: border-color .2s ease, background .2s ease;
+}
+
+.dropzone.drag-over {
+  border-color: var(--brand2);
+  background: rgba(20, 184, 166, .1);
+}
+
+.upload-placeholder {
+  display: grid;
+  gap: 6px;
+  place-items: center;
+  text-align: center;
+  padding: 18px;
+  color: var(--muted);
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px dashed var(--line);
+}
+
+.upload-placeholder strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.upload-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.upload-progress span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--brand), var(--brand2));
+  transition: width .35s ease;
+}
+
+.preview {
+  width: min(100%, 220px);
+  height: 130px;
+  object-fit: cover;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────────────── */
+.erp-sidebar {
+  transition: width .28s cubic-bezier(.4, 0, .2, 1), transform .28s cubic-bezier(.4, 0, .2, 1);
+}
+
+.erp-nav .nav-item {
+  position: relative;
+  transition: background .18s ease, color .18s ease, transform .18s ease;
+}
+
+.erp-nav .nav-item::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  width: 3px;
+  height: 0;
+  border-radius: 999px;
+  background: var(--brand2);
+  transform: translateY(-50%);
+  transition: height .2s ease;
+}
+
+.erp-nav .nav-item.active::before,
+.erp-nav .nav-item:hover::before {
+  height: 60%;
+}
+
+.erp-nav .nav-item.active {
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  color: var(--brand);
+}
+
+.erp-nav .nav-item:hover {
+  transform: translateX(2px);
+}
+
+.sidebar-overlay {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s ease;
+}
+
+body.sidebar-open .sidebar-overlay {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ── Dashboard cards ─────────────────────────────────────────────────── */
+.overview-card,
+.stat-card,
+.glass-card.dash-panel,
+.dash-hero {
+  border-radius: 20px;
+  box-shadow: var(--shadow-sm);
+  background: linear-gradient(180deg, var(--panel), color-mix(in srgb, var(--panel2) 40%, var(--panel)));
+}
+
+.overview-card {
+  transition: transform .22s ease, box-shadow .22s ease;
+}
+
+.overview-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow);
+}
+
+.overview-value,
+.stat-value {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 780px) {
+  .editor-dialog .editor-body,
+  .editor-dialog .editor-fields {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+
+  .editor-dialog .dialog-head,
+  .editor-dialog .dialog-foot {
+    padding: 14px 16px;
+  }
+
+  body[data-sidebar="expanded"] .erp-sidebar,
+  body[data-sidebar="collapsed"] .erp-sidebar {
+    transform: translateX(-100%);
+  }
+
+  body.sidebar-open .erp-sidebar {
+    transform: translateX(0);
+  }
+}

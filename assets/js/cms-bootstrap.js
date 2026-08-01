@@ -1,5 +1,5 @@
 /**
- * CMS content bootstrap — seeds recovered Eaglewood defaults into Supabase when empty.
+ * CMS content bootstrap — seeds Eaglewood defaults into Supabase when empty.
  */
 import { cmsEnabled, safeCount } from "./supabase.js";
 import { importCmsContent } from "./cms-import.js";
@@ -25,8 +25,8 @@ export async function isCmsContentEmpty() {
     return CONTENT_TABLES.every((table) => (counts[table] || 0) === 0);
 }
 
-/** Seed Supabase when CMS tables are empty (direct REST inserts with admin headers). */
-export async function bootstrapCmsContentIfNeeded({ force = false, adminOnly = false } = {}) {
+/** Seed Supabase when CMS tables are empty (admin REST inserts). */
+export async function bootstrapCmsContentIfNeeded({ force = false } = {}) {
     if (!cmsEnabled()) {
         return { ok: false, skipped: true, reason: "cms_disabled" };
     }
@@ -52,7 +52,6 @@ export async function bootstrapCmsContentIfNeeded({ force = false, adminOnly = f
     if (result.seeded) {
         sessionStorage.setItem(BOOTSTRAP_LOCK_KEY, "done");
         try {
-            localStorage.removeItem("ew_cms_bootstrap_rpc_missing");
             localStorage.setItem("ew_cms_updated_at", String(Date.now()));
         } catch {
             /* ignore */
@@ -62,7 +61,7 @@ export async function bootstrapCmsContentIfNeeded({ force = false, adminOnly = f
 
     if (result.skipped) {
         sessionStorage.setItem(BOOTSTRAP_LOCK_KEY, "done");
-        return { ok: true, skipped: true, reason: "already_seeded", via: result.via };
+        return { ok: true, skipped: true, reason: result.reason || "already_seeded", via: result.via };
     }
 
     if (result.reason === "permission") {

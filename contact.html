@@ -16,13 +16,17 @@
     <link rel="canonical" href="https://www.eaglewoodpoly.in/contact.html">
     <link rel="icon" href="assets/images/logo.jpg">
     <link rel="manifest" href="manifest.json">
+    <link rel="preload" href="assets/images/logo.jpg" as="image">
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/ai-assistant.css">
 </head>
 
 <body>
-    <div class="page-loader">
-        <div class="loader-mark">EPI</div>
+        <div class="page-loader" id="pageLoader" aria-live="polite" aria-busy="true">
+        <div class="loader-shell">
+            <div class="loader-ring" aria-hidden="true"></div>
+            <img class="loader-logo" src="assets/images/logo.jpg" alt="Eaglewood Polytechnic Institute" width="120" height="120" decoding="async" fetchpriority="high">
+        </div>
     </div><a class="skip-link" href="#main">Skip to content</a>
     <div data-site-header></div>
     <main id="main">

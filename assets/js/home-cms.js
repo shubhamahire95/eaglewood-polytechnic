@@ -1,6 +1,14 @@
 import { safeFetch, ensureCmsReady, isCmsStrictMode, clearCmsQueryCache } from "./supabase.js";
+import { fetchCmsRows, isContentTable } from "./cms-store.js";
 import { injectSiteChrome, initHomeUI, initFooterSettings } from "./ui.js";
 import { bindHomeInquiryForm } from "./page-forms.js";
+import { markCmsReady } from "./page-loader.js";
+import { ensureMediaMap, resolveAdminPreviewUrl } from "./media-url.js";
+import {
+    fetchPrincipalMessage,
+    principalPhotoMarkup,
+    principalMessageParagraphs,
+} from "./principal-content.js";
 
 const CMS_SYNC_KEY = "ew_cms_updated_at";
 
@@ -23,7 +31,7 @@ if (typeof window !== "undefined") {
 
 export const FALLBACK_IMAGE = "assets/images/campus.jpg";
 
-const TABLES = ["home_slides", "updates", "notices", "principal_message", "courses", "departments", "faculty", "facilities", "placements", "gallery"];
+const TABLES = ["home_slides", "updates", "notices", "courses", "departments", "faculty", "facilities", "placements", "gallery"];
 
 const HIGHLIGHT_ICONS = {
     students: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
@@ -37,8 +45,19 @@ const HIGHLIGHT_ICONS = {
     scholarship: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3 7 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1 3-7z"/></svg>',
 };
 
+let homeRenderPromise = null;
+
 export async function renderCmsHome() {
+    if (homeRenderPromise) return homeRenderPromise;
+    homeRenderPromise = renderCmsHomeInner().finally(() => {
+        homeRenderPromise = null;
+    });
+    return homeRenderPromise;
+}
+
+async function renderCmsHomeInner() {
     injectSiteChrome();
+    await ensureMediaMap();
     const data = await loadHomeData();
     renderTopUtility(data.settings, data.cmsOnly);
     renderBreakingNews(data.notices);
@@ -71,18 +90,21 @@ export async function renderCmsHome() {
     initHighlightCounters();
     initHomeGalleryFilters();
     initHomeCarousels();
-    initFacilitiesSlider();
+    initFacilitiesSwiper();
+    initPlacementsSwiper();
     initHeroAiButton();
     bindHomeInquiryForm(data.courses);
     runInit("departmentsSwiper", initDepartmentsSwiper);
+    runInit("programsSwiper", initProgramsSwiper);
     initHomeUI();
     void initFooterSettings();
+    markCmsReady();
 }
 
 async function loadHomeData() {
-    clearCmsQueryCache();
-    window.__ewLastCmsSync = localStorage.getItem("ew_cms_updated_at") || "";
+    window.__ewLastCmsSync = localStorage.getItem(CMS_SYNC_KEY) || "";
     await ensureCmsReady({ verifyFull: true });
+    await ensureMediaMap();
 
     const result = { settings: await settings() };
     const fetchMeta = {};
@@ -94,6 +116,8 @@ async function loadHomeData() {
     }));
     TABLES.forEach((table) => { result[keyFor(table)] ||= []; });
 
+    const principal = await fetchPrincipalMessage({ admin: false });
+
     const settingsMerged = { ...result.settings };
     const cmsOnly = isCmsStrictMode();
 
@@ -102,7 +126,7 @@ async function loadHomeData() {
         slides: result.slides,
         updates: result.updates,
         notices: result.notices,
-        principal: result.principal[0] || null,
+        principal,
         courses: result.courses,
         departments: result.departments,
         faculty: result.faculty,
@@ -132,6 +156,10 @@ function parseAdmissionSteps(value) {
 }
 
 async function rows(table) {
+    if (isContentTable(table)) {
+        const result = await fetchCmsRows(table, { admin: false, publishedOnly: true });
+        return { data: result.data || [], ok: result.ok === true };
+    }
     const result = await safeFetch(table, (q) => q.select("*").eq("published", true).order("display_order", { ascending: true }).order("created_at", { ascending: false }), [], `home:${table}`);
     return { data: result.data || [], ok: result.ok === true };
 }
@@ -158,8 +186,9 @@ function keyFor(table) {
     return table;
 }
 function img(src) {
-    const value = (src && String(src).trim()) ? String(src).trim() : FALLBACK_IMAGE;
-    return value.startsWith("http") || value.startsWith("assets/") || value.startsWith("/") ? value : FALLBACK_IMAGE;
+    const value = (src && String(src).trim()) ? String(src).trim() : "";
+    if (!value) return FALLBACK_IMAGE;
+    return resolveAdminPreviewUrl(value) || FALLBACK_IMAGE;
 }
 
 function imgTag(src, alt = "", lazy = true) {
@@ -198,7 +227,6 @@ function categoryFor(value) {
 }
 function plain(v) { return esc(String(v || "").replace(/<[^>]+>/g, "")); }
 function initials(value) { return String(value || "Principal").split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase() || "").join("") || "EP"; }
-function usablePrincipalPhoto(src) { return Boolean(src && !/logo|placeholder|default/i.test(String(src))); }
 function listBits(value) {
     if (Array.isArray(value)) return value;
     return String(value || "").replace(/[?;]+/g, ",").split(/\n|,/).map((item) => item.trim()).filter(Boolean).slice(0, 4);
@@ -239,12 +267,21 @@ function sectionHead(kicker, title, lead = "") {
 function hero(data) {
     const items = data.slides || [];
     if (!items.length) return "";
+    const facultyCount = data.faculty?.length || data.departments.reduce((s, d) => s + Number(d.faculty_count || 0), 0);
+    const students = data.departments.reduce((s, d) => s + Number(d.students_count || 0), 0);
+    const placementPct = data.placements[0]?.placement_percentage || data.placements[0]?.package || "";
+    const transport = parseSettingValue(data.settings?.transport_routes) || "";
     const stats = [
-        ["600+", "Students"],
-        ["5", "Departments"],
-        ["85%", "Placement Focus"],
-        ["12+", "Bus Routes"],
-    ];
+        [students || "", students ? "" : "", "Students"],
+        [data.departments.length || "", "", "Departments"],
+        [facultyCount || "", "", "Faculty"],
+        [placementPct || "", "", "Placement Focus"],
+        [transport || "", "", "Bus Routes"],
+    ].filter(([value]) => value !== "" && value !== 0);
+    const dte = parseSettingValue(data.settings?.dte_code) || "";
+    const msbte = parseSettingValue(data.settings?.msbte_code) || "";
+    const approval = parseSettingValue(data.settings?.approval) || "";
+    const trustBadges = [approval, dte ? `DTE ${dte}` : "", msbte ? `MSBTE ${msbte}` : ""].filter(Boolean);
     return `<section class="premium-hero gov-hero" id="hero" aria-label="Eaglewood Polytechnic Institute">
         <div class="hero-pattern" aria-hidden="true"></div>
         <div class="hero-orbit one" aria-hidden="true"></div>
@@ -253,7 +290,7 @@ function hero(data) {
             <img ${i === 0 ? "" : "loading=\"lazy\" decoding=\"async\""} src="${esc(img(slide.image_url))}" alt="${esc(slide.title)}" onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}';">
             <div class="hero-copy premium-reveal">
                 <div class="hero-badge">Admissions Open 2026-27</div>
-                <div class="hero-trust-badges"><span>AICTE Approved</span><span>DTE 2634</span><span>MSBTE 51307</span><span>Govt. of Maharashtra</span></div>
+                <div class="hero-trust-badges">${trustBadges.map((badge) => `<span>${esc(badge)}</span>`).join("")}</div>
                 <h1>${esc(slide.title)}</h1>
                 <p class="animated-subtitle">${esc(slide.subtitle)}</p>
                 <div class="hero-actions">
@@ -263,7 +300,7 @@ function hero(data) {
                 </div>
             </div>
         </article>`).join("")}
-        <div class="hero-float-grid premium-reveal" aria-hidden="true">${stats.map(([value, label]) => `<div class="hero-float-card"><strong data-count="${String(value).replace(/[^0-9]/g, "") || 0}" data-suffix="${String(value).replace(/[0-9]/g, "") || ""}">${esc(value)}</strong><span>${esc(label)}</span></div>`).join("")}</div>
+        <div class="hero-float-grid premium-reveal" aria-hidden="true">${stats.length ? stats.map(([value, suffix, label]) => `<div class="hero-float-card"><strong data-count="${String(value).replace(/[^0-9]/g, "") || 0}" data-suffix="${String(value).replace(/[0-9]/g, "") || suffix}">${esc(String(value))}${esc(suffix)}</strong><span>${esc(label)}</span></div>`).join("") : ""}</div>
         <button class="slide-nav prev" data-prev type="button" aria-label="Previous slide">‹</button>
         <button class="slide-nav next" data-next type="button" aria-label="Next slide">›</button>
         <div class="slide-dots">${items.map((_, i) => `<button class="${i === 0 ? "active" : ""}" data-dot="${i}" type="button" aria-label="Show slide ${i + 1}"></button>`).join("")}</div>
@@ -362,24 +399,27 @@ function missionVision(settings = {}, cmsOnly = false) {
 }
 
 function principal(p, cmsOnly = false) {
-    if (!p) return "";
+    if (!p || p.published === false) return "";
     const name = p.name || "Principal";
     const designation = p.designation || "Principal, Eaglewood Polytechnic Institute";
     const qualification = p.qualification ? `<span class="gov-principal-qual">${esc(p.qualification)}</span>` : "";
-    const hasPhoto = usablePrincipalPhoto(p.photo_url);
-    const message = String(p.message || "").replace(/<[^>]+>/g, " ").trim();
-    if (!message) return "";
-    const excerpt = message.length > 320 ? `${message.slice(0, 320)}…` : message;
+    const messageParts = principalMessageParagraphs(p.message, { excerpt: true, maxLength: 320 });
+    if (!messageParts.length) return "";
+    const excerpt = messageParts[0];
     const signature = p.signature || name;
+    const photo = principalPhotoMarkup({
+        photoUrl: p.photo_url,
+        name,
+        className: "gov-principal-photo",
+        loading: "eager",
+    });
     return `<section class="premium-section gray gov-principal-section" id="principal" aria-labelledby="principal-title">
         <div class="container">
             ${sectionHead("Leadership", "Principal's Message", "A message from the academic leadership guiding Eaglewood Polytechnic Institute.")}
             <div class="gov-principal-layout premium-reveal">
                 <div class="gov-principal-frame">
                     <div class="gov-principal-ring" aria-hidden="true"></div>
-                    ${hasPhoto
-        ? `<img loading="lazy" decoding="async" src="${esc(img(p.photo_url))}" alt="${esc(name)}" class="gov-principal-photo">`
-        : `<div class="gov-principal-fallback" aria-hidden="true">${initials(name)}</div>`}
+                    ${photo}
                     <span class="gov-principal-badge">Principal</span>
                 </div>
                 <article class="gov-principal-content glass-card">
@@ -439,30 +479,64 @@ function notices(items) {
 
 function courses(items) {
     if (!items?.length) return "";
-    const rows = items.slice(0, 6);
-    return `<section class="premium-section white gov-courses-section" id="courses">
+    const rows = items.slice(0, 12);
+    return `<section class="premium-section white gov-courses-section programs-carousel-section" id="courses">
         <div class="container">
             <div class="section-split-head">${sectionHead("Programs", "Engineering Courses", "Diploma and degree pathways with practical training, laboratories and industry exposure.")}<a class="section-view-all" href="courses.html">All Courses</a></div>
-            <div class="gov-course-grid premium-course-grid premium-reveal">${rows.map((c) => `<article class="gov-course-card premium-course glass-card">
-                <a class="gov-course-media course-image" href="${esc(c.button_url || "courses.html")}">${imgTag(c.image_url, c.title)}</a>
-                <div class="gov-course-body">
-                    <span class="gov-course-meta">${esc(c.duration || "3 Years")} · ${esc(c.seats || 60)} Seats</span>
-                    <h3>${esc(c.title)}</h3>
-                    <p>${plain(c.description)}</p>
-                    <ul>
-                        <li><span>Eligibility</span><strong>${esc(c.eligibility || "As per DTE norms")}</strong></li>
-                        <li><span>Code</span><strong>${esc(c.code || "—")}</strong></li>
-                    </ul>
-                    <a class="btn btn-teal btn-sm btn-ripple" href="${esc(c.button_url || "courses.html")}">${esc(c.button_label || "Read More")}</a>
+            <div class="programs-swiper-shell premium-reveal">
+                <div class="swiper programs-swiper" id="programsSwiper" aria-label="Engineering programs carousel">
+                    <div class="swiper-wrapper">
+                        ${rows.map((c) => `<div class="swiper-slide">
+                            <article class="gov-course-card premium-course glass-card">
+                                <a class="gov-course-media course-image" href="${esc(c.button_url || "courses.html")}">${imgTag(c.image_url, c.title)}</a>
+                                <div class="gov-course-body">
+                                    <span class="gov-course-meta">${esc(c.duration || "3 Years")} · ${esc(c.seats || 60)} Seats</span>
+                                    <h3>${esc(c.title)}</h3>
+                                    <p>${plain(c.description)}</p>
+                                    <ul>
+                                        <li><span>Eligibility</span><strong>${esc(c.eligibility || "As per DTE norms")}</strong></li>
+                                        <li><span>Code</span><strong>${esc(c.code || "—")}</strong></li>
+                                    </ul>
+                                    <a class="btn btn-teal btn-sm btn-ripple" href="${esc(c.button_url || "courses.html")}">${esc(c.button_label || "Read More")}</a>
+                                </div>
+                            </article>
+                        </div>`).join("")}
+                    </div>
+                    <button class="programs-swiper-prev" type="button" aria-label="Previous program">‹</button>
+                    <button class="programs-swiper-next" type="button" aria-label="Next program">›</button>
+                    <div class="programs-swiper-pagination" role="tablist" aria-label="Program slides"></div>
                 </div>
-            </article>`).join("")}</div>
+            </div>
         </div></section>`;
 }
 
 function facilities(items) {
     if (!items?.length) return "";
-    const rows = items.slice(0, 10);
-    return `<section class="premium-section gray facilities-section facilities-slider-section" id="facilities"><div class="container"><div class="facilities-slider-head premium-reveal"><div><span>CAMPUS FACILITIES</span><h2>Everything Students Need to Succeed</h2><p>Modern infrastructure, practical learning spaces and student-focused campus facilities.</p></div><div class="facilities-slider-controls"><button type="button" data-facility-prev aria-label="Previous facility">&lt;</button><button type="button" data-facility-next aria-label="Next facility">&gt;</button></div></div><div class="facilities-slider premium-reveal" data-facilities-slider data-autoplay="4500"><div class="facilities-track">${rows.map((f) => `<article class="facility-slide-card"><a class="facility-media" href="${esc(f.link || f.button_url || "infrastructure.html")}"><img loading="lazy" decoding="async" src="${esc(img(f.image_url))}" alt="${esc(f.title)}" onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}'"><span class="facility-overlay"></span></a><div class="facility-card-body"><span class="facility-badge">${facilityIcon(f.icon || f.title)}${esc(f.short_title || f.category || "Facility")}</span><h3>${esc(f.title)}</h3><p>${plain(f.description)}</p><a class="facility-link" href="${esc(f.link || f.button_url || "infrastructure.html")}">Explore Facility</a></div></article>`).join("")}</div><div class="facilities-dots" data-facility-dots></div></div></div></section>`;
+    const rows = items.slice(0, 12);
+    return `<section class="premium-section gray facilities-section facilities-carousel-section" id="facilities" data-lazy-section>
+        <div class="container">
+            <div class="facilities-slider-head premium-reveal section-split-head">
+                <div>${sectionHead("Campus Facilities", "Everything Students Need to Succeed", "Modern infrastructure, practical learning spaces and student-focused campus facilities.")}</div>
+            </div>
+            <div class="facilities-swiper-shell premium-reveal">
+                <div class="swiper facilities-swiper" aria-label="Campus facilities carousel">
+                    <div class="swiper-wrapper">
+                        ${rows.map((f) => `<div class="swiper-slide"><article class="facility-slide-card glass-card">
+                            <a class="facility-media" href="${esc(f.link || f.button_url || "infrastructure.html")}"><img loading="lazy" decoding="async" src="${esc(img(f.image_url))}" alt="${esc(f.title)}" onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}'"><span class="facility-overlay"></span></a>
+                            <div class="facility-card-body">
+                                <span class="facility-badge">${facilityIcon(f.icon || f.title)}${esc(f.short_title || f.category || "Facility")}</span>
+                                <h3>${esc(f.title)}</h3>
+                                <p>${plain(f.description)}</p>
+                                <a class="facility-link" href="${esc(f.link || f.button_url || "infrastructure.html")}">Explore Facility</a>
+                            </div>
+                        </article></div>`).join("")}
+                    </div>
+                    <button class="facilities-swiper-prev programs-swiper-prev" type="button" aria-label="Previous facility">‹</button>
+                    <button class="facilities-swiper-next programs-swiper-next" type="button" aria-label="Next facility">›</button>
+                    <div class="facilities-swiper-pagination programs-swiper-pagination"></div>
+                </div>
+            </div>
+        </div></section>`;
 }
 
 function placements(items) {
@@ -478,7 +552,7 @@ function placements(items) {
     const testimonialCards = testimonials.length
         ? testimonials.map((t) => `<blockquote class="gov-placement-quote glass-card"><p>${plain(t.testimonial)}</p><footer><strong>${esc(t.student_name || "Student")}</strong><span>${esc(t.course || "Alumni")}</span></footer></blockquote>`).join("")
         : "";
-    return `<section class="premium-section white gov-placement-section" id="placements">
+    return `<section class="premium-section white gov-placement-section" id="placements" data-lazy-section>
         <div class="container">
             ${sectionHead("Training & Placement", "Placement Highlights", "Career readiness through aptitude training, technical skills and industry interaction.")}
             <div class="gov-placement-grid premium-reveal">
@@ -489,6 +563,19 @@ function placements(items) {
                     <article class="glass-card"><span>Placement Guidance</span><strong data-count="100" data-suffix="%">100%</strong></article>
                 </div>
                 <div class="gov-placement-visual"><img loading="lazy" decoding="async" src="${esc(placementImage)}" alt="Placement activity at Eaglewood Polytechnic"></div>
+            </div>
+            <div class="placements-swiper-shell premium-reveal">
+                <div class="swiper placements-swiper" aria-label="Placement highlights carousel">
+                    <div class="swiper-wrapper">
+                        ${items.slice(0, 6).map((p) => `<div class="swiper-slide"><article class="placement-slide-card glass-card">
+                            <img loading="lazy" decoding="async" src="${esc(img(p.image_url || p.company_logo_url || placementImage))}" alt="${esc(p.title || p.recruiter || "Placement")}">
+                            <div><span>${esc(p.recruiter || "Recruiter")}</span><h3>${esc(p.title || "Placement Drive")}</h3><p>${plain(p.testimonial || p.training_activities || "")}</p></div>
+                        </article></div>`).join("")}
+                    </div>
+                    <button class="placements-swiper-prev programs-swiper-prev" type="button" aria-label="Previous placement">‹</button>
+                    <button class="placements-swiper-next programs-swiper-next" type="button" aria-label="Next placement">›</button>
+                    <div class="placements-swiper-pagination programs-swiper-pagination"></div>
+                </div>
             </div>
             <div class="gov-recruiter-row premium-reveal"><span>Recruiters & Partners</span><div>${recruiterLabels.map((r) => `<strong>${esc(String(r).slice(0, 24))}</strong>`).join("")}</div></div>
             <div class="gov-placement-testimonials premium-reveal">${testimonialCards}</div>
@@ -517,7 +604,9 @@ function studentResources() {
 function gallery(items) {
     if (!items?.length) return "";
     const categories = ["All", ...new Set(items.map((g) => categoryFor(g.category || "Campus")).filter(Boolean))].slice(0, 6);
-    return `<section class="premium-section blue gallery-section" id="gallery"><div class="container"><div class="section-split-head">${sectionHead("Gallery", "Campus life, workshops and student moments", "Filterable masonry preview with lightbox interactions and editorial overlays.")}<a class="section-view-all" href="gallery.html">Open Gallery</a></div><div class="home-gallery-filters" aria-label="Filter gallery preview">${categories.map((cat, i) => `<button type="button" class="${i === 0 ? "active" : ""}" data-home-gallery-filter="${esc(cat)}">${esc(cat)}</button>`).join("")}</div><div class="premium-gallery-grid">${items.slice(0, 9).map((g, i) => `<button class="premium-gallery-tile premium-reveal ${i === 0 ? "large" : ""}" data-category="${esc(categoryFor(g.category || "Campus"))}" data-full="${esc(img(g.image_url))}" type="button"><img loading="lazy" src="${esc(img(g.image_url))}" alt="${esc(g.alt || g.title)}"><span>${esc(g.category || "Campus")}</span><strong>${esc(g.title)}</strong></button>`).join("")}</div></div></section>`;
+    const tiles = items.slice(0, 9).map((g, i) => `<button class="premium-gallery-tile premium-reveal ${i === 0 ? "large" : ""}" data-category="${esc(categoryFor(g.category || "Campus"))}" data-full="${esc(img(g.image_url))}" type="button"><img loading="lazy" decoding="async" src="${esc(img(g.image_url))}" alt="${esc(g.alt || g.title)}"><span>${esc(g.category || "Campus")}</span><strong>${esc(g.title)}</strong></button>`).join("");
+    const mobileSlides = items.slice(0, 8).map((g) => `<div class="swiper-slide"><button class="premium-gallery-tile" data-full="${esc(img(g.image_url))}" type="button"><img loading="lazy" decoding="async" src="${esc(img(g.image_url))}" alt="${esc(g.alt || g.title)}"><strong>${esc(g.title)}</strong></button></div>`).join("");
+    return `<section class="premium-section blue gallery-section" id="gallery" data-lazy-section><div class="container"><div class="section-split-head">${sectionHead("Gallery", "Campus life, workshops and student moments", "Filterable masonry preview with lightbox interactions and editorial overlays.")}<a class="section-view-all" href="gallery.html">Open Gallery</a></div><div class="home-gallery-filters" aria-label="Filter gallery preview">${categories.map((cat, i) => `<button type="button" class="${i === 0 ? "active" : ""}" data-home-gallery-filter="${esc(cat)}">${esc(cat)}</button>`).join("")}</div><div class="premium-gallery-grid gallery-desktop">${tiles}</div><div class="gallery-mobile-shell"><div class="swiper gallery-mobile-swiper"><div class="swiper-wrapper">${mobileSlides}</div><button class="gallery-mobile-prev programs-swiper-prev" type="button" aria-label="Previous">‹</button><button class="gallery-mobile-next programs-swiper-next" type="button" aria-label="Next">›</button><div class="gallery-mobile-pagination programs-swiper-pagination"></div></div></div></div></section>`;
 }
 
 function achievements(data, cmsOnly = false) {
@@ -723,6 +812,36 @@ function initPremiumInteractions() {
 
 
 
+function initProgramsSwiper() {
+    const el = document.querySelector(".programs-swiper");
+    if (!el) return;
+    const boot = () => {
+        if (!window.Swiper) return false;
+        new window.Swiper(el, {
+            slidesPerView: 1,
+            spaceBetween: 20,
+            loop: true,
+            speed: 700,
+            grabCursor: true,
+            autoplay: { delay: 4200, disableOnInteraction: false, pauseOnMouseEnter: true },
+            keyboard: { enabled: true, onlyInViewport: true },
+            a11y: { enabled: true },
+            pagination: { el: ".programs-swiper-pagination", clickable: true },
+            navigation: { nextEl: ".programs-swiper-next", prevEl: ".programs-swiper-prev" },
+            breakpoints: {
+                0: { slidesPerView: 1, spaceBetween: 16 },
+                768: { slidesPerView: 2, spaceBetween: 20 },
+                1200: { slidesPerView: 4, spaceBetween: 24 },
+            },
+        });
+        return true;
+    };
+    if (!boot()) {
+        const wait = setInterval(() => { if (boot()) clearInterval(wait); }, 60);
+        setTimeout(() => clearInterval(wait), 8000);
+    }
+}
+
 function initDepartmentsSwiper() {
     const el = document.querySelector(".dept-swiper");
     if (!el) return;
@@ -795,69 +914,49 @@ function initHomeCarousels() {
     });
 }
 
-function initFacilitiesSlider() {
-    document.querySelectorAll("[data-facilities-slider]").forEach((slider) => {
-        const track = slider.querySelector(".facilities-track");
-        const slides = [...slider.querySelectorAll(".facility-slide-card")];
-        const prev = document.querySelector("[data-facility-prev]");
-        const next = document.querySelector("[data-facility-next]");
-        const dots = slider.querySelector("[data-facility-dots]");
-        if (!track || !slides.length) return;
-
-        let index = 0;
-        let timer;
-        let isDragging = false;
-        let startX = 0;
-        let startLeft = 0;
-        const perView = () => window.matchMedia("(max-width: 640px)").matches ? 1 : window.matchMedia("(max-width: 900px)").matches ? 2 : window.matchMedia("(max-width: 1200px)").matches ? 3 : 4;
-        const maxIndex = () => Math.max(0, slides.length - perView());
-        const clamp = (value) => Math.min(Math.max(value, 0), maxIndex());
-        const cardStep = () => {
-            const gap = parseFloat(getComputedStyle(track).gap || "20") || 20;
-            return slides[0].getBoundingClientRect().width + gap;
-        };
-        const renderDots = () => {
-            if (!dots) return;
-            dots.innerHTML = Array.from({ length: maxIndex() + 1 }, (_, i) => `<button type="button" class="${i === index ? "active" : ""}" data-facility-dot="${i}" aria-label="Go to facility slide ${i + 1}"></button>`).join("");
-        };
-        const go = (nextIndex) => {
-            index = clamp(nextIndex);
-            track.scrollTo({ left: index * cardStep(), behavior: "smooth" });
-            renderDots();
-        };
-        const stop = () => { if (timer) clearInterval(timer); };
-        const play = () => {
-            stop();
-            const ms = Number(slider.dataset.autoplay || 4500);
-            if (slides.length > perView()) timer = setInterval(() => go(index >= maxIndex() ? 0 : index + 1), ms);
-        };
-        const sync = () => {
-            index = clamp(Math.round(track.scrollLeft / Math.max(cardStep(), 1)));
-            renderDots();
-        };
-
-        prev?.addEventListener("click", () => { go(index <= 0 ? maxIndex() : index - 1); play(); });
-        next?.addEventListener("click", () => { go(index >= maxIndex() ? 0 : index + 1); play(); });
-        dots?.addEventListener("click", (event) => {
-            const dot = event.target.closest("[data-facility-dot]");
-            if (!dot) return;
-            go(Number(dot.dataset.facilityDot));
-            play();
-        });
-        track.addEventListener("scroll", localDebounce(sync, 80), { passive: true });
-        track.addEventListener("pointerdown", (event) => { isDragging = true; startX = event.clientX; startLeft = track.scrollLeft; track.setPointerCapture?.(event.pointerId); stop(); });
-        track.addEventListener("pointermove", (event) => { if (!isDragging) return; track.scrollLeft = startLeft - (event.clientX - startX); });
-        track.addEventListener("pointerup", () => { isDragging = false; sync(); play(); });
-        track.addEventListener("pointercancel", () => { isDragging = false; play(); });
-        slider.addEventListener("mouseenter", stop);
-        slider.addEventListener("mouseleave", play);
-        slider.addEventListener("focusin", stop);
-        slider.addEventListener("focusout", play);
-        window.addEventListener("resize", localDebounce(() => go(index), 120), { passive: true });
-        renderDots();
-        play();
+function initFacilitiesSwiper() {
+    initGenericSwiper(".facilities-swiper", {
+        prev: ".facilities-swiper-prev",
+        next: ".facilities-swiper-next",
+        pagination: ".facilities-swiper-pagination",
+        breakpoints: { 0: { slidesPerView: 1, spaceBetween: 16 }, 768: { slidesPerView: 2, spaceBetween: 20 }, 1200: { slidesPerView: 3, spaceBetween: 24 } },
     });
 }
+
+function initPlacementsSwiper() {
+    initGenericSwiper(".placements-swiper", {
+        prev: ".placements-swiper-prev",
+        next: ".placements-swiper-next",
+        pagination: ".placements-swiper-pagination",
+        breakpoints: { 0: { slidesPerView: 1, spaceBetween: 16 }, 768: { slidesPerView: 2, spaceBetween: 20 }, 1200: { slidesPerView: 3, spaceBetween: 24 } },
+    });
+}
+
+function initGenericSwiper(selector, { prev, next, pagination, breakpoints }) {
+    const el = document.querySelector(selector);
+    if (!el) return;
+    const boot = () => {
+        if (!window.Swiper) return false;
+        new window.Swiper(el, {
+            slidesPerView: 1,
+            spaceBetween: 16,
+            loop: true,
+            speed: 700,
+            grabCursor: true,
+            autoplay: { delay: 4500, disableOnInteraction: false, pauseOnMouseEnter: true },
+            keyboard: { enabled: true, onlyInViewport: true },
+            pagination: { el: pagination, clickable: true },
+            navigation: { nextEl: next, prevEl: prev },
+            breakpoints,
+        });
+        return true;
+    };
+    if (!boot()) {
+        const wait = setInterval(() => { if (boot()) clearInterval(wait); }, 60);
+        setTimeout(() => clearInterval(wait), 8000);
+    }
+}
+
 function initHomeGalleryFilters() {
     const buttons = [...document.querySelectorAll("[data-home-gallery-filter]")];
     const tiles = [...document.querySelectorAll(".premium-gallery-tile[data-category]")];

@@ -17,6 +17,11 @@ const ORDER = [
     "002_admin_auth_fixes.sql",
     "004_indexes.sql",
     "005_mission_vision_settings.sql",
+    "006_legacy_admin_sessions.sql",
+    "007_admin_auth_bootstrap.sql",
+    "008_bootstrap_cms_content.sql",
+    "009_production_stabilize.sql",
+    "010_admin_auth_storage_fix.sql",
 ];
 
 const files = ORDER.filter((f) => {

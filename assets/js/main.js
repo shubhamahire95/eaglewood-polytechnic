@@ -3,6 +3,12 @@
  * Home renders from the production Supabase CMS; other pages keep shared chrome behavior.
  */
 
+import { dismissPageLoader, preloadSiteLogo } from "./page-loader.js";
+import { applyStorageImageMapToDom } from "./media-url.js";
+
+preloadSiteLogo();
+void applyStorageImageMapToDom();
+
 async function initAssistant() {
     try {
         const { initAiAssistant } = await import("./ai-assistant.js");
@@ -12,11 +18,6 @@ async function initAssistant() {
     }
 }
 
-function hidePageLoader() {
-    const loader = document.querySelector(".page-loader");
-    if (loader) loader.classList.add("loaded");
-}
-
 function renderBootFallback() {
     const main = document.getElementById("main");
     if (!main || main.children.length) return;
@@ -24,18 +25,22 @@ function renderBootFallback() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+    const isHomePage = document.body.hasAttribute("data-home");
     try {
-        const isHomePage = document.body.hasAttribute("data-home");
         const { initLegacyUI } = await import("./ui.js");
 
         if (isHomePage) {
             const { renderCmsHome } = await import("./home-cms.js");
             await renderCmsHome();
+            const { initPublicUiPolish } = await import("./ui-polish.js");
+            initPublicUiPolish();
             await initAssistant();
         } else {
             initLegacyUI();
             const { initDynamicPages } = await import("./page-forms.js");
             await initDynamicPages();
+            const { initPublicUiPolish } = await import("./ui-polish.js");
+            initPublicUiPolish();
             await initAssistant();
         }
     } catch (error) {
@@ -46,6 +51,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         } catch { /* ignore */ }
         renderBootFallback();
     } finally {
-        hidePageLoader();
+        await dismissPageLoader({
+            waitForHero: isHomePage,
+            waitForCms: isHomePage,
+        });
     }
 });

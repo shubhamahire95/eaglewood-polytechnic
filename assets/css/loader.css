@@ -1,0 +1,111 @@
+/* Shared college logo page loader */
+.page-loader {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: grid;
+    place-items: center;
+    background: #fff;
+    opacity: 0;
+    visibility: visible;
+    transition: opacity 0.48s ease, visibility 0.48s ease;
+    animation: loader-fade-in 0.5s ease forwards;
+}
+
+.page-loader.is-hiding {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.page-loader.is-hidden {
+    visibility: hidden;
+    display: none;
+}
+
+.loader-shell {
+    --loader-size: 120px;
+    position: relative;
+    width: var(--loader-size);
+    height: var(--loader-size);
+    display: grid;
+    place-items: center;
+}
+
+.loader-logo {
+    width: var(--loader-size);
+    height: var(--loader-size);
+    object-fit: contain;
+    border-radius: 50%;
+    animation: loader-logo-motion 1.5s ease-in-out infinite;
+    will-change: transform, box-shadow;
+}
+
+.loader-ring {
+    position: absolute;
+    inset: -14px;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    border-top-color: #c9a227;
+    border-right-color: rgba(201, 162, 39, 0.35);
+    animation: loader-ring-spin 1.5s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes loader-fade-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes loader-logo-motion {
+
+    0%,
+    100% {
+        transform: scale(0.95) translateY(0);
+        box-shadow: 0 6px 18px rgba(0, 91, 91, 0.1);
+    }
+
+    50% {
+        transform: scale(1) translateY(-6px);
+        box-shadow: 0 14px 32px rgba(0, 91, 91, 0.2);
+    }
+}
+
+@keyframes loader-ring-spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (max-width: 992px) {
+    .loader-shell {
+        --loader-size: 100px;
+    }
+}
+
+@media (max-width: 576px) {
+    .loader-shell {
+        --loader-size: 80px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .page-loader {
+        animation: none;
+        opacity: 1;
+    }
+
+    .loader-logo,
+    .loader-ring {
+        animation: none;
+    }
+}

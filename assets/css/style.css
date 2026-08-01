@@ -2,6 +2,8 @@
 @import url("footer.css");
 @import url("ai-assistant.css");
 @import url("pages.css");
+@import url("ui-polish.css");
+@import url("loader.css");
 
 :root {
     --teal: #005b5b;
@@ -104,49 +106,6 @@ textarea {
 
 .skip-link:focus {
     top: 18px
-}
-
-.page-loader {
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    display: grid;
-    place-items: center;
-    background: #fff;
-    transition: .5s ease
-}
-
-.page-loader.loaded {
-    opacity: 0;
-    visibility: hidden
-}
-
-.loader-mark {
-    width: 72px;
-    height: 72px;
-    position: relative;
-    display: grid;
-    place-items: center;
-    color: #fff;
-    background: var(--teal);
-    border-radius: 50%;
-    font-weight: 800
-}
-
-.loader-mark:after {
-    position: absolute;
-    inset: -9px;
-    content: "";
-    border: 3px solid transparent;
-    border-top-color: var(--orange);
-    border-radius: 50%;
-    animation: spin .8s linear infinite
-}
-
-@keyframes spin {
-    to {
-        transform: rotate(360deg)
-    }
 }
 
 .topbar {
@@ -4643,7 +4602,7 @@ body:not([data-home]) .section:nth-of-type(even) {
   background: #fff !important;
   border: 8px solid #fff !important;
 }
-#principal .gov-principal-portrait img[src*="logo"] {
+#principal .gov-principal-portrait img.is-placeholder {
   object-fit: contain !important;
   object-position: center !important;
   padding: 24px !important;
@@ -5105,8 +5064,8 @@ body:not([data-home]) .section:nth-of-type(even) {
 .admission-steps-nav li { flex: 1; text-align: center; padding: 10px; border-radius: 12px; background: #f1f5f9; font-size: 13px; font-weight: 800; color: #64748b; }
 .admission-steps-nav li.active { background: #0f766e; color: #fff; }
 .admission-steps-nav li.done { background: #dcfce7; color: #166534; }
-.admission-step { display: none; }
-.admission-step.active { display: block; animation: fadeSlide .35s ease; }
+.admission-multistep .admission-form-step { display: none; }
+.admission-multistep .admission-form-step.active { display: block; animation: fadeSlide .35s ease; }
 .admission-step-actions { display: flex; gap: 12px; margin-top: 16px; }
 .admission-preview { padding: 20px; border-radius: 16px; background: #f8fafc; border: 1px solid #e2e8f0; margin-bottom: 16px; }
 .preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -5135,4 +5094,26 @@ body:not([data-home]) .section:nth-of-type(even) {
   text-transform: uppercase;
   letter-spacing: .06em;
   font-size: 11px;
+}
+
+/* AI Assistant launcher — override legacy .ai-assistant rules in this file */
+.ai-assistant,
+.ai-fab,
+.ai-panel,
+.ai-system {
+  display: none !important;
+}
+
+.ew-ai {
+  right: max(24px, env(safe-area-inset-right)) !important;
+  bottom: max(24px, env(safe-area-inset-bottom)) !important;
+  left: auto !important;
+  z-index: 99999 !important;
+}
+
+@media (max-width: 560px) {
+  .ew-ai {
+    right: max(16px, env(safe-area-inset-right)) !important;
+    bottom: max(16px, env(safe-area-inset-bottom)) !important;
+  }
 }

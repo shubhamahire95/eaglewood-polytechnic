@@ -22,33 +22,57 @@ const SYNONYMS = {
     laboratory: ["laboratory", "lab", "labs", "practical"],
 };
 
-let initPromise;
-
 const FALLBACK_QUESTIONS = [
     { question: "Admissions", answer: "Admissions are open at Eaglewood Polytechnic Institute. Call +91 94237 16230 or visit the admission office for eligibility, documents and seat guidance.", category: "Admissions", keywords: ["admission", "apply", "eligibility"], priority: 10 },
-    { question: "Courses", answer: "Eaglewood offers engineering programs through departments such as Civil, Computer, Electrical, Artificial Intelligence and AIML.", category: "Courses", keywords: ["courses", "programs", "branches"], priority: 9 },
+    { question: "Courses", answer: "Eaglewood offers engineering programs through departments such as Civil, Computer, Electrical, and AI & Machine Learning.", category: "Courses", keywords: ["courses", "programs", "branches"], priority: 9 },
     { question: "Contact", answer: "Contact Eaglewood at +91 94237 16230 or eaglewoodpoly@gmail.com. Sunanda Nagar, Phule Pimpalgaon, Majalgaon, Dist. Beed 431131.", category: "Contact", keywords: ["contact", "phone", "email"], priority: 9 },
     { question: "Fees", answer: "For the latest fee details and scholarship guidance, call the admission office at +91 94237 16230.", category: "Fees", keywords: ["fees", "fee", "cost"], priority: 8 },
-    { question: "Departments", answer: "Focused academic departments with practical labs, workshops and faculty mentoring.", category: "Departments", keywords: ["departments", "labs"], priority: 8 },
+    { question: "Placements", answer: "The Training & Placement Cell provides aptitude training, interview preparation and industry interaction for final-year students.", category: "Placements", keywords: ["placement", "job"], priority: 8 },
+    { question: "Hostel", answer: "Hostel facilities are available for students. Contact the admission office for availability and guidelines.", category: "Hostel", keywords: ["hostel", "accommodation"], priority: 7 },
     { question: "Scholarships", answer: "Scholarship guidance is available through the admission office with required documents.", category: "Scholarships", keywords: ["scholarship"], priority: 7 },
-    { question: "Call Office", answer: "Call the admission office at +91 94237 16230.", category: "Contact", keywords: ["call", "office"], priority: 7 },
     { question: "WhatsApp Admission Help", answer: "WhatsApp: https://wa.me/919423716230", category: "Contact", keywords: ["whatsapp"], priority: 7 },
 ];
 
+let initPromise;
 let state = {
     questions: [],
     settings: DEFAULT_SETTINGS,
-    recent: JSON.parse(localStorage.getItem("ew_ai_recent") || "[]"),
+    messages: [],
     sessionId: localStorage.getItem("ew_ai_session") || crypto.randomUUID(),
     lastAnswer: null,
     lastQuestion: "",
+    isOpen: false,
+    isLoading: false,
 };
+
 localStorage.setItem("ew_ai_session", state.sessionId);
+restoreHistory();
+
+const AI_ICON_SVG = `<svg class="ew-ai__fab-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <rect x="5" y="9" width="14" height="11" rx="4" fill="currentColor" opacity="0.95"/>
+  <path d="M9 5.5h6a2.5 2.5 0 0 1 2.5 2.5V9H6.5V8A2.5 2.5 0 0 1 9 5.5Z" fill="currentColor" opacity="0.88"/>
+  <circle cx="9.5" cy="13" r="1.35" fill="#0f766e"/>
+  <circle cx="14.5" cy="13" r="1.35" fill="#0f766e"/>
+  <path d="M10 16.2c.7.55 1.4.8 2 .8s1.3-.25 2-.8" stroke="#0f766e" stroke-width="1.2" stroke-linecap="round"/>
+  <path d="M12 3.2v2.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+  <circle cx="12" cy="2.4" r="1" fill="currentColor"/>
+  <path d="M4.5 12.5 3 13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+  <path d="M19.5 12.5 21 13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+</svg>`;
 
 export async function initAiAssistant() {
     if (initPromise) return initPromise;
     initPromise = mountAiAssistant();
     return initPromise;
+}
+
+export function openAiAssistant() {
+    const opener = document.getElementById("ewAiFab");
+    if (opener) {
+        opener.click();
+        return;
+    }
+    void initAiAssistant().then(() => document.getElementById("ewAiFab")?.click());
 }
 
 async function mountAiAssistant() {
@@ -63,6 +87,19 @@ async function mountAiAssistant() {
     renderHeaderButton();
     renderAssistant();
     bindAssistant();
+    renderHistory();
+}
+
+function restoreHistory() {
+    try {
+        state.messages = JSON.parse(localStorage.getItem("ew_ai_messages") || "[]");
+    } catch {
+        state.messages = [];
+    }
+}
+
+function saveHistory() {
+    localStorage.setItem("ew_ai_messages", JSON.stringify(state.messages.slice(-40)));
 }
 
 function timeGreeting() {
@@ -77,12 +114,10 @@ async function loadKnowledgeBase() {
         state.questions = FALLBACK_QUESTIONS;
         return;
     }
-
     const [kbResult, promptResult] = await Promise.all([
         safeFetch("ai_knowledge_base", (q) => q.select("id,question,answer,category,keywords,version,published").eq("published", true).order("display_order", { ascending: true }).limit(400), [], "ai:kb"),
-        safeFetch("ai_prompts", (q) => q.select("name,greeting_message,fallback_response,quick_replies,suggested_questions,temperature,token_limit,response_delay").eq("published", true).limit(1), [], "ai:prompts"),
+        safeFetch("ai_prompts", (q) => q.select("name,greeting_message,fallback_response,quick_replies,suggested_questions,response_delay").eq("published", true).limit(1), [], "ai:prompts"),
     ]);
-
     const kb = (kbResult.data || []).map((row) => ({
         id: row.id,
         question: row.question,
@@ -91,9 +126,7 @@ async function loadKnowledgeBase() {
         keywords: row.keywords || "",
         priority: Number(row.version || 0),
     }));
-
     state.questions = kb.length ? kb : FALLBACK_QUESTIONS;
-
     const prompt = promptResult.data?.[0];
     if (prompt) {
         state.settings = {
@@ -101,7 +134,6 @@ async function loadKnowledgeBase() {
             assistant_name: prompt.name || DEFAULT_SETTINGS.assistant_name,
             welcome_message: prompt.greeting_message || DEFAULT_SETTINGS.welcome_message,
             fallback_message: prompt.fallback_response || DEFAULT_SETTINGS.fallback_message,
-            primary_color: DEFAULT_SETTINGS.primary_color,
             typing_speed: Number(prompt.response_delay || DEFAULT_SETTINGS.typing_speed),
             suggested_questions: toArray(prompt.suggested_questions || prompt.quick_replies) || DEFAULT_SETTINGS.suggested_questions,
         };
@@ -114,7 +146,7 @@ function renderHeaderButton() {
     const button = document.createElement("button");
     button.className = "ask-ai-nav";
     button.type = "button";
-    button.innerHTML = '<span class="ask-ai-mark" aria-hidden="true">AI</span><span>Ask AI</span>';
+    button.innerHTML = '<span class="ask-ai-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" aria-hidden="true"><rect x="5" y="9" width="14" height="11" rx="4" fill="currentColor"/><circle cx="9.5" cy="13" r="1" fill="#0f766e"/><circle cx="14.5" cy="13" r="1" fill="#0f766e"/></svg></span><span>Ask AI</span>';
     button.setAttribute("aria-label", "Ask Eaglewood AI");
     if (nav.tagName === "UL") {
         const item = document.createElement("li");
@@ -126,28 +158,43 @@ function renderHeaderButton() {
     }
 }
 
+const FAB_ICON = AI_ICON_SVG;
+
 function renderAssistant() {
     const s = state.settings;
-    const greeting = timeGreeting();
+    const displayName = "AI Assistant";
     document.documentElement.style.setProperty("--ai-primary", s.primary_color || DEFAULT_SETTINGS.primary_color);
     document.body.insertAdjacentHTML("beforeend", `
+        <div class="ew-ai__backdrop" id="ewAiBackdrop" hidden></div>
         <aside class="ew-ai" id="ewAi" data-ai-assistant aria-live="polite">
-            <button class="ew-ai__fab" id="ewAiFab" type="button" aria-label="Open ${esc(s.assistant_name)}">
-                <span class="ew-ai__fab-icon" aria-hidden="true">AI</span>
-                <span class="ew-ai__fab-label">Ask AI</span>
-            </button>
-            <section class="ew-ai__panel" id="ewAiPanel" aria-label="${esc(s.assistant_name)}" hidden>
+            <div class="ew-ai__fab-wrap">
+                <button class="ew-ai__fab" id="ewAiFab" type="button" aria-label="Open ${esc(displayName)}" aria-expanded="false" aria-controls="ewAiPanel">
+                    <span class="ew-ai__fab-icon">${FAB_ICON}</span>
+                </button>
+            </div>
+            <section class="ew-ai__panel" id="ewAiPanel" aria-label="${esc(displayName)}" role="dialog" aria-modal="true" hidden>
                 <header class="ew-ai__head">
-                    <div class="ew-ai__avatar" aria-hidden="true">AI</div>
+                    <div class="ew-ai__avatar" aria-hidden="true">${FAB_ICON}</div>
                     <div class="ew-ai__meta">
                         <small>Online</small>
-                        <strong>${esc(s.assistant_name)}</strong>
+                        <strong>${esc(displayName)}</strong>
                     </div>
-                    <button class="ew-ai__close" id="ewAiClose" type="button" aria-label="Close assistant">×</button>
+                    <div class="ew-ai__toolbar">
+                        <button class="ew-ai__tool" id="ewAiMinimize" type="button" title="Minimize" aria-label="Minimize assistant">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14"/></svg>
+                        </button>
+                        <button class="ew-ai__close" id="ewAiClose" type="button" aria-label="Close assistant">×</button>
+                    </div>
                 </header>
+                <div class="ew-ai__quick-actions">
+                    <a href="admission.html">Admission</a>
+                    <a href="tel:+919423716230">Call</a>
+                    <a href="https://wa.me/919423716230" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+                    <a href="courses.html">Courses</a>
+                </div>
                 <div class="ew-ai__body" id="ewAiBody">
                     <div class="ew-ai__welcome" id="ewAiWelcome">
-                        <h3>${esc(greeting)}</h3>
+                        <h3>${esc(timeGreeting())}</h3>
                         <p>${esc(s.welcome_message)}</p>
                         <div class="ew-ai__chips">${topicButtons().join("")}</div>
                     </div>
@@ -159,7 +206,7 @@ function renderAssistant() {
                     <button class="ew-ai__send" id="ewAiSend" type="submit" aria-label="Send message">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9z"/></svg>
                     </button>
-                    <span class="ew-ai__hint">Press Enter to send · Shift+Enter for new line</span>
+                    <span class="ew-ai__hint">Enter to send · Shift+Enter for new line</span>
                 </form>
             </section>
         </aside>
@@ -173,13 +220,59 @@ function topicButtons() {
 function bindAssistant() {
     const root = document.getElementById("ewAi");
     const panel = document.getElementById("ewAiPanel");
+    const backdrop = document.getElementById("ewAiBackdrop");
     const input = document.getElementById("ewAiInput");
-    const open = () => { panel.hidden = false; root.classList.add("open"); setTimeout(() => input.focus(), 80); };
-    const close = () => { panel.hidden = true; root.classList.remove("open"); };
+    const fab = document.getElementById("ewAiFab");
 
-    document.getElementById("ewAiFab").addEventListener("click", async () => { await loadKnowledgeBase(); open(); });
-    document.querySelector(".ask-ai-nav")?.addEventListener("click", async () => { await loadKnowledgeBase(); open(); });
+    const open = async () => {
+        await loadKnowledgeBase();
+        panel.hidden = false;
+        backdrop.hidden = false;
+        panel.classList.remove("is-minimized");
+        root.classList.add("open");
+        state.isOpen = true;
+        fab.setAttribute("aria-expanded", "true");
+        requestAnimationFrame(() => {
+            panel.classList.add("is-visible");
+            backdrop.classList.add("is-visible");
+        });
+        setTimeout(() => input.focus(), 180);
+        scrollToBottom();
+    };
+
+    const close = () => {
+        panel.classList.remove("is-visible", "is-minimized");
+        backdrop.classList.remove("is-visible");
+        root.classList.remove("open");
+        state.isOpen = false;
+        fab.setAttribute("aria-expanded", "false");
+        setTimeout(() => {
+            panel.hidden = true;
+            backdrop.hidden = true;
+            fab.focus({ preventScroll: true });
+        }, 320);
+    };
+
+    const minimize = () => {
+        if (!state.isOpen) return;
+        panel.classList.remove("is-visible");
+        panel.classList.add("is-minimized");
+        backdrop.classList.remove("is-visible");
+        root.classList.remove("open");
+        state.isOpen = false;
+        fab.setAttribute("aria-expanded", "false");
+        setTimeout(() => {
+            panel.hidden = true;
+            backdrop.hidden = true;
+            fab.focus({ preventScroll: true });
+        }, 280);
+    };
+
+    fab.addEventListener("click", () => (state.isOpen ? close() : open()));
+    document.querySelector(".ask-ai-nav")?.addEventListener("click", () => (state.isOpen ? close() : open()));
     document.getElementById("ewAiClose").addEventListener("click", close);
+    document.getElementById("ewAiMinimize").addEventListener("click", minimize);
+    backdrop.addEventListener("click", close);
     root.addEventListener("click", handleAssistantClick);
     input.addEventListener("input", debounce(() => {
         input.style.height = "auto";
@@ -188,6 +281,28 @@ function bindAssistant() {
     }, 160));
     document.getElementById("ewAiComposer").addEventListener("submit", (event) => { event.preventDefault(); submitQuestion(); });
     input.addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submitQuestion(); } });
+    document.addEventListener("keydown", (event) => { if (event.key === "Escape" && state.isOpen) close(); });
+}
+
+function clearChat() {
+    state.messages = [];
+    saveHistory();
+    document.getElementById("ewAiMessages").innerHTML = "";
+    const welcome = document.getElementById("ewAiWelcome");
+    if (welcome) welcome.hidden = false;
+    state.lastAnswer = null;
+    state.lastQuestion = "";
+}
+
+function renderHistory() {
+    if (!state.messages.length) return;
+    document.getElementById("ewAiWelcome")?.remove();
+    state.messages.forEach((msg) => {
+        if (msg.role === "user") addBubble(msg.text, "user", msg.time, false);
+        else if (msg.role === "answer") renderAnswerCard(msg.payload, false);
+        else if (msg.role === "error") addErrorBubble(msg.text, false);
+    });
+    scrollToBottom();
 }
 
 function submitQuestion() {
@@ -205,24 +320,32 @@ function handleAssistantClick(event) {
     if (event.target.closest("[data-copy]")) copyText(state.lastAnswer?.answer || "");
     if (event.target.closest("[data-share]")) shareAnswer();
     if (event.target.closest("[data-rating]")) saveFeedback(event);
+    if (event.target.closest("[data-retry]")) ask(state.lastQuestion);
     if (event.target.closest("[data-ask-again]")) ask(state.lastQuestion);
 }
 
 async function ask(rawQuestion) {
     const question = sanitize(rawQuestion);
-    if (!question) return;
+    if (!question || state.isLoading) return;
     document.getElementById("ewAiWelcome")?.remove();
     state.lastQuestion = question;
-    remember(question);
+    state.isLoading = true;
     addBubble(question, "user");
-    const thinking = addBubble("Thinking...", "bot typing");
-    const answer = searchKnowledge(question);
-    await delay(Number(state.settings.typing_speed || 260));
-    thinking.remove();
-    state.lastAnswer = answer;
-    addAnswerCard(answer, question);
-    await persistResult(question, answer);
-    document.getElementById("ewAiBody").scrollTop = document.getElementById("ewAiBody").scrollHeight;
+    const thinking = addTypingBubble();
+    try {
+        const answer = searchKnowledge(question);
+        await delay(Number(state.settings.typing_speed || 260));
+        thinking.remove();
+        state.lastAnswer = answer;
+        renderAnswerCard(answer);
+        await persistResult(question, answer);
+    } catch {
+        thinking.remove();
+        addErrorBubble("Something went wrong. Please try again.");
+    } finally {
+        state.isLoading = false;
+        scrollToBottom();
+    }
 }
 
 function searchKnowledge(question) {
@@ -249,7 +372,7 @@ function answerPayload(item, source) {
     return { answer: item.answer, confidence: Math.max(1, Math.round(item.confidence)), category: item.category || "Knowledge Base", source, related: relatedQuestions(tokenize(item.question)).filter((q) => q !== item.question).slice(0, 3), id: item.id };
 }
 
-function addAnswerCard(result) {
+function renderAnswerCard(result, persist = true) {
     const isUnavailable = !result.confidence;
     const related = result.related?.length && !isUnavailable
         ? `<div class="ew-ai__chips">${result.related.map((q) => `<button type="button" data-question="${esc(q)}">${esc(q)}</button>`).join("")}</div>`
@@ -258,23 +381,43 @@ function addAnswerCard(result) {
         ? `<div class="ew-ai__card-top"><span class="ew-ai__badge ew-ai__badge--warn">Forwarded to Admin</span></div>`
         : `<div class="ew-ai__card-top"><span class="ew-ai__badge">${esc(result.category)}</span><span class="ew-ai__badge ew-ai__badge--warn">${result.confidence}% match</span></div>`;
     const actions = isUnavailable
-        ? `<div class="ew-ai__actions"><button data-ask-again type="button">Ask again</button></div>`
-        : `<div class="ew-ai__actions"><button data-copy type="button">Copy</button><button data-share type="button">Share</button><button data-rating="5" type="button">Like</button><button data-rating="1" type="button">Dislike</button><button data-ask-again type="button">Regenerate</button></div>`;
+        ? `<div class="ew-ai__actions"><button data-retry type="button">Retry</button><button data-ask-again type="button">Ask again</button></div>`
+        : `<div class="ew-ai__actions"><button data-copy type="button">Copy</button><button data-share type="button">Share</button><button data-rating="5" type="button">Like</button><button data-rating="1" type="button">Dislike</button></div>`;
+    const time = new Date().toISOString();
     document.getElementById("ewAiMessages").insertAdjacentHTML("beforeend", `
         <article class="ew-ai__card ${isUnavailable ? "is-unavailable" : ""}">
             ${top}
-            <p>${formatAnswer(result.answer)}</p>
+            <div class="ew-ai__card-body">${formatAnswer(result.answer)}</div>
             ${isUnavailable ? "" : `<div class="ew-ai__source">Source: ${esc(result.source)}</div>`}
             ${related}
             ${actions}
-            <time datetime="${new Date().toISOString()}">${formatTime()}</time>
+            <time datetime="${time}">${formatTime(time)}</time>
         </article>
     `);
-    document.getElementById("ewAiBody").scrollTop = document.getElementById("ewAiBody").scrollHeight;
+    if (persist) {
+        state.messages.push({ role: "answer", payload: result, time });
+        saveHistory();
+    }
+    scrollToBottom();
 }
 
-function formatTime() {
-    return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+function addErrorBubble(text, persist = true) {
+    const time = new Date().toISOString();
+    document.getElementById("ewAiMessages").insertAdjacentHTML("beforeend", `
+        <div class="ew-ai__msg ew-ai__msg--error">
+            <p>${esc(text)}</p>
+            <button type="button" data-retry>Retry</button>
+            <time datetime="${time}">${formatTime(time)}</time>
+        </div>
+    `);
+    if (persist) {
+        state.messages.push({ role: "error", text, time });
+        saveHistory();
+    }
+}
+
+function formatTime(value = new Date()) {
+    return new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 function renderInstantSuggestions(value) {
@@ -289,20 +432,53 @@ function renderInstantSuggestions(value) {
 }
 
 function hideInstant() { const box = document.getElementById("ewAiInstant"); if (box) box.hidden = true; }
-function addBubble(text, type) {
+
+function addTypingBubble() {
     const el = document.getElementById("ewAiMessages");
-    const cls = type.includes("user") ? "ew-ai__msg ew-ai__msg--user" : type.includes("typing") ? "ew-ai__msg ew-ai__msg--bot ew-ai__msg--typing" : "ew-ai__msg ew-ai__msg--bot";
-    el.insertAdjacentHTML("beforeend", `<div class="${cls}">${esc(text)}${type.includes("user") ? `<time datetime="${new Date().toISOString()}">${formatTime()}</time>` : ""}</div>`);
-    document.getElementById("ewAiBody").scrollTop = document.getElementById("ewAiBody").scrollHeight;
+    el.insertAdjacentHTML("beforeend", `<div class="ew-ai__msg ew-ai__msg--bot ew-ai__msg--typing" aria-live="polite"><span class="ew-ai__dots" aria-hidden="true"><span></span><span></span><span></span></span><span class="sr-only">Assistant is thinking</span></div>`);
+    scrollToBottom();
     return el.lastElementChild;
 }
-function remember(question) { state.recent = [question, ...state.recent.filter((q) => q !== question)].slice(0, 8); localStorage.setItem("ew_ai_recent", JSON.stringify(state.recent)); }
-function relatedQuestions(tokens) { const expanded = expandTokens(tokens); return state.questions.map((item) => scoreQuestion(item, expanded, expanded.join(" "))).filter((item) => item.confidence > 5).sort((a, b) => b.confidence - a.confidence).map((item) => item.question).slice(0, 6); }
+
+function addBubble(text, type, timeValue, persist = true) {
+    const el = document.getElementById("ewAiMessages");
+    const time = timeValue || new Date().toISOString();
+    const cls = type.includes("user") ? "ew-ai__msg ew-ai__msg--user" : "ew-ai__msg ew-ai__msg--bot";
+    el.insertAdjacentHTML("beforeend", `<div class="${cls}"><div class="ew-ai__bubble">${formatAnswer(text)}</div><time datetime="${time}">${formatTime(time)}</time></div>`);
+    if (persist && type.includes("user")) {
+        state.messages.push({ role: "user", text, time });
+        saveHistory();
+    }
+    scrollToBottom();
+    return el.lastElementChild;
+}
+
+function scrollToBottom() {
+    const body = document.getElementById("ewAiBody");
+    if (body) body.scrollTop = body.scrollHeight;
+}
+
+function relatedQuestions(tokens) {
+    const expanded = expandTokens(tokens);
+    return state.questions.map((item) => scoreQuestion(item, expanded, expanded.join(" "))).filter((item) => item.confidence > 5).sort((a, b) => b.confidence - a.confidence).map((item) => item.question).slice(0, 6);
+}
+
 function tokenize(text) { return clean(text).split(" ").filter((word) => word.length > 2); }
 function expandTokens(tokens) { return [...new Set(tokens.flatMap((token) => [token, ...(SYNONYMS[token] || []), ...Object.entries(SYNONYMS).filter(([, list]) => list.includes(token)).map(([key]) => key)]))]; }
 function clean(text) { return String(text || "").toLowerCase().replace(/[^a-z0-9\u0900-\u097F ]/g, " ").replace(/\s+/g, " ").trim(); }
 function sanitize(text) { return String(text || "").replace(/[<>]/g, "").trim().slice(0, 500); }
-function formatAnswer(text) { return esc(text).replace(/\n/g, "<br>").replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>"); }
+
+function formatAnswer(text) {
+    let html = esc(text);
+    html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+    html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
+    html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    html = html.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+    html = html.replace(/\n/g, "<br>");
+    return html;
+}
+
 function toArray(value) { return Array.isArray(value) ? value : typeof value === "string" ? value.split(/\n|,/).map((x) => x.trim()).filter(Boolean) : []; }
 function delay(ms) { return new Promise((resolve) => setTimeout(resolve, Math.min(Math.max(ms, 100), 1200))); }
 function debounce(fn, wait) { let timer; return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), wait); }; }
@@ -335,15 +511,15 @@ async function saveFeedback(event) {
     if (!state.lastQuestion || !rating) return;
     if (isCmsAvailable()) {
         await safeInsert("ai_conversations", {
-        session_id: state.sessionId,
-        question: state.lastQuestion,
-        answer: state.lastAnswer?.answer || "",
-        rating,
-        status: "feedback",
-        metadata: { feedback: rating >= 4 ? "positive" : "negative" },
+            session_id: state.sessionId,
+            question: state.lastQuestion,
+            answer: state.lastAnswer?.answer || "",
+            rating,
+            status: "feedback",
+            metadata: { feedback: rating >= 4 ? "positive" : "negative" },
         });
     }
-    addBubble("Thank you. Your feedback helps improve the institute assistant.", "bot");
+    addBubble("Thank you. Your feedback helps improve the institute assistant.", "bot", null, false);
 }
 
 function copyText(text) { navigator.clipboard?.writeText(text); }

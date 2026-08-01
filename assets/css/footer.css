@@ -21,6 +21,7 @@
   border-top: 1px solid var(--epi-ft-border);
   box-shadow: 0 -10px 40px rgba(2, 24, 28, 0.32);
   overflow: hidden;
+  overflow-x: clip;
   isolation: isolate;
 }
 
@@ -317,7 +318,7 @@
 
 body.footer-visible .epi-ft-wa,
 body.footer-visible .ew-ai {
-  bottom: calc(max(18px, env(safe-area-inset-bottom)) + var(--epi-ft-float-offset, 0px));
+  bottom: calc(max(24px, env(safe-area-inset-bottom)) + var(--epi-ft-float-offset, 0px));
 }
 
 a.whatsapp,

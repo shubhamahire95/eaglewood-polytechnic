@@ -1,0 +1,1149 @@
+{
+  "home_slides": [
+    {
+      "title": "Eaglewood Polytechnic Institute",
+      "subtitle": "AICTE Approved • DTE 2634 • MSBTE 51307 — Learn, innovate and lead with practical engineering education in Majalgaon.",
+      "image_url": "assets/images/uploaded/workshop-front.jpg",
+      "button_primary_label": "Apply for Admission",
+      "button_primary_url": "admission.html",
+      "button_secondary_label": "Explore Courses",
+      "button_secondary_url": "courses.html",
+      "published": true,
+      "status": "published",
+      "display_order": 1
+    },
+    {
+      "title": "Hands-On Engineering Education",
+      "subtitle": "Modern laboratories, workshops and project-based learning prepare students for industry and higher studies.",
+      "image_url": "assets/images/uploaded/machine-lab-practical.jpg",
+      "button_primary_label": "View Departments",
+      "button_primary_url": "departments.html",
+      "button_secondary_label": "Campus Gallery",
+      "button_secondary_url": "gallery.html",
+      "published": true,
+      "status": "published",
+      "display_order": 2
+    },
+    {
+      "title": "Industry Exposure & Placements",
+      "subtitle": "Industrial visits, aptitude training and placement guidance build interview-ready engineering professionals.",
+      "image_url": "assets/images/uploaded/industrial-visit-group.jpg",
+      "button_primary_label": "Placement Highlights",
+      "button_primary_url": "index.html#placements",
+      "button_secondary_label": "Contact Office",
+      "button_secondary_url": "contact.html",
+      "published": true,
+      "status": "published",
+      "display_order": 3
+    },
+    {
+      "title": "A Vibrant Student Campus",
+      "subtitle": "Sports, cultural events, NSS activities and disciplined residential life support holistic student growth.",
+      "image_url": "assets/images/uploaded/sports-volleyball.jpg",
+      "button_primary_label": "Admission Open 2026-27",
+      "button_primary_url": "admission.html",
+      "button_secondary_label": "Important Notices",
+      "button_secondary_url": "index.html#notice-board",
+      "published": true,
+      "status": "published",
+      "display_order": 4
+    }
+  ],
+  "principal_message": {
+    "photo_url": "assets/images/logo-official.jpg",
+    "name": "Dr. Principal Name",
+    "qualification": "M.Tech, Ph.D.",
+    "designation": "Principal, Eaglewood Polytechnic Institute",
+    "message": "Welcome to Eaglewood Polytechnic Institute. We are committed to disciplined learning, practical engineering education and student-centred mentoring. Our campus at Sunanda Nagar, Phule Pimpalgaon, Majalgaon offers AICTE-approved diploma and degree pathways with modern laboratories, experienced faculty and strong industry exposure. We nurture confident, ethical and capable engineers ready to serve society and industry.",
+    "signature": "Principal, Eaglewood Polytechnic",
+    "published": true,
+    "status": "published",
+    "display_order": 1
+  },
+  "updates": [
+    {
+      "icon": "Admission",
+      "title": "Admissions Open 2026-27",
+      "description": "Diploma and degree engineering admissions are open. Visit the admission office with required documents.",
+      "image_url": "assets/images/induction-programme.jpg",
+      "category": "Admission",
+      "color": "#D4AF37",
+      "date": "2026-07-01",
+      "button_label": "Read More",
+      "button_url": "#notice-board",
+      "published": true,
+      "status": "published",
+      "display_order": 1,
+      "pinned": true
+    },
+    {
+      "icon": "Academics",
+      "title": "Induction Programme for New Students",
+      "description": "Orientation sessions introduce students to campus rules, laboratories and academic mentoring.",
+      "image_url": "assets/images/induction-programme.jpg",
+      "category": "Academics",
+      "color": "#005B5B",
+      "date": "2026-07-01",
+      "button_label": "Read More",
+      "button_url": "index.html#latest-updates",
+      "published": true,
+      "status": "published",
+      "display_order": 2,
+      "pinned": true
+    },
+    {
+      "icon": "Workshop",
+      "title": "Drone Technology Workshop",
+      "description": "Students explored drone assembly, flight controls and emerging aerospace applications.",
+      "image_url": "assets/images/drone-workshop.jpg",
+      "category": "Workshop",
+      "color": "#D4AF37",
+      "date": "2026-07-01",
+      "button_label": "Read More",
+      "button_url": "gallery.html",
+      "published": true,
+      "status": "published",
+      "display_order": 3,
+      "pinned": false
+    },
+    {
+      "icon": "Industrial Visit",
+      "title": "Industrial Visit to Manufacturing Plant",
+      "description": "Final-year students observed production processes and safety practices during an industry visit.",
+      "image_url": "assets/images/industrial-visit-plant.jpg",
+      "category": "Industrial Visit",
+      "color": "#005B5B",
+      "date": "2026-07-01",
+      "button_label": "Read More",
+      "button_url": "gallery.html",
+      "published": true,
+      "status": "published",
+      "display_order": 4,
+      "pinned": false
+    },
+    {
+      "icon": "Campus",
+      "title": "Annual Gathering 2025",
+      "description": "Cultural performances, awards and student achievements were celebrated on campus.",
+      "image_url": "assets/images/annual-gathering.jpg",
+      "category": "Campus",
+      "color": "#D4AF37",
+      "date": "2026-07-01",
+      "button_label": "Read More",
+      "button_url": "gallery.html",
+      "published": true,
+      "status": "published",
+      "display_order": 5,
+      "pinned": false
+    },
+    {
+      "icon": "Placement",
+      "title": "Placement Guidance Session",
+      "description": "Training on aptitude, communication and interview skills for final-year students.",
+      "image_url": "assets/images/placement-guidance.jpg",
+      "category": "Placement",
+      "color": "#005B5B",
+      "date": "2026-07-01",
+      "button_label": "Read More",
+      "button_url": "index.html#placements",
+      "published": true,
+      "status": "published",
+      "display_order": 6,
+      "pinned": false
+    },
+    {
+      "icon": "Social",
+      "title": "Blood Donation Camp",
+      "description": "NSS and student volunteers organised a successful blood donation drive.",
+      "image_url": "assets/images/blood-donation.jpg",
+      "category": "Social",
+      "color": "#D4AF37",
+      "date": "2026-07-01",
+      "button_label": "Read More",
+      "button_url": "gallery.html",
+      "published": true,
+      "status": "published",
+      "display_order": 7,
+      "pinned": false
+    },
+    {
+      "icon": "Event",
+      "title": "Engineers Day Celebration",
+      "description": "Technical quiz, project display and expert lecture marked Engineers Day.",
+      "image_url": "assets/images/engineers-day.jpg",
+      "category": "Event",
+      "color": "#005B5B",
+      "date": "2026-07-01",
+      "button_label": "Read More",
+      "button_url": "gallery.html",
+      "published": true,
+      "status": "published",
+      "display_order": 8,
+      "pinned": false
+    },
+    {
+      "icon": "Infrastructure",
+      "title": "Smart Classroom Upgrade",
+      "description": "Digital teaching aids installed in select classrooms for interactive learning.",
+      "image_url": "assets/images/smart-classroom.jpg",
+      "category": "Infrastructure",
+      "color": "#D4AF37",
+      "date": "2026-07-01",
+      "button_label": "Read More",
+      "button_url": "infrastructure.html",
+      "published": true,
+      "status": "published",
+      "display_order": 9,
+      "pinned": false
+    },
+    {
+      "icon": "Student Services",
+      "title": "Scholarship Guidance Desk",
+      "description": "Students received information on government and institute scholarship schemes.",
+      "image_url": "assets/images/student-achievements.jpg",
+      "category": "Student Services",
+      "color": "#005B5B",
+      "date": "2026-07-01",
+      "button_label": "Read More",
+      "button_url": "admission.html",
+      "published": true,
+      "status": "published",
+      "display_order": 10,
+      "pinned": false
+    }
+  ],
+  "notices": [
+    {
+      "title": "Admissions Open 2026-27",
+      "description": "Admission forms and document verification are available at the institute office on working days.",
+      "date": "2026-07-15",
+      "important": true,
+      "is_new": true,
+      "priority": "Important",
+      "category": "Admission",
+      "published": true,
+      "status": "published",
+      "display_order": 1
+    },
+    {
+      "title": "Document Verification Schedule",
+      "description": "Bring original mark sheets, leaving certificate, Aadhaar and passport photos for verification.",
+      "date": "2026-07-15",
+      "important": false,
+      "is_new": true,
+      "priority": "Academic",
+      "category": "Admission",
+      "published": true,
+      "status": "published",
+      "display_order": 2
+    },
+    {
+      "title": "MSBTE Exam Form Notification",
+      "description": "Students must submit examination forms before the deadline announced by the exam cell.",
+      "date": "2026-07-15",
+      "important": false,
+      "is_new": true,
+      "priority": "Examination",
+      "category": "Exam Cell",
+      "published": true,
+      "status": "published",
+      "display_order": 3
+    },
+    {
+      "title": "Anti-Ragging Awareness",
+      "description": "Eaglewood maintains zero tolerance for ragging. Contact the anti-ragging committee immediately.",
+      "date": "2026-07-15",
+      "important": true,
+      "is_new": true,
+      "priority": "Important",
+      "category": "Compliance",
+      "published": true,
+      "status": "published",
+      "display_order": 4
+    },
+    {
+      "title": "Industrial Visit Registration",
+      "description": "Department-wise industrial visit registrations are open for eligible students through HODs.",
+      "date": "2026-07-15",
+      "important": false,
+      "is_new": false,
+      "priority": "General",
+      "category": "Academics",
+      "published": true,
+      "status": "published",
+      "display_order": 5
+    },
+    {
+      "title": "Hostel Allotment Notice",
+      "description": "Hostel seat allotment list will be displayed on the notice board and website.",
+      "date": "2026-07-15",
+      "important": false,
+      "is_new": false,
+      "priority": "Student Services",
+      "category": "Hostel",
+      "published": true,
+      "status": "published",
+      "display_order": 6
+    },
+    {
+      "title": "Scholarship Application Window",
+      "description": "Eligible students may apply for government scholarships with income and caste certificates.",
+      "date": "2026-07-15",
+      "important": false,
+      "is_new": false,
+      "priority": "Scholarship",
+      "category": "Student Services",
+      "published": true,
+      "status": "published",
+      "display_order": 7
+    },
+    {
+      "title": "Library Timings Extended",
+      "description": "Reading hall will remain open until 8 PM during examination preparation period.",
+      "date": "2026-07-15",
+      "important": false,
+      "is_new": false,
+      "priority": "General",
+      "category": "Library",
+      "published": true,
+      "status": "published",
+      "display_order": 8
+    },
+    {
+      "title": "Campus Transport Routes",
+      "description": "Updated bus routes for Majalgaon and nearby villages are available at the admin office.",
+      "date": "2026-07-15",
+      "important": false,
+      "is_new": false,
+      "priority": "General",
+      "category": "Transport",
+      "published": true,
+      "status": "published",
+      "display_order": 9
+    },
+    {
+      "title": "Parent-Teacher Meeting",
+      "description": "Parents are invited to meet faculty on the scheduled Saturday between 10 AM and 1 PM.",
+      "date": "2026-07-15",
+      "important": true,
+      "is_new": false,
+      "priority": "Important",
+      "category": "Academics",
+      "published": true,
+      "status": "published",
+      "display_order": 10
+    }
+  ],
+  "courses": [
+    {
+      "title": "Civil Engineering",
+      "department": "Civil",
+      "code": "263419110",
+      "duration": "3 Years Diploma",
+      "seats": 60,
+      "image_url": "assets/images/civil-department.jpg",
+      "description": "Surveying, construction materials, structural drawing and site practice.",
+      "eligibility": "10th pass for Diploma; 12th Science for Degree as per DTE norms",
+      "fees": "As per Shikshan Shulk committee",
+      "button_label": "View Course",
+      "button_url": "courses.html",
+      "published": true,
+      "status": "published",
+      "display_order": 1
+    },
+    {
+      "title": "Computer Engineering",
+      "department": "Computer",
+      "code": "263424510",
+      "duration": "3 Years Diploma",
+      "seats": 60,
+      "image_url": "assets/images/computer-department.jpg",
+      "description": "Programming, networking, databases and software development fundamentals.",
+      "eligibility": "10th pass for Diploma; 12th Science for Degree as per DTE norms",
+      "fees": "As per Shikshan Shulk committee",
+      "button_label": "View Course",
+      "button_url": "courses.html",
+      "published": true,
+      "status": "published",
+      "display_order": 2
+    },
+    {
+      "title": "Electrical Engineering",
+      "department": "Electrical",
+      "code": "263429310",
+      "duration": "3 Years Diploma",
+      "seats": 60,
+      "image_url": "assets/images/electrical-department.jpg",
+      "description": "Electrical machines, circuits, power systems and workshop practice.",
+      "eligibility": "10th pass for Diploma; 12th Science for Degree as per DTE norms",
+      "fees": "As per Shikshan Shulk committee",
+      "button_label": "View Course",
+      "button_url": "courses.html",
+      "published": true,
+      "status": "published",
+      "display_order": 3
+    },
+    {
+      "title": "Artificial Intelligence (AI)",
+      "department": "AI & ML",
+      "code": "263498510",
+      "duration": "3 Years Diploma",
+      "seats": 60,
+      "image_url": "assets/images/ai-department.jpg",
+      "description": "Machine learning, data science, Python and intelligent systems.",
+      "eligibility": "10th pass for Diploma; 12th Science for Degree as per DTE norms",
+      "fees": "As per Shikshan Shulk committee",
+      "button_label": "View Course",
+      "button_url": "courses.html",
+      "published": true,
+      "status": "published",
+      "display_order": 4
+    },
+    {
+      "title": "Civil Engineering (Degree)",
+      "department": "Civil",
+      "code": "263411191",
+      "duration": "4 Years Degree",
+      "seats": 60,
+      "image_url": "assets/images/civil-department.jpg",
+      "description": "Advanced civil engineering with design projects and industry exposure.",
+      "eligibility": "10th pass for Diploma; 12th Science for Degree as per DTE norms",
+      "fees": "As per Shikshan Shulk committee",
+      "button_label": "View Course",
+      "button_url": "courses.html",
+      "published": true,
+      "status": "published",
+      "display_order": 5
+    },
+    {
+      "title": "Computer Engineering (Degree)",
+      "department": "Computer",
+      "code": "263411245",
+      "duration": "4 Years Degree",
+      "seats": 60,
+      "image_url": "assets/images/computer-department.jpg",
+      "description": "Degree pathway in computing with projects and internship support.",
+      "eligibility": "10th pass for Diploma; 12th Science for Degree as per DTE norms",
+      "fees": "As per Shikshan Shulk committee",
+      "button_label": "View Course",
+      "button_url": "courses.html",
+      "published": true,
+      "status": "published",
+      "display_order": 6
+    }
+  ],
+  "departments": [
+    {
+      "title": "Civil Engineering",
+      "department_image_url": "assets/images/civil-department.jpg",
+      "description": "Surveying, construction materials, site practice and infrastructure fundamentals.",
+      "labs": "Surveying Lab, CAD Lab, Materials Testing Lab",
+      "faculty_count": 8,
+      "students_count": 180,
+      "hod_name": "HOD, Civil",
+      "button_label": "Explore Department",
+      "button_url": "departments.html",
+      "published": true,
+      "status": "published",
+      "display_order": 1
+    },
+    {
+      "title": "Computer Engineering",
+      "department_image_url": "assets/images/computer-department.jpg",
+      "description": "Programming, networking, software development and digital problem solving.",
+      "labs": "Programming Lab, Networking Lab, DB Lab",
+      "faculty_count": 9,
+      "students_count": 200,
+      "hod_name": "HOD, Computer",
+      "button_label": "Explore Department",
+      "button_url": "departments.html",
+      "published": true,
+      "status": "published",
+      "display_order": 2
+    },
+    {
+      "title": "Electrical Engineering",
+      "department_image_url": "assets/images/electrical-department.jpg",
+      "description": "Electrical machines, circuits, power systems and workshop-based learning.",
+      "labs": "Machines Lab, Circuits Lab, Power Lab",
+      "faculty_count": 8,
+      "students_count": 175,
+      "hod_name": "HOD, Electrical",
+      "button_label": "Explore Department",
+      "button_url": "departments.html",
+      "published": true,
+      "status": "published",
+      "display_order": 3
+    },
+    {
+      "title": "Artificial Intelligence & ML",
+      "department_image_url": "assets/images/ai-department.jpg",
+      "description": "Data science, intelligent systems, NLP and database technologies.",
+      "labs": "AI Lab, Data Science Lab, NLP Lab",
+      "faculty_count": 6,
+      "students_count": 150,
+      "hod_name": "HOD, Artificial",
+      "button_label": "Explore Department",
+      "button_url": "departments.html",
+      "published": true,
+      "status": "published",
+      "display_order": 4
+    },
+    {
+      "title": "Mechanical Engineering",
+      "department_image_url": "assets/images/workshop.jpg",
+      "description": "Workshop practice, manufacturing processes and machine fundamentals.",
+      "labs": "Workshop, Manufacturing Lab, CAD Lab",
+      "faculty_count": 7,
+      "students_count": 160,
+      "hod_name": "HOD, Mechanical",
+      "button_label": "Explore Department",
+      "button_url": "departments.html",
+      "published": true,
+      "status": "published",
+      "display_order": 5
+    }
+  ],
+  "faculty": [
+    {
+      "name": "Prof. A. Patil",
+      "qualification": "M.Tech Civil",
+      "experience": "12 Years",
+      "department": "Civil Engineering",
+      "subjects": "Surveying, Building Materials",
+      "photo_url": "assets/images/logo.jpg",
+      "published": true,
+      "status": "published",
+      "display_order": 1
+    },
+    {
+      "name": "Prof. S. Jadhav",
+      "qualification": "M.Tech CSE",
+      "experience": "10 Years",
+      "department": "Computer Engineering",
+      "subjects": "Programming, DBMS",
+      "photo_url": "assets/images/logo.jpg",
+      "published": true,
+      "status": "published",
+      "display_order": 2
+    },
+    {
+      "name": "Prof. R. Deshmukh",
+      "qualification": "M.Tech Electrical",
+      "experience": "11 Years",
+      "department": "Electrical Engineering",
+      "subjects": "Machines, Power Systems",
+      "photo_url": "assets/images/logo.jpg",
+      "published": true,
+      "status": "published",
+      "display_order": 3
+    },
+    {
+      "name": "Prof. N. Kulkarni",
+      "qualification": "M.Tech AI",
+      "experience": "8 Years",
+      "department": "AI & ML",
+      "subjects": "Machine Learning, Python",
+      "photo_url": "assets/images/logo.jpg",
+      "published": true,
+      "status": "published",
+      "display_order": 4
+    },
+    {
+      "name": "Prof. M. Shaikh",
+      "qualification": "B.E. Mechanical",
+      "experience": "9 Years",
+      "department": "Mechanical Engineering",
+      "subjects": "Workshop, Manufacturing",
+      "photo_url": "assets/images/logo.jpg",
+      "published": true,
+      "status": "published",
+      "display_order": 5
+    },
+    {
+      "name": "Prof. P. More",
+      "qualification": "M.Sc. Physics",
+      "experience": "7 Years",
+      "department": "Applied Science",
+      "subjects": "Engineering Physics",
+      "photo_url": "assets/images/logo.jpg",
+      "published": true,
+      "status": "published",
+      "display_order": 6
+    },
+    {
+      "name": "Prof. V. Gaikwad",
+      "qualification": "M.Sc. Chemistry",
+      "experience": "6 Years",
+      "department": "Applied Science",
+      "subjects": "Engineering Chemistry",
+      "photo_url": "assets/images/logo.jpg",
+      "published": true,
+      "status": "published",
+      "display_order": 7
+    },
+    {
+      "name": "Prof. L. Bhosale",
+      "qualification": "MBA",
+      "experience": "5 Years",
+      "department": "Placement Cell",
+      "subjects": "Soft Skills, Aptitude",
+      "photo_url": "assets/images/logo.jpg",
+      "published": true,
+      "status": "published",
+      "display_order": 8
+    }
+  ],
+  "facilities": [
+    {
+      "title": "Modern Laboratories",
+      "icon": "Lab",
+      "image_url": "assets/images/workshop.jpg",
+      "description": "Well-equipped practical spaces for hands-on engineering learning.",
+      "category": "Labs",
+      "published": true,
+      "status": "published",
+      "display_order": 1
+    },
+    {
+      "title": "Central Library",
+      "icon": "Library",
+      "image_url": "assets/images/library.jpg",
+      "description": "Reference books, journals and quiet reading spaces for students.",
+      "category": "Library",
+      "published": true,
+      "status": "published",
+      "display_order": 2
+    },
+    {
+      "title": "Boys Hostel",
+      "icon": "Hostel",
+      "image_url": "assets/images/hostel-building.jpg",
+      "description": "Secure residential accommodation with mess and study hours.",
+      "category": "Hostel",
+      "published": true,
+      "status": "published",
+      "display_order": 3
+    },
+    {
+      "title": "Girls Hostel",
+      "icon": "Hostel",
+      "image_url": "assets/images/hostel-exterior.jpg",
+      "description": "Disciplined residential facility for women students.",
+      "category": "Hostel",
+      "published": true,
+      "status": "published",
+      "display_order": 4
+    },
+    {
+      "title": "College Transport",
+      "icon": "Transport",
+      "image_url": "assets/images/transport.jpg",
+      "description": "Bus routes connecting Majalgaon and nearby towns.",
+      "category": "Transport",
+      "published": true,
+      "status": "published",
+      "display_order": 5
+    },
+    {
+      "title": "Sports Ground",
+      "icon": "Sports",
+      "image_url": "assets/images/boys-volleyball.jpg",
+      "description": "Volleyball, kabaddi and annual sports competitions.",
+      "category": "Sports",
+      "published": true,
+      "status": "published",
+      "display_order": 6
+    },
+    {
+      "title": "Computer Centre",
+      "icon": "Monitor",
+      "image_url": "assets/images/computer-lab.jpg",
+      "description": "Programming labs with updated systems and internet.",
+      "category": "Smart Classroom",
+      "published": true,
+      "status": "published",
+      "display_order": 7
+    },
+    {
+      "title": "Workshop & Machine Lab",
+      "icon": "Workshop",
+      "image_url": "assets/images/uploaded/workshop-interior.jpg",
+      "description": "Fabrication, fitting and machine shop practice.",
+      "category": "Workshop",
+      "published": true,
+      "status": "published",
+      "display_order": 8
+    },
+    {
+      "title": "Auditorium",
+      "icon": "Mic",
+      "image_url": "assets/images/annual-gathering-stage.jpg",
+      "description": "Seminars, guest lectures and cultural programmes.",
+      "category": "Auditorium",
+      "published": true,
+      "status": "published",
+      "display_order": 9
+    },
+    {
+      "title": "Canteen",
+      "icon": "Cafe",
+      "image_url": "assets/images/dining-hall.jpg",
+      "description": "Hygienic meals and refreshments for students and staff.",
+      "category": "Canteen",
+      "published": true,
+      "status": "published",
+      "display_order": 10
+    }
+  ],
+  "placements": [
+    {
+      "title": "Placement Highlights 2025",
+      "recruiter": "TCS",
+      "package": "85%",
+      "highest_package": "₹6 LPA",
+      "average_package": "₹3.2 LPA",
+      "placed_students": 120,
+      "image_url": "assets/images/placement-interview.jpg",
+      "testimonial": "Placement training and mock interviews helped me secure a campus interview confidently.",
+      "student_name": "Rahul K.",
+      "course": "Computer Engineering",
+      "published": true,
+      "status": "published",
+      "display_order": 1
+    },
+    {
+      "title": "Industry Partners",
+      "recruiter": "Infosys",
+      "package": "72%",
+      "highest_package": "₹5.5 LPA",
+      "average_package": "₹3 LPA",
+      "placed_students": 95,
+      "image_url": "assets/images/placement-guidance.jpg",
+      "testimonial": "Industrial visits gave real context to our classroom learning.",
+      "student_name": "Priya S.",
+      "course": "Electrical Engineering",
+      "published": true,
+      "status": "published",
+      "display_order": 2
+    },
+    {
+      "title": "Training & Placement Cell",
+      "recruiter": "Wipro",
+      "package": "80%",
+      "highest_package": "₹6 LPA",
+      "average_package": "₹3.4 LPA",
+      "placed_students": 110,
+      "image_url": "assets/images/personality-development.jpg",
+      "testimonial": "Soft skills sessions improved my communication for interviews.",
+      "student_name": "Amit D.",
+      "course": "Civil Engineering",
+      "published": true,
+      "status": "published",
+      "display_order": 3
+    }
+  ],
+  "gallery": [
+    {
+      "title": "Annual Gathering",
+      "category": "Events",
+      "image_url": "assets/images/annual-gathering.jpg",
+      "alt": "Annual Gathering",
+      "description": "Annual Gathering at Eaglewood Polytechnic Institute",
+      "featured": true,
+      "published": true,
+      "status": "published",
+      "display_order": 1
+    },
+    {
+      "title": "Drone Workshop",
+      "category": "Workshops",
+      "image_url": "assets/images/drone-workshop.jpg",
+      "alt": "Drone Workshop",
+      "description": "Drone Workshop at Eaglewood Polytechnic Institute",
+      "featured": true,
+      "published": true,
+      "status": "published",
+      "display_order": 2
+    },
+    {
+      "title": "Industrial Visit",
+      "category": "Industrial Visits",
+      "image_url": "assets/images/industrial-visit-plant.jpg",
+      "alt": "Industrial Visit",
+      "description": "Industrial Visit at Eaglewood Polytechnic Institute",
+      "featured": true,
+      "published": true,
+      "status": "published",
+      "display_order": 3
+    },
+    {
+      "title": "Volleyball Tournament",
+      "category": "Sports",
+      "image_url": "assets/images/boys-volleyball.jpg",
+      "alt": "Volleyball Tournament",
+      "description": "Volleyball Tournament at Eaglewood Polytechnic Institute",
+      "featured": false,
+      "published": true,
+      "status": "published",
+      "display_order": 4
+    },
+    {
+      "title": "Blood Donation Camp",
+      "category": "Social",
+      "image_url": "assets/images/blood-donation.jpg",
+      "alt": "Blood Donation Camp",
+      "description": "Blood Donation Camp at Eaglewood Polytechnic Institute",
+      "featured": false,
+      "published": true,
+      "status": "published",
+      "display_order": 5
+    },
+    {
+      "title": "Computer Lab Session",
+      "category": "Labs",
+      "image_url": "assets/images/uploaded/computer-lab-students.jpg",
+      "alt": "Computer Lab Session",
+      "description": "Computer Lab Session at Eaglewood Polytechnic Institute",
+      "featured": false,
+      "published": true,
+      "status": "published",
+      "display_order": 6
+    },
+    {
+      "title": "Surveying Practical",
+      "category": "Labs",
+      "image_url": "assets/images/uploaded/surveying-field-practical.jpg",
+      "alt": "Surveying Practical",
+      "description": "Surveying Practical at Eaglewood Polytechnic Institute",
+      "featured": false,
+      "published": true,
+      "status": "published",
+      "display_order": 7
+    },
+    {
+      "title": "Workshop Practice",
+      "category": "Labs",
+      "image_url": "assets/images/uploaded/workshop-group.jpg",
+      "alt": "Workshop Practice",
+      "description": "Workshop Practice at Eaglewood Polytechnic Institute",
+      "featured": false,
+      "published": true,
+      "status": "published",
+      "display_order": 8
+    },
+    {
+      "title": "Republic Day",
+      "category": "Events",
+      "image_url": "assets/images/republic-day.jpg",
+      "alt": "Republic Day",
+      "description": "Republic Day at Eaglewood Polytechnic Institute",
+      "featured": false,
+      "published": true,
+      "status": "published",
+      "display_order": 9
+    },
+    {
+      "title": "Teachers Day",
+      "category": "Events",
+      "image_url": "assets/images/teachers-day.jpg",
+      "alt": "Teachers Day",
+      "description": "Teachers Day at Eaglewood Polytechnic Institute",
+      "featured": false,
+      "published": true,
+      "status": "published",
+      "display_order": 10
+    },
+    {
+      "title": "Campus Aerial View",
+      "category": "Campus",
+      "image_url": "assets/images/campus.jpg",
+      "alt": "Campus Aerial View",
+      "description": "Campus Aerial View at Eaglewood Polytechnic Institute",
+      "featured": false,
+      "published": true,
+      "status": "published",
+      "display_order": 11
+    },
+    {
+      "title": "Library Reading Hall",
+      "category": "Campus",
+      "image_url": "assets/images/reading-hall.jpg",
+      "alt": "Library Reading Hall",
+      "description": "Library Reading Hall at Eaglewood Polytechnic Institute",
+      "featured": false,
+      "published": true,
+      "status": "published",
+      "display_order": 12
+    }
+  ],
+  "footer_blocks": [
+    {
+      "block_key": "footer_main",
+      "title": "Main Footer",
+      "content": {
+        "tagline": "AICTE Approved • MSBTE Affiliated • DTE 2634",
+        "copyright": "Eaglewood Polytechnic Institute"
+      },
+      "published": true,
+      "status": "published",
+      "display_order": 1
+    },
+    {
+      "block_key": "quick_links",
+      "title": "Quick Links",
+      "content": {
+        "links": [
+          {
+            "label": "About",
+            "href": "about.html"
+          },
+          {
+            "label": "Courses",
+            "href": "courses.html"
+          },
+          {
+            "label": "Departments",
+            "href": "departments.html"
+          },
+          {
+            "label": "Gallery",
+            "href": "gallery.html"
+          },
+          {
+            "label": "Admissions",
+            "href": "admission.html"
+          },
+          {
+            "label": "Contact",
+            "href": "contact.html"
+          }
+        ]
+      },
+      "published": true,
+      "status": "published",
+      "display_order": 2
+    },
+    {
+      "block_key": "contact_block",
+      "title": "Contact",
+      "content": {
+        "phone": "+91 94237 16230",
+        "email": "eaglewoodpoly@gmail.com",
+        "address": "Sunanda Nagar, Phule Pimpalgaon, Majalgaon, Dist. Beed 431131"
+      },
+      "published": true,
+      "status": "published",
+      "display_order": 3
+    }
+  ],
+  "ai_prompts": [
+    {
+      "name": "Eaglewood Assistant",
+      "prompt": "You are the official AI assistant for Eaglewood Polytechnic Institute, Majalgaon. Answer questions about admissions, courses, departments, fees, scholarships, hostel, transport and contact details. Be concise, accurate and friendly. If unsure, direct users to the admission office.",
+      "greeting_message": "Hello! I am the Eaglewood AI Assistant. Ask me about admissions, courses, departments, fees or contact details.",
+      "fallback_response": "I could not find a confident answer. Please contact the admission office at +91 94237 16230 or eaglewoodpoly@gmail.com.",
+      "quick_replies": [
+        "Admissions",
+        "Courses",
+        "Fees",
+        "Hostel",
+        "Contact"
+      ],
+      "suggested_questions": [
+        "How do I apply for admission?",
+        "Which courses are offered?",
+        "What is the DTE code?",
+        "Is hostel available?",
+        "How to contact the office?"
+      ],
+      "temperature": 0.7,
+      "token_limit": 800,
+      "published": true,
+      "status": "published",
+      "display_order": 1
+    }
+  ],
+  "ai_knowledge_base": [
+    {
+      "question": "What courses does Eaglewood offer?",
+      "answer": "Eaglewood offers Diploma and Degree programs in Civil, Computer, Electrical and Artificial Intelligence engineering.",
+      "category": "Admissions",
+      "keywords": "admissions",
+      "published": true,
+      "status": "published",
+      "display_order": 1
+    },
+    {
+      "question": "What is the DTE institute code?",
+      "answer": "The DTE institute code is 2634.",
+      "category": "Admissions",
+      "keywords": "admissions",
+      "published": true,
+      "status": "published",
+      "display_order": 2
+    },
+    {
+      "question": "What is the MSBTE institute code?",
+      "answer": "The MSBTE institute code is 51307.",
+      "category": "Admissions",
+      "keywords": "admissions",
+      "published": true,
+      "status": "published",
+      "display_order": 3
+    },
+    {
+      "question": "Where is Eaglewood Polytechnic located?",
+      "answer": "Sunanda Nagar, Phule Pimpalgaon, Majalgaon, District Beed 431131, Maharashtra.",
+      "category": "Contact",
+      "keywords": "contact",
+      "published": true,
+      "status": "published",
+      "display_order": 4
+    },
+    {
+      "question": "What is the admission office phone number?",
+      "answer": "Call +91 94237 16230 for admission enquiries.",
+      "category": "Contact",
+      "keywords": "contact",
+      "published": true,
+      "status": "published",
+      "display_order": 5
+    },
+    {
+      "question": "What is the admission email?",
+      "answer": "Email eaglewoodpoly@gmail.com for admission support.",
+      "category": "Contact",
+      "keywords": "contact",
+      "published": true,
+      "status": "published",
+      "display_order": 6
+    },
+    {
+      "question": "What are the office hours?",
+      "answer": "Monday to Saturday, 9:30 AM to 5:30 PM.",
+      "category": "Contact",
+      "keywords": "contact",
+      "published": true,
+      "status": "published",
+      "display_order": 7
+    },
+    {
+      "question": "Is the institute AICTE approved?",
+      "answer": "Yes. Eaglewood Polytechnic is approved by AICTE and Government of Maharashtra.",
+      "category": "Approvals",
+      "keywords": "approvals",
+      "published": true,
+      "status": "published",
+      "display_order": 8
+    },
+    {
+      "question": "Which university is Eaglewood affiliated to?",
+      "answer": "Affiliated to MSBTE for diploma programs and DBATU for degree programs.",
+      "category": "Approvals",
+      "keywords": "approvals",
+      "published": true,
+      "status": "published",
+      "display_order": 9
+    },
+    {
+      "question": "Is hostel facility available?",
+      "answer": "Yes. Separate hostel facilities are available for boys and girls.",
+      "category": "Campus",
+      "keywords": "campus",
+      "published": true,
+      "status": "published",
+      "display_order": 10
+    },
+    {
+      "question": "Is transport available?",
+      "answer": "College buses operate on routes covering Majalgaon and nearby villages.",
+      "category": "Campus",
+      "keywords": "campus",
+      "published": true,
+      "status": "published",
+      "display_order": 11
+    },
+    {
+      "question": "How many seats per branch?",
+      "answer": "Typically 60 sanctioned institute seats plus EWS and TFWS seats per branch.",
+      "category": "Admissions",
+      "keywords": "admissions",
+      "published": true,
+      "status": "published",
+      "display_order": 12
+    },
+    {
+      "question": "What documents are needed for admission?",
+      "answer": "Mark sheets, leaving certificate, Aadhaar, photos and category certificates if applicable.",
+      "category": "Admissions",
+      "keywords": "admissions",
+      "published": true,
+      "status": "published",
+      "display_order": 13
+    },
+    {
+      "question": "Are scholarships available?",
+      "answer": "Government and eligible scholarship schemes are supported through the admission office.",
+      "category": "Admissions",
+      "keywords": "admissions",
+      "published": true,
+      "status": "published",
+      "display_order": 14
+    },
+    {
+      "question": "Does Eaglewood have placement support?",
+      "answer": "Yes. Training, aptitude sessions and placement guidance are provided.",
+      "category": "Placements",
+      "keywords": "placements",
+      "published": true,
+      "status": "published",
+      "display_order": 15
+    },
+    {
+      "question": "What labs are on campus?",
+      "answer": "Computer, electrical, surveying, workshop, AI and science laboratories.",
+      "category": "Academics",
+      "keywords": "academics",
+      "published": true,
+      "status": "published",
+      "display_order": 16
+    },
+    {
+      "question": "How can I visit the campus?",
+      "answer": "Contact the office to schedule a campus visit on working days.",
+      "category": "Contact",
+      "keywords": "contact",
+      "published": true,
+      "status": "published",
+      "display_order": 17
+    },
+    {
+      "question": "Is there an anti-ragging policy?",
+      "answer": "Eaglewood maintains zero tolerance for ragging with an active anti-ragging committee.",
+      "category": "Compliance",
+      "keywords": "compliance",
+      "published": true,
+      "status": "published",
+      "display_order": 18
+    },
+    {
+      "question": "Who developed this website?",
+      "answer": "Designed and developed by Shubham Ahire.",
+      "category": "General",
+      "keywords": "general",
+      "published": true,
+      "status": "published",
+      "display_order": 19
+    },
+    {
+      "question": "How do I apply online?",
+      "answer": "Fill the admission form on the website or visit the admission office with documents.",
+      "category": "Admissions",
+      "keywords": "admissions",
+      "published": true,
+      "status": "published",
+      "display_order": 20
+    }
+  ]
+}

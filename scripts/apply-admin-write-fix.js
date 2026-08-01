@@ -1,22 +1,28 @@
 #!/usr/bin/env node
 /**
- * Apply supabase/APPLY_ADMIN_WRITE_FIX.sql to enable admin writes.
+ * Apply supabase/migrations/010_admin_auth_storage_fix.sql then seed via admin REST.
  *
- * Usage (any one):
- *   set SUPABASE_DB_URL=postgresql://postgres.[ref]:[PASSWORD]@...
- *   set SUPABASE_ACCESS_TOKEN=sbp_...
- *   npm run admin:fix
+ * Usage:
+ *   Copy .env.local.example → .env.local and set SUPABASE_DB_URL or SUPABASE_ACCESS_TOKEN
+ *   npm run cms:fix
  */
 import { readFileSync, existsSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createInterface } from "node:readline/promises";
+import { stdin as input, stdout as output } from "node:process";
+import { seedViaAdminRest } from "./seed-via-admin-rest.js";
+import {
+    SUPABASE_URL,
+    PROJECT_REF,
+    DEFAULT_ADMIN_EMAIL,
+    DEFAULT_ADMIN_PASSWORD,
+    buildAdminAuthHeaders,
+    checkAdminWritePermission,
+} from "./lib/admin-rest.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const rlsSqlPath = join(root, "supabase", "migrations", "009_production_stabilize.sql");
-const seedSqlPath = join(root, "supabase", "default_content.sql");
-const SUPABASE_URL = "https://rhqmquaojetmzdznbevz.supabase.co";
-const PROJECT_REF = "rhqmquaojetmzdznbevz";
-const KEY = "sb_publishable_fUfSHGs4xC7ut470YywOuw_ire40q8v";
+const rlsSqlPath = join(root, "supabase", "migrations", "010_admin_auth_storage_fix.sql");
 
 function loadEnvValue(name) {
     const candidates = [process.env[name]].filter(Boolean);
@@ -32,17 +38,35 @@ function loadEnvValue(name) {
     return candidates[0] || "";
 }
 
+async function promptDbUrl() {
+    const rl = createInterface({ input, output });
+    try {
+        const value = await rl.question("Paste SUPABASE_DB_URL (or press Enter to skip): ");
+        const trimmed = value.trim();
+        if (!trimmed) return "";
+        const envPath = join(root, ".env.local");
+        const line = `SUPABASE_DB_URL=${trimmed}\n`;
+        if (existsSync(envPath)) {
+            const existing = readFileSync(envPath, "utf8");
+            if (!existing.includes("SUPABASE_DB_URL=")) {
+                writeFileSync(envPath, `${existing.trimEnd()}\n${line}`, "utf8");
+            }
+        } else {
+            writeFileSync(envPath, line, "utf8");
+        }
+        console.log("Saved SUPABASE_DB_URL to .env.local");
+        return trimmed;
+    } finally {
+        rl.close();
+    }
+}
+
 async function verifyAdminInsert() {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/home_slides`, {
         method: "POST",
-        headers: {
-            apikey: KEY,
-            Authorization: `Bearer ${KEY}`,
-            "Content-Type": "application/json",
-            "x-admin-email": "admin@eaglewoodpoly.in",
-            "x-admin-password": "admin123",
+        headers: buildAdminAuthHeaders(DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD, {
             Prefer: "return=representation",
-        },
+        }),
         body: JSON.stringify({
             title: "RLS probe",
             subtitle: "delete me",
@@ -63,44 +87,26 @@ async function verifyAdminInsert() {
     if (row?.id) {
         await fetch(`${SUPABASE_URL}/rest/v1/home_slides?id=eq.${row.id}`, {
             method: "DELETE",
-            headers: {
-                apikey: KEY,
-                Authorization: `Bearer ${KEY}`,
-                "x-admin-email": "admin@eaglewoodpoly.in",
-                "x-admin-password": "admin123",
-            },
+            headers: buildAdminAuthHeaders(DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD),
         });
     }
     return { ok: true };
 }
 
-function updateRpcCapabilities() {
-    const capsPath = join(root, "assets", "data", "rpc-capabilities.json");
-    const caps = {
-        verify_legacy_admin: true,
-        create_legacy_admin_session: false,
-        validate_legacy_admin_session: false,
-        revoke_legacy_admin_session: false,
-        destroy_legacy_admin_session: false,
-        bootstrap_cms_default_content: false,
-        seed_cms_as_admin: false,
-        get_admin_login_route: true,
-        bootstrap_admin_auth_links: false,
-    };
-    writeFileSync(capsPath, `${JSON.stringify(caps, null, 2)}\n`, "utf8");
-    console.log("Updated assets/data/rpc-capabilities.json");
-}
-
 async function countPublished(table) {
     const filter = table === "settings" ? "" : "&published=eq.true";
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=id&limit=1${filter}`, {
-        headers: { apikey: KEY, Authorization: `Bearer ${KEY}`, Prefer: "count=exact" },
+        headers: {
+            apikey: buildAdminAuthHeaders(DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD).apikey,
+            Authorization: buildAdminAuthHeaders(DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD).Authorization,
+            Prefer: "count=exact",
+        },
     });
     return Number((res.headers.get("content-range") || "").split("/")[1] || 0);
 }
 
 async function verifyCmsContent() {
-    const tables = ["home_slides", "principal_message", "updates", "notices", "courses", "departments", "gallery", "footer_blocks"];
+    const tables = ["home_slides", "principal_message", "updates", "notices", "courses", "departments", "facilities", "placements", "gallery", "footer_blocks"];
     const counts = {};
     for (const table of tables) {
         counts[table] = await countPublished(table);
@@ -108,89 +114,91 @@ async function verifyCmsContent() {
     return counts;
 }
 
-async function applySqlFiles(dbUrl, files) {
+async function applyViaPg(dbUrl, file) {
     const pg = await import("pg");
+    const sql = readFileSync(file, "utf8");
     const client = new pg.default.Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
     await client.connect();
     try {
-        for (const file of files) {
-            console.log(`Applying ${file}...`);
-            await client.query(readFileSync(file, "utf8"));
-        }
+        console.log(`Applying ${file}...`);
+        await client.query(sql);
     } finally {
         await client.end();
     }
 }
 
-async function applyViaPg(dbUrl, files) {
-    await applySqlFiles(dbUrl, files);
-    console.log("Applied successfully.");
-}
-
-async function applyViaManagementApi(accessToken, files) {
-    for (const file of files) {
-        const sql = readFileSync(file, "utf8");
-        const res = await fetch(`https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query`, {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ query: sql }),
-        });
-        const text = await res.text();
-        if (!res.ok) {
-            throw new Error(`Management API ${res.status} (${file}): ${text}`);
-        }
-        console.log(`Applied ${file} via Management API.`);
+async function applyViaManagementApi(accessToken, file) {
+    const sql = readFileSync(file, "utf8");
+    const res = await fetch(`https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query`, {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query: sql }),
+    });
+    const text = await res.text();
+    if (!res.ok) {
+        throw new Error(`Management API ${res.status}: ${text}`);
     }
 }
 
 async function main() {
-    console.log("CMS production fix — RLS auth + default content seed\n");
+    console.log("CMS production fix — RLS auth + admin REST seed\n");
 
-    const writeProbe = await verifyAdminInsert();
+    const permission = await checkAdminWritePermission();
     let counts = await verifyCmsContent();
     const contentEmpty = Object.values(counts).every((n) => n === 0);
 
-    if (writeProbe.ok && !contentEmpty) {
+    if (permission.admin && !contentEmpty) {
         console.log("Admin writes OK and CMS content already seeded.");
         Object.entries(counts).forEach(([t, n]) => console.log(`  ${t}: ${n}`));
-        updateRpcCapabilities();
         return;
     }
 
-    const dbUrl = loadEnvValue("SUPABASE_DB_URL") || loadEnvValue("DATABASE_URL");
-    const accessToken = loadEnvValue("SUPABASE_ACCESS_TOKEN");
-    const sqlFiles = [];
+    if (!permission.admin) {
+        console.log(`Admin writes blocked (is_admin=${permission.admin}) — applying 010_admin_auth_storage_fix.sql`);
 
-    if (!writeProbe.ok) {
-        console.log(`Admin writes blocked (${writeProbe.status || "error"}) — need 009_production_stabilize.sql`);
-        sqlFiles.push(rlsSqlPath);
-    }
-    if (contentEmpty) {
-        console.log("CMS content tables empty — need default_content.sql");
-        sqlFiles.push(seedSqlPath);
-    }
+        let dbUrl = loadEnvValue("SUPABASE_DB_URL") || loadEnvValue("DATABASE_URL");
+        const accessToken = loadEnvValue("SUPABASE_ACCESS_TOKEN");
 
-    if (sqlFiles.length) {
+        if (!dbUrl && !accessToken && process.stdin.isTTY) {
+            dbUrl = await promptDbUrl();
+        }
+
         if (dbUrl) {
-            await applyViaPg(dbUrl, sqlFiles);
+            await applyViaPg(dbUrl, rlsSqlPath);
         } else if (accessToken) {
-            await applyViaManagementApi(accessToken, sqlFiles);
+            await applyViaManagementApi(accessToken, rlsSqlPath);
         } else {
-            console.error("\nCannot apply automatically — set SUPABASE_DB_URL in .env.local");
-            console.error("Or paste these files in Supabase SQL Editor (in order):");
-            console.error("  supabase/migrations/009_production_stabilize.sql");
-            console.error("  supabase/default_content.sql");
+            console.error("\nCannot apply migration automatically:");
+            console.error("  • No SUPABASE_DB_URL or SUPABASE_ACCESS_TOKEN in environment or .env.local");
+            console.error("  • Supabase MCP is not authenticated in this session");
+            console.error("\nFix: copy .env.local.example → .env.local, add your database URL from");
+            console.error("Supabase Dashboard → Project Settings → Database → Connection string (URI),");
+            console.error("then run: npm run cms:fix");
             process.exit(1);
         }
     }
 
+    const afterPermission = await checkAdminWritePermission();
+    if (!afterPermission.admin) {
+        console.error("Admin write permission still blocked after migration (is_admin=false).");
+        process.exit(1);
+    }
+    console.log("✓ is_admin() returns true with admin headers\n");
+
     const afterWrite = await verifyAdminInsert();
     if (!afterWrite.ok) {
-        console.error(`Admin write still blocked: ${afterWrite.status} ${afterWrite.body || ""}`);
+        console.error(`Admin INSERT still blocked: ${afterWrite.status} ${afterWrite.body || ""}`);
         process.exit(1);
+    }
+    console.log("✓ Admin REST INSERT verified\n");
+
+    counts = await verifyCmsContent();
+    if (Object.values(counts).every((n) => n === 0)) {
+        console.log("Seeding CMS content via admin REST...");
+        await seedViaAdminRest();
     }
 
     counts = await verifyCmsContent();
@@ -203,7 +211,6 @@ async function main() {
 
     console.log("\nPASS: Admin CRUD + CMS content verified.");
     Object.entries(counts).forEach(([t, n]) => console.log(`  ✓ ${t}: ${n}`));
-    updateRpcCapabilities();
 }
 
 main().catch((err) => {

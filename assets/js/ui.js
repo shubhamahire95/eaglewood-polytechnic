@@ -6,11 +6,12 @@
 import CONFIG from "./config.js";
 import { debounce, throttle } from "./utils.js";
 import { safeFetch, ensureCmsReady, isCmsAvailable, isCmsStrictMode } from "./supabase.js";
+import { getSiteLogoUrl } from "./page-loader.js";
 
 const FOOTER_DEFAULTS = {
     institute_name: "Eaglewood Polytechnic Institute",
     footer_tagline: "AICTE Approved • MSBTE Affiliated",
-    logo_url: "assets/images/logo.jpg",
+    logo_url: getSiteLogoUrl(),
     phone: "+91 94237 16230",
     email: "eaglewoodpoly@gmail.com",
     address: "Majalgaon, Dist. Beed",
@@ -66,7 +67,7 @@ const siteHeader = `
   <header class="site-header">
     <nav class="container navbar" aria-label="Main navigation">
       <a class="brand" href="index.html" aria-label="Eaglewood Polytechnic Institute home">
-        <img src="assets/images/logo.jpg" alt="Eaglewood Polytechnic Institute official logo">
+        <img src="${getSiteLogoUrl()}" alt="Eaglewood Polytechnic Institute official logo">
         <span><small>Venkateshwara Manav Vikas Mandal's</small><strong>Eaglewood Polytechnic Institute</strong><em>DTE 2634 | MSBTE 51307</em></span>
       </a>
       <button class="nav-toggle" type="button" aria-label="Toggle navigation" aria-expanded="false"><span></span><span></span><span></span></button>
@@ -84,7 +85,7 @@ const siteFooter = `
       <div class="epi-ft__main">
         <section class="epi-ft__brand" aria-label="Institute">
           <a class="epi-ft__brand-link" href="index.html">
-            <img data-footer-logo loading="lazy" src="assets/images/logo.jpg" alt="Eaglewood Polytechnic Institute logo">
+            <img data-footer-logo loading="lazy" src="${getSiteLogoUrl()}" alt="Eaglewood Polytechnic Institute logo">
             <div class="epi-ft__brand-text">
               <strong data-footer-name>Eaglewood Polytechnic Institute</strong>
               <span class="epi-ft__tagline" data-footer-tagline>AICTE Approved • MSBTE Affiliated</span>
@@ -331,15 +332,6 @@ export function initFooterSettings() {
     return footerInitPromise;
 }
 
-/** Page loader fade-out. */
-function initPageLoader() {
-    const loader = document.querySelector(".page-loader");
-    const finishLoading = () => window.setTimeout(() => loader?.classList.add("loaded"), 450);
-    if (document.readyState === "complete") finishLoading();
-    else window.addEventListener("load", finishLoading, { once: true });
-    window.setTimeout(() => loader?.classList.add("loaded"), 1800);
-}
-
 /** Mobile navigation toggle. */
 function initNavigation() {
     const navToggle = document.querySelector(".nav-toggle");
@@ -572,7 +564,6 @@ function initPageTransitions() {
 /** Initialize all home page UI behaviors (site chrome must be injected first). */
 export function initHomeUI() {
     document.body.classList.add("home-page");
-    initPageLoader();
     initNavigation();
     initHeroSlider();
     initScrollReveal();
@@ -590,7 +581,6 @@ export function initHomeUI() {
 /** Initialize shared UI for non-home pages (legacy support). */
 export function initLegacyUI() {
     injectSiteChrome();
-    initPageLoader();
     initNavigation();
     initScrollReveal();
     initPremiumReveal();
