@@ -1,0 +1,11 @@
+{
+  "verify_legacy_admin": true,
+  "create_legacy_admin_session": false,
+  "validate_legacy_admin_session": false,
+  "revoke_legacy_admin_session": false,
+  "destroy_legacy_admin_session": false,
+  "bootstrap_cms_default_content": false,
+  "seed_cms_as_admin": false,
+  "get_admin_login_route": false,
+  "bootstrap_admin_auth_links": false
+}

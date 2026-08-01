@@ -1,4 +1,5 @@
 import CONFIG from "./config.js";
+import { probeRpcCapabilities, isRpcDeployed, clearRpcCapabilities } from "./rpc-capabilities.js";
 
 const SUPABASE_URL = "https://rhqmquaojetmzdznbevz.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_fUfSHGs4xC7ut470YywOuw_ire40q8v";
@@ -11,8 +12,261 @@ const CLIENT_KEY = "__eaglewoodSupabaseClient";
 const LOADER_KEY = "__eaglewoodSupabaseLoader";
 const STATUS_KEY = "ew_cms_status";
 const SCHEMA_CAPS_KEY = "ew_schema_caps";
+const LEGACY_SESSION_KEY = "ew_admin_session";
+const LEGACY_CREDS_KEY = "ew_admin_legacy_creds";
+const LOCAL_ADMIN_SESSION_KEY = "ew_local_admin_session";
+const AUTH_STORAGE_KEY = CONFIG.auth?.storageKey || "ew-supabase-auth";
+const CMS_SYNC_KEY = "ew_cms_updated_at";
+const LEGACY_SESSION_HEADER = "x-legacy-admin-session";
+const ADMIN_EMAIL_HEADER = "x-admin-email";
+const ADMIN_PASSWORD_HEADER = "x-admin-password";
+
+const PUBLIC_INSERT_TABLES = new Set(["inquiries", "admissions", "contacts"]);
+
+const EMAIL_NOT_CONFIRMED_MESSAGE =
+    "Your administrator account has not been confirmed yet. "
+    + "Please confirm the email in Supabase Authentication or disable email confirmation for development.";
+
+/** No-op storage prevents Supabase Auth from persisting or refreshing sessions. */
+const NOOP_AUTH_STORAGE = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+};
+
+export function isDevelopmentEnv() {
+    const env = String(CONFIG.env || "").toLowerCase();
+    if (env === "development") return true;
+    if (env === "production") return false;
+    if (typeof location !== "undefined") {
+        const host = location.hostname;
+        return host === "localhost" || host === "127.0.0.1" || host.endsWith(".local");
+    }
+    return false;
+}
+
+/** Dev-only legacy RPC fallback — never enabled in production. */
+export function isDevLegacyFallbackEnabled() {
+    return isDevelopmentEnv() && CONFIG.auth?.devLegacyFallback === true;
+}
+
+/** Legacy-only admin login — no Supabase Auth. */
+export function isLegacyAuthOnly() {
+    return CONFIG.auth?.mode === "legacy" || CONFIG.auth?.supabaseAuth === false;
+}
+
+/** Remove stale Supabase Auth keys that trigger /auth/v1/* requests. */
+export function purgeSupabaseAuthStorage() {
+    try {
+        const remove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (!key) continue;
+            if (
+                key === AUTH_STORAGE_KEY
+                || key.includes("auth-token")
+                || key.startsWith("sb-")
+            ) {
+                remove.push(key);
+            }
+        }
+        remove.forEach((key) => localStorage.removeItem(key));
+    } catch {
+        /* ignore */
+    }
+}
+
+if (isLegacyAuthOnly()) {
+    purgeSupabaseAuthStorage();
+}
+
+/** Legacy admins.password login via verify_legacy_admin. */
+export function isLegacyPasswordLoginEnabled() {
+    return isLegacyAuthOnly() || CONFIG.auth?.legacyPasswordLogin !== false;
+}
+
+function createLocalAdminSession(admin, email, password) {
+    const expiresAt = Date.now() + 12 * 60 * 60 * 1000;
+    try {
+        sessionStorage.setItem(LOCAL_ADMIN_SESSION_KEY, JSON.stringify({
+            id: admin.id,
+            email: admin.email,
+            expires_at: expiresAt,
+        }));
+    } catch {
+        /* ignore */
+    }
+    storeLegacyCredentials(email, password);
+    storeAdminProfile({ ...admin, devLegacy: true });
+}
+
+function getLocalAdminSession() {
+    try {
+        const raw = sessionStorage.getItem(LOCAL_ADMIN_SESSION_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed?.id) return null;
+        if (parsed.expires_at && Date.now() > parsed.expires_at) {
+            sessionStorage.removeItem(LOCAL_ADMIN_SESSION_KEY);
+            return null;
+        }
+        return parsed;
+    } catch {
+        return null;
+    }
+}
+
+function clearLocalAdminSession() {
+    try {
+        sessionStorage.removeItem(LOCAL_ADMIN_SESSION_KEY);
+    } catch {
+        /* ignore */
+    }
+}
+
+function storeLegacyCredentials(email, password) {
+    try {
+        sessionStorage.setItem(LEGACY_CREDS_KEY, JSON.stringify({ email: email.trim(), password }));
+    } catch {
+        /* ignore */
+    }
+}
+
+export function loadLegacyCredentials() {
+    try {
+        const raw = sessionStorage.getItem(LEGACY_CREDS_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (parsed?.email && parsed?.password) return parsed;
+    } catch {
+        /* ignore */
+    }
+    return null;
+}
+
+function clearLegacyCredentials() {
+    try {
+        sessionStorage.removeItem(LEGACY_CREDS_KEY);
+    } catch {
+        /* ignore */
+    }
+}
+
+function getLegacySessionToken() {
+    try {
+        const raw = localStorage.getItem(LEGACY_SESSION_KEY);
+        if (!raw) return "";
+        const parsed = JSON.parse(raw);
+        if (parsed?.token) return String(parsed.token);
+        return String(raw);
+    } catch {
+        return localStorage.getItem(LEGACY_SESSION_KEY) || "";
+    }
+}
+
+function setLegacySessionToken(token, expiresAt = "") {
+    localStorage.setItem(LEGACY_SESSION_KEY, JSON.stringify({
+        token,
+        expires_at: expiresAt,
+    }));
+}
+
+function buildClientOptions() {
+    const headers = {};
+    const legacyToken = getLegacySessionToken();
+    if (legacyToken) headers[LEGACY_SESSION_HEADER] = legacyToken;
+    const creds = loadLegacyCredentials();
+    if (creds?.email && creds?.password) {
+        headers[ADMIN_EMAIL_HEADER] = creds.email;
+        headers[ADMIN_PASSWORD_HEADER] = creds.password;
+    }
+    const authOptions = isLegacyAuthOnly()
+        ? {
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
+            storage: NOOP_AUTH_STORAGE,
+            storageKey: AUTH_STORAGE_KEY,
+        }
+        : {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: false,
+            storageKey: AUTH_STORAGE_KEY,
+        };
+    return { auth: authOptions, global: { headers } };
+}
+
+function getClientHeaderFingerprint() {
+    const creds = loadLegacyCredentials();
+    return `${getLegacySessionToken() || ""}:${creds?.email || ""}:${creds?.password || ""}`;
+}
+
+/** Build REST headers for admin writes — always includes session + email/password when available. */
+function buildAdminAuthHeaders(extra = {}) {
+    const headers = {
+        apikey: SUPABASE_PUBLISHABLE_KEY,
+        Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+        "Content-Type": "application/json",
+        ...extra,
+    };
+    const legacyToken = getLegacySessionToken();
+    if (legacyToken) headers[LEGACY_SESSION_HEADER] = legacyToken;
+    const creds = loadLegacyCredentials();
+    if (creds?.email && creds?.password) {
+        headers[ADMIN_EMAIL_HEADER] = creds.email;
+        headers[ADMIN_PASSWORD_HEADER] = creds.password;
+    }
+    return headers;
+}
+
+/** Admin table write via PostgREST fetch — guarantees auth headers on every request. */
+async function adminRestRequest(method, table, { payload, match, prefer } = {}) {
+    let url = `${SUPABASE_URL}/rest/v1/${table}`;
+    if (match && typeof match === "object") {
+        const params = Object.entries(match).map(
+            ([key, value]) => `${encodeURIComponent(key)}=eq.${encodeURIComponent(value)}`,
+        );
+        if (params.length) url += `?${params.join("&")}`;
+    }
+    const headers = buildAdminAuthHeaders({
+        Prefer: prefer || (method === "POST" ? "return=representation" : "return=minimal"),
+    });
+    const init = { method, headers };
+    if (payload !== undefined) init.body = JSON.stringify(payload);
+    const res = await fetch(url, init);
+    const text = await res.text();
+    let data = null;
+    try {
+        data = text ? JSON.parse(text) : null;
+    } catch {
+        data = text;
+    }
+    if (!res.ok) {
+        return {
+            ok: false,
+            error: { message: data?.message || text, code: data?.code, status: res.status },
+            data: null,
+        };
+    }
+    if (method === "POST" && Array.isArray(data)) {
+        return { ok: true, data: data[0] ?? null };
+    }
+    return { ok: true, data };
+}
+
+/** Notify open public pages that CMS data changed (cross-tab sync). */
+export function notifyCmsDataChanged() {
+    clearCmsQueryCache();
+    try {
+        localStorage.setItem(CMS_SYNC_KEY, String(Date.now()));
+    } catch {
+        /* ignore */
+    }
+}
 
 let schemaCaps = null;
+let lastConnectionDiagnostics = null;
 
 /**
  * Tables in supabase/migrations/001_eaglewood_cms.sql — the ONLY tables queried by JS.
@@ -46,13 +300,15 @@ const tableStatus = new Map();
 let cmsReadyPromise = null;
 let cmsFullyMissing = false;
 let cmsAdminMode = false;
+/** Tracks admin header creds on the cached Supabase client (see getClientHeaderFingerprint). */
+let clientHeaderFingerprint = "";
 
 /** Enable full CMS queries on admin pages (even before connection is confirmed). */
 export function setCmsAdminMode(enabled) {
     cmsAdminMode = Boolean(enabled);
 }
 
-function cmsEnabled() {
+export function cmsEnabled() {
     return CONFIG.cms?.enabled === true;
 }
 
@@ -82,6 +338,11 @@ export function isCmsAvailable() {
     return cmsEnabled() && !cmsFullyMissing && cachedStatus() === "ready";
 }
 
+/** When true, public pages must render CMS data only — no local fallback/demo content. */
+export function isCmsStrictMode() {
+    return cmsEnabled() && !cmsFullyMissing && cachedStatus() !== "unavailable";
+}
+
 /** True when at least admins table is reachable (auth bootstrap). */
 export function isAuthBootstrapReady() {
     const status = cachedStatus();
@@ -101,6 +362,21 @@ export function getMissingTables() {
     return [...CMS_TABLES].filter((t) => tableStatus.get(t) === "missing");
 }
 
+export function getCmsTableStats() {
+    const missing = getMissingTables();
+    const total = CMS_TABLES.size;
+    return { total, found: total - missing.length, missing };
+}
+
+export function getLastConnectionDiagnostics() {
+    return lastConnectionDiagnostics;
+}
+
+/** Clear in-memory query cache so public pages pick up fresh CMS data. */
+export function clearCmsQueryCache() {
+    queryCache.clear();
+}
+
 /** Clear cached probe result (e.g. after running migration). */
 export function resetCmsStatus() {
     try {
@@ -112,8 +388,10 @@ export function resetCmsStatus() {
     cmsReadyPromise = null;
     cmsFullyMissing = false;
     schemaCaps = null;
+    lastConnectionDiagnostics = null;
     tableStatus.clear();
-    queryCache.clear();
+    clearCmsQueryCache();
+    clearRpcCapabilities();
 }
 
 function loadSchemaCaps() {
@@ -144,41 +422,120 @@ function isMissingColumnError(error) {
 
 function isMissingRpcError(error) {
     const code = String(error?.code || "");
-    return code === "PGRST202" || isMissingTableError(error);
+    return code === "PGRST202";
 }
 
-/** Probe live schema once per session — avoids 404/400 on missing tables, columns, RPCs. */
+function getProjectIdFromUrl(url = SUPABASE_URL) {
+    try {
+        return new URL(url).hostname.split(".")[0] || url;
+    } catch {
+        return url;
+    }
+}
+
+function tableProbeResult(error) {
+    if (!error) return "ok";
+    if (isMissingTableError(error)) return "missing";
+    return "error";
+}
+
+/** Admin-only connection diagnostics — logs URL, project, per-table status, storage, RPC. */
+export async function logCmsConnectionDiagnostics() {
+    const projectId = getProjectIdFromUrl();
+    const tableResults = {};
+    const tables = [...CMS_TABLES];
+
+    await Promise.all(tables.map(async (table) => {
+        try {
+            const { error } = await supabase.from(table).select("id").limit(1);
+            tableResults[table] = tableProbeResult(error);
+            if (tableResults[table] === "ok") tableStatus.set(table, "ok");
+            else if (tableResults[table] === "missing") tableStatus.set(table, "missing");
+        } catch {
+            tableResults[table] = "error";
+        }
+    }));
+
+    let storage = { ok: false, detail: "unknown" };
+    try {
+        const { data, error } = await supabase.storage.from(CONFIG.cms?.storageBucket || "cms").list("", { limit: 1 });
+        storage = { ok: !error, detail: error ? String(error.message || error) : `${data?.length ?? 0} object(s) visible` };
+    } catch (err) {
+        storage = { ok: false, detail: String(err?.message || err) };
+    }
+
+    let rpc = { ok: true, detail: "Legacy verify_legacy_admin" };
+
+    const missing = tables.filter((t) => tableResults[t] === "missing");
+    const diagnostics = {
+        url: SUPABASE_URL,
+        projectId,
+        tables: tableResults,
+        missing,
+        storage,
+        rpc,
+        stats: {
+            total: tables.length,
+            found: tables.length - missing.length,
+        },
+    };
+    lastConnectionDiagnostics = diagnostics;
+
+    console.group("[CMS] Connection diagnostics");
+    console.log("Supabase URL:", SUPABASE_URL);
+    console.log("Project ID:", projectId);
+    for (const table of tables) {
+        const state = tableResults[table];
+        console.log(state === "ok" ? `✓ ${table} — Exists` : state === "missing" ? `✗ ${table} — Missing` : `? ${table} — ${state}`);
+    }
+    console.log("Missing tables:", missing.length ? missing : "[]");
+    console.log("Storage bucket:", storage.ok ? "✓ Ready" : `✗ ${storage.detail}`);
+    console.log("RPC status:", rpc.ok ? "✓ Ready" : `✗ ${rpc.detail}`);
+    console.log(`Tables found: ${diagnostics.stats.found}/${diagnostics.stats.total}`);
+    console.groupEnd();
+
+    return diagnostics;
+}
+
+/** Probe live schema — re-probes when verifyFull is true and CMS is not confirmed ready. */
 export async function probeSchemaCapabilities(options = {}) {
     const { force = false, verifyFull = false } = options;
     const cached = loadSchemaCaps();
-    if (cached && !force) return cached;
+    const status = cachedStatus();
 
-    const caps = {
-        admins: false,
-        settings: false,
-        authUserId: false,
-        statusColumn: false,
-        rpc: false,
-    };
-
-    const { data: adminRows, error: adminError } = await supabase.from("admins").select("*").limit(1);
-    caps.admins = !adminError;
-
-    if (caps.admins && adminRows?.length) {
-        const row = adminRows[0];
-        caps.authUserId = Object.prototype.hasOwnProperty.call(row, "auth_user_id");
-        caps.statusColumn = Object.prototype.hasOwnProperty.call(row, "status");
+    if (cached && !force) {
+        const confirmedReady = cached.settings === true && status === "ready";
+        if (confirmedReady) return cached;
+        if (!verifyFull && cached.admins !== undefined) return cached;
     }
 
-    if (verifyFull) {
-        const { error: settingsError } = await supabase.from("settings").select("id").limit(1);
-        caps.settings = !settingsError && !isMissingTableError(settingsError);
+    const caps = {
+        admins: cached?.admins ?? false,
+        settings: cached?.settings ?? false,
+        authUserId: cached?.authUserId ?? false,
+        statusColumn: cached?.statusColumn ?? false,
+        rpc: cached?.rpc ?? false,
+    };
 
-        if (caps.settings) {
-            const { error: rpcError } = await supabase.rpc("get_admin_login_route", {
-                p_email: "__schema_probe__@invalid.local",
-            });
-            caps.rpc = !rpcError && !isMissingRpcError(rpcError);
+    const needsAdminProbe = force || !cached?.admins;
+    if (needsAdminProbe) {
+        const { data: adminRows, error: adminError } = await supabase.from("admins").select("*").limit(1);
+        caps.admins = !adminError;
+
+        if (caps.admins && adminRows?.length) {
+            const row = adminRows[0];
+            caps.authUserId = Object.prototype.hasOwnProperty.call(row, "auth_user_id");
+            caps.statusColumn = Object.prototype.hasOwnProperty.call(row, "status");
+        }
+    }
+
+    const needsSettingsProbe = verifyFull && (force || cached?.settings !== true);
+    if (needsSettingsProbe) {
+        const { error: settingsError } = await supabase.from("settings").select("id").limit(1);
+        caps.settings = !settingsError;
+
+        if (!caps.settings) {
+            caps.rpc = false;
         }
     }
 
@@ -187,8 +544,8 @@ export async function probeSchemaCapabilities(options = {}) {
 }
 
 /**
- * Connect CMS for admin dashboard — probes settings table and upgrades to "ready" when migration ran.
- * Returns { connected: boolean, reason?: string, missing?: string[] }
+ * Connect CMS for admin dashboard — probes each table independently.
+ * Returns { connected, reason?, missing?, stats?, storage?, rpc? }
  */
 export async function connectCms(options = {}) {
     const { force = false } = options;
@@ -201,38 +558,56 @@ export async function connectCms(options = {}) {
     if (force) {
         cmsReadyPromise = null;
         queryCache.clear();
+        try {
+            sessionStorage.removeItem(STATUS_KEY);
+            sessionStorage.removeItem(SCHEMA_CAPS_KEY);
+        } catch {
+            /* ignore */
+        }
+        schemaCaps = null;
+        tableStatus.clear();
     }
 
     setCmsAdminMode(true);
 
-    const caps = await probeSchemaCapabilities({ force: true, verifyFull: true });
+    await probeRpcCapabilities({ force });
+
+    const caps = await probeSchemaCapabilities({ force, verifyFull: true });
 
     if (!caps.admins) {
         setCachedStatus("unavailable");
         markAllMissing();
-        return { connected: false, reason: "no_admins" };
+        await logCmsConnectionDiagnostics();
+        return { connected: false, reason: "no_admins", missing: getMissingTables() };
     }
 
     tableStatus.set("admins", "ok");
     cmsFullyMissing = false;
 
-    if (caps.settings) {
+    const diagnostics = await logCmsConnectionDiagnostics();
+    const missing = getMissingTables();
+    const stats = getCmsTableStats();
+
+    if (missing.length === 0) {
         setCachedStatus("ready");
-        tableStatus.set("settings", "ok");
-        CMS_TABLES.forEach((t) => {
-            if (tableStatus.get(t) !== "missing") tableStatus.set(t, "ok");
-        });
-        return { connected: true };
+        caps.settings = true;
+        saveSchemaCaps(caps);
+        return {
+            connected: true,
+            stats,
+            storage: diagnostics.storage,
+            rpc: diagnostics.rpc,
+        };
     }
 
-    CMS_TABLES.forEach((t) => {
-        if (t !== "admins") tableStatus.set(t, "missing");
-    });
     setCachedStatus("partial");
     return {
         connected: false,
-        reason: "migration_required",
-        missing: getMissingTables(),
+        reason: missing.includes("settings") ? "migration_required" : "partial_schema",
+        missing,
+        stats,
+        storage: diagnostics.storage,
+        rpc: diagnostics.rpc,
     };
 }
 
@@ -242,18 +617,24 @@ export async function probeCmsTableHealth() {
     await Promise.all(tables.map(async (table) => {
         try {
             const { error } = await supabase.from(table).select("id").limit(1);
-            tableStatus.set(table, error && isMissingTableError(error) ? "missing" : "ok");
+            const result = tableProbeResult(error);
+            if (result === "ok") tableStatus.set(table, "ok");
+            else if (result === "missing") tableStatus.set(table, "missing");
         } catch {
-            tableStatus.set(table, "missing");
+            /* keep existing status on transient failures */
         }
     }));
 
-    if (tableStatus.get("settings") === "ok") {
+    const missing = getMissingTables();
+    if (missing.length === 0) {
         setCachedStatus("ready");
         cmsFullyMissing = false;
         const caps = loadSchemaCaps() || {};
         caps.settings = true;
+        caps.admins = true;
         saveSchemaCaps(caps);
+    } else if (tableStatus.get("admins") === "ok") {
+        setCachedStatus("partial");
     }
 }
 
@@ -264,10 +645,9 @@ export function isLegacySchema() {
     return cachedStatus() === "partial";
 }
 
-/** True when login RPCs are available. */
+/** True when login RPCs are available. @deprecated Supabase Auth only — always false. */
 export function hasAuthRpc() {
-    const caps = loadSchemaCaps();
-    return Boolean(caps?.rpc);
+    return false;
 }
 
 /** Build admin OR filter without referencing missing columns. */
@@ -284,7 +664,6 @@ export function adminSelectColumns(caps = loadSchemaCaps()) {
     const cols = ["id", "email", "name", "role"];
     if (caps?.statusColumn) cols.push("status");
     if (caps?.authUserId) cols.push("auth_user_id");
-    if (!caps?.settings) cols.push("password");
     return cols.join(",");
 }
 
@@ -310,7 +689,9 @@ export async function ensureCmsReady(options = {}) {
         }
         if (status === "ready" && !force) {
             cmsFullyMissing = false;
-            tableStatus.set("settings", "ok");
+            CMS_TABLES.forEach((t) => {
+                if (tableStatus.get(t) !== "missing") tableStatus.set(t, "ok");
+            });
             return true;
         }
 
@@ -325,12 +706,21 @@ export async function ensureCmsReady(options = {}) {
         tableStatus.set("admins", "ok");
         cmsFullyMissing = false;
 
-        if (caps.settings) {
+        await probeRpcCapabilities({ force: force || verifyFull });
+
+        if (verifyFull || force) {
+            await probeCmsTableHealth();
+        } else if (caps.settings) {
             setCachedStatus("ready");
             tableStatus.set("settings", "ok");
             CMS_TABLES.forEach((t) => {
-                if (t !== "admins" && tableStatus.get(t) !== "missing") tableStatus.set(t, "ok");
+                if (tableStatus.get(t) !== "missing") tableStatus.set(t, "ok");
             });
+            return true;
+        }
+
+        if (getMissingTables().length === 0) {
+            setCachedStatus("ready");
             return true;
         }
 
@@ -345,14 +735,211 @@ async function requireCmsReady() {
     if (!cmsEnabled()) return false;
     if (isCmsAvailable()) return true;
     if (cachedStatus() === "partial") return true;
-    return ensureCmsReady();
+    const ready = await ensureCmsReady();
+    if (ready) await probeRpcCapabilities();
+    return ready;
 }
 
 function isPartialCms() {
     return cachedStatus() === "partial";
 }
 
-export const supabase = await getSupabaseClient();
+/** Block reads only when a table is confirmed missing — not when setup is partial. */
+function shouldBlockPublicRead(table) {
+    return !cmsAdminMode && tableStatus.get(table) === "missing";
+}
+
+/** Clear leftover legacy-session artifacts (does not touch Supabase Auth session). */
+export function clearLegacyAuthArtifacts() {
+    try {
+        localStorage.removeItem(LEGACY_SESSION_KEY);
+        clearLocalAdminSession();
+        clearLegacyCredentials();
+    } catch {
+        /* ignore */
+    }
+}
+
+async function verifyLegacyAdminRpc(email, password) {
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/verify_legacy_admin`, {
+            method: "POST",
+            headers: {
+                apikey: SUPABASE_PUBLISHABLE_KEY,
+                Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                p_email: email.trim(),
+                p_password: password,
+            }),
+        });
+        const text = await res.text();
+        let data = null;
+        try {
+            data = text ? JSON.parse(text) : null;
+        } catch {
+            data = null;
+        }
+        if (!res.ok || !data) {
+            return { ok: false, reason: "invalid" };
+        }
+        if (data?.error === "inactive") {
+            return { ok: false, reason: "inactive" };
+        }
+        if (!data?.id || String(data?.status || "active") !== "active") {
+            return { ok: false, reason: "inactive" };
+        }
+        if (data?.session_token) {
+            setLegacySessionToken(data.session_token, data.expires_at || "");
+            await syncWriteClient();
+        }
+        return { ok: true, admin: formatAdminProfile(data) };
+    } catch {
+        return { ok: false, reason: "network" };
+    }
+}
+
+export async function validateLegacySession() {
+    const local = getLocalAdminSession();
+    const cached = JSON.parse(localStorage.getItem("admin") || "null");
+    const creds = loadLegacyCredentials();
+    if (local?.id && cached?.id && String(local.id) === String(cached.id) && cached.status === "active"
+        && creds?.email && creds?.password) {
+        return formatAdminProfile(cached);
+    }
+    return null;
+}
+
+async function tryLegacyPasswordLogin(email, password) {
+    if (!isLegacyPasswordLoginEnabled()) {
+        return { ok: false, reason: "disabled" };
+    }
+
+    const verified = await verifyLegacyAdminRpc(email, password);
+    if (!verified.ok) {
+        return { ok: false, message: "Invalid email or password.", code: "invalid_credentials" };
+    }
+
+    createLocalAdminSession(verified.admin, email, password);
+    await syncWriteClient();
+    return { ok: true, admin: verified.admin, devLegacy: true };
+}
+
+/** @deprecated */
+async function tryDevLegacyLogin(email, password) {
+    return tryLegacyPasswordLogin(email, password);
+}
+
+/** @deprecated Use clearLegacyAuthArtifacts */
+export function clearStaleSupabaseAuthStorage() {
+    clearLegacyAuthArtifacts();
+}
+
+function logAuthError(error, context = "") {
+    if (!error) return;
+    console.error("[Auth] error", context, error);
+    console.error("[Auth] status:", error.status);
+    console.error("[Auth] code:", error.code || error.error_code);
+    console.error("[Auth] message:", error.message || error.msg);
+}
+
+function formatAdminProfile(data) {
+    return {
+        id: data.id,
+        auth_user_id: data.auth_user_id,
+        email: data.email,
+        name: data.name || data.email,
+        role: data.role || "admin",
+        status: data.status,
+    };
+}
+
+function mapAuthErrorMessage(error) {
+    const code = String(error?.code || error?.error_code || "").toLowerCase();
+    const message = String(error?.message || error?.msg || "").toLowerCase();
+
+    if (code === "email_not_confirmed" || message.includes("email not confirmed")) {
+        return EMAIL_NOT_CONFIRMED_MESSAGE;
+    }
+    if (code === "invalid_credentials" || code === "400" && message.includes("invalid login")) {
+        return "Invalid email or password.";
+    }
+    if (code === "user_banned" || message.includes("banned") || message.includes("disabled")) {
+        return "This account has been disabled. Contact the institute administrator.";
+    }
+    if (code === "too_many_requests" || message.includes("too many")) {
+        return "Too many attempts. Please wait a minute and try again.";
+    }
+    return "Unable to sign in. Please verify your credentials and try again.";
+}
+
+export function storeAdminProfile(admin) {
+    localStorage.setItem("admin", JSON.stringify({
+        id: admin.id,
+        auth_user_id: admin.auth_user_id,
+        email: admin.email,
+        name: admin.name || admin.email,
+        role: admin.role || "admin",
+        status: admin.status || "active",
+        devLegacy: Boolean(admin.devLegacy),
+    }));
+}
+
+export async function getAuthSession() {
+    return null;
+}
+
+/** @deprecated Legacy mode — Supabase Auth is disabled. */
+export async function resolveAdminProfile() {
+    return null;
+}
+
+export async function signInWithAdminAuth(email, password) {
+    purgeSupabaseAuthStorage();
+    return tryLegacyPasswordLogin(email, password);
+}
+
+export async function signOutAdmin() {
+    localStorage.removeItem("admin");
+    clearLegacyAuthArtifacts();
+    purgeSupabaseAuthStorage();
+    await refreshSupabaseClient();
+}
+
+export let supabase = await getSupabaseClient();
+
+export async function refreshSupabaseClient() {
+    const fingerprint = getClientHeaderFingerprint();
+    if (window[CLIENT_KEY] && clientHeaderFingerprint === fingerprint) {
+        supabase = window[CLIENT_KEY];
+        return supabase;
+    }
+    window[CLIENT_KEY] = null;
+    clientHeaderFingerprint = "";
+    supabase = await getSupabaseClient();
+    return supabase;
+}
+
+async function syncWriteClient() {
+    const fingerprint = getClientHeaderFingerprint();
+    if (window[CLIENT_KEY] && clientHeaderFingerprint === fingerprint) {
+        return window[CLIENT_KEY];
+    }
+    return refreshSupabaseClient();
+}
+
+async function prepareAdminWriteRequest() {
+    if (!(await ensureAdminWriteSession())) return false;
+    await syncWriteClient();
+    return true;
+}
+
+/** Returns a Supabase client with write headers attached, or null when write session is missing. */
+export async function getAdminWriteClient() {
+    if (!(await prepareAdminWriteRequest())) return null;
+    return syncWriteClient();
+}
 
 function isMissingTableError(error) {
     const msg = String(error?.message || error?.details || "").toLowerCase();
@@ -391,8 +978,8 @@ export async function safeFetch(table, builder, fallback = [], cacheKey = "") {
     if (!cmsEnabled() || cmsFullyMissing || cachedStatus() === "unavailable") {
         return notConfiguredResult(fallback);
     }
-    if (isPartialCms() && table !== "admins" && !cmsAdminMode) {
-        return notConfiguredResult(fallback);
+    if (shouldBlockPublicRead(table)) {
+        return { data: fallback, ok: false, reason: "missing_table" };
     }
     if (cmsAdminMode && tableStatus.get(table) === "missing") {
         return { data: fallback, ok: false, reason: "missing_table" };
@@ -404,6 +991,9 @@ export async function safeFetch(table, builder, fallback = [], cacheKey = "") {
     const request = (async () => {
         if (!(await requireCmsReady())) {
             return { data: fallback, ok: false, reason: "not_configured" };
+        }
+        if (shouldBlockPublicRead(table)) {
+            return { data: fallback, ok: false, reason: "missing_table" };
         }
         try {
             let query = supabase.from(table);
@@ -440,8 +1030,8 @@ export async function safeCount(table, cacheKey = "") {
     if (!cmsEnabled() || cmsFullyMissing || cachedStatus() === "unavailable") {
         return { count: null, ok: false, reason: "not_configured" };
     }
-    if (isPartialCms() && table !== "admins" && !cmsAdminMode) {
-        return { count: null, ok: false, reason: "not_configured" };
+    if (shouldBlockPublicRead(table)) {
+        return { count: null, ok: false, reason: "missing_table" };
     }
     if (cmsAdminMode && tableStatus.get(table) === "missing") {
         return { count: null, ok: false, reason: "missing_table" };
@@ -453,6 +1043,9 @@ export async function safeCount(table, cacheKey = "") {
     const request = (async () => {
         if (!(await requireCmsReady())) {
             return { count: null, ok: false, reason: "not_configured" };
+        }
+        if (shouldBlockPublicRead(table)) {
+            return { count: null, ok: false, reason: "missing_table" };
         }
         try {
             const { count, error } = await supabase.from(table).select("*", { count: "exact", head: true });
@@ -475,18 +1068,45 @@ export async function safeCount(table, cacheKey = "") {
 }
 
 export async function safeInsert(table, payload) {
+    if (PUBLIC_INSERT_TABLES.has(table)) {
+        return safePublicInsert(table, payload);
+    }
     if (!CMS_TABLES.has(table)) return { data: null, ok: false, reason: "not_configured" };
     if (!(await requireCmsReady())) return { data: null, ok: false, reason: "not_configured" };
+    if (!cmsAdminMode && isPartialCms() && table !== "admins") return { data: null, ok: false, reason: "not_configured" };
+    if (!(await prepareAdminWriteRequest())) return { data: null, ok: false, reason: "permission" };
     try {
-        const { data, error } = await supabase.from(table).insert(payload).select().maybeSingle();
-        if (error) {
+        const result = await adminRestRequest("POST", table, { payload });
+        if (!result.ok) {
+            const error = result.error;
             if (isMissingTableError(error)) {
                 tableStatus.set(table, "missing");
                 return { data: null, ok: false, reason: "missing_table" };
             }
-            return { data: null, ok: false, reason: isPermissionError(error) ? "permission" : "error" };
+            if (isPermissionError(error)) {
+                return { data: null, ok: false, reason: "permission" };
+            }
+            return { data: null, ok: false, reason: "error" };
         }
-        queryCache.clear();
+        notifyCmsDataChanged();
+        return { data: result.data, ok: true };
+    } catch {
+        return { data: null, ok: false, reason: "network" };
+    }
+}
+
+/** Public form submissions — no admin session required. */
+export async function safePublicInsert(table, payload) {
+    if (!PUBLIC_INSERT_TABLES.has(table)) {
+        return { data: null, ok: false, reason: "not_configured" };
+    }
+    if (!(await requireCmsReady())) return { data: null, ok: false, reason: "not_configured" };
+    try {
+        const { data, error } = await supabase.from(table).insert(payload).select().maybeSingle();
+        if (error) {
+            if (isPermissionError(error)) return { data: null, ok: false, reason: "permission" };
+            return { data: null, ok: false, reason: "error" };
+        }
         return { data, ok: true };
     } catch {
         return { data: null, ok: false, reason: "network" };
@@ -496,16 +1116,19 @@ export async function safeInsert(table, payload) {
 export async function safeUpdate(table, payload, match) {
     if (!CMS_TABLES.has(table)) return { ok: false, reason: "not_configured" };
     if (!(await requireCmsReady())) return { ok: false, reason: "not_configured" };
+    if (!cmsAdminMode && isPartialCms() && table !== "admins") return { ok: false, reason: "not_configured" };
+    if (!(await prepareAdminWriteRequest())) return { ok: false, reason: "permission" };
     try {
-        const { error } = await supabase.from(table).update(payload).match(match);
-        if (error) {
+        const result = await adminRestRequest("PATCH", table, { payload, match });
+        if (!result.ok) {
+            const error = result.error;
             if (isMissingTableError(error)) {
                 tableStatus.set(table, "missing");
                 return { ok: false, reason: "missing_table" };
             }
             return { ok: false, reason: isPermissionError(error) ? "permission" : "error" };
         }
-        queryCache.clear();
+        notifyCmsDataChanged();
         return { ok: true };
     } catch {
         return { ok: false, reason: "network" };
@@ -515,16 +1138,19 @@ export async function safeUpdate(table, payload, match) {
 export async function safeDelete(table, match) {
     if (!CMS_TABLES.has(table)) return { ok: false, reason: "not_configured" };
     if (!(await requireCmsReady())) return { ok: false, reason: "not_configured" };
+    if (!cmsAdminMode && isPartialCms() && table !== "admins") return { ok: false, reason: "not_configured" };
+    if (!(await prepareAdminWriteRequest())) return { ok: false, reason: "permission" };
     try {
-        const { error } = await supabase.from(table).delete().match(match);
-        if (error) {
+        const result = await adminRestRequest("DELETE", table, { match });
+        if (!result.ok) {
+            const error = result.error;
             if (isMissingTableError(error)) {
                 tableStatus.set(table, "missing");
                 return { ok: false, reason: "missing_table" };
             }
             return { ok: false, reason: isPermissionError(error) ? "permission" : "error" };
         }
-        queryCache.clear();
+        notifyCmsDataChanged();
         return { ok: true };
     } catch {
         return { ok: false, reason: "network" };
@@ -535,6 +1161,10 @@ export async function safeDelete(table, match) {
 export async function safeAdminSelect(table, builder, fallback = null) {
     if (!CMS_TABLES.has(table)) return { data: fallback, ok: false, reason: "not_configured" };
     if (!(await requireCmsReady())) return { data: fallback, ok: false, reason: "not_configured" };
+    if (!cmsAdminMode && isPartialCms() && table !== "admins") return { data: fallback, ok: false, reason: "not_configured" };
+    if (cmsAdminMode && loadLegacyCredentials()) {
+        await syncWriteClient();
+    }
     try {
         let query = supabase.from(table);
         if (typeof builder === "function") query = builder(query);
@@ -551,23 +1181,26 @@ export async function safeAdminSelect(table, builder, fallback = null) {
     }
 }
 
-/** RPC helper — never throws. Skips network call when RPCs are known missing. */
+/** RPC helper — never throws; skips network when RPC is known missing. */
 export async function safeRpc(fn, params = {}, fallback = null) {
     if (!cmsEnabled()) return { data: fallback, ok: false, reason: "not_configured" };
-    const caps = loadSchemaCaps();
-    if (caps && !caps.rpc) return { data: fallback, ok: false, reason: "missing_rpc" };
+    const deployed = isRpcDeployed(fn);
+    if (deployed === false) {
+        return { data: fallback, ok: false, reason: "missing_rpc" };
+    }
+    if (deployed === null) {
+        await probeRpcCapabilities();
+        if (isRpcDeployed(fn) === false) {
+            return { data: fallback, ok: false, reason: "missing_rpc" };
+        }
+    }
     try {
         const { data, error } = await supabase.rpc(fn, params);
         if (error) {
             if (isMissingRpcError(error)) {
-                saveSchemaCaps({ ...(caps || {}), rpc: false });
                 return { data: fallback, ok: false, reason: "missing_rpc" };
             }
             return { data: fallback, ok: false, reason: "error" };
-        }
-        if (caps) {
-            caps.rpc = true;
-            saveSchemaCaps(caps);
         }
         return { data: data ?? fallback, ok: true };
     } catch {
@@ -575,82 +1208,58 @@ export async function safeRpc(fn, params = {}, fallback = null) {
     }
 }
 
-export async function verifyLegacyAdmin(email, password) {
-    const caps = loadSchemaCaps() || await probeSchemaCapabilities();
-
-    if (caps.rpc) {
-        const result = await safeRpc("verify_legacy_admin", {
-            p_email: email,
-            p_password: password,
-        });
-        if (result.ok && result.data) {
-            if (result.data?.error === "inactive") return { ok: false, reason: "inactive" };
-            return { ok: true, admin: result.data };
-        }
-        if (result.reason !== "missing_rpc") {
-            return { ok: false, reason: "invalid" };
-        }
-    }
-
-    try {
-        const { data, error } = await supabase
-            .from("admins")
-            .select(adminSelectColumns(caps))
-            .eq("email", email)
-            .eq("password", password)
-            .limit(1);
-        if (error) {
-            if (isMissingTableError(error)) return { ok: false, reason: "missing_table" };
-            if (isMissingColumnError(error)) return { ok: false, reason: "schema_incomplete" };
-            return { ok: false, reason: "invalid" };
-        }
-        if (!data?.length) return { ok: false, reason: "invalid" };
-        const row = data[0];
-        if (row.status && row.status !== "active") return { ok: false, reason: "inactive" };
-        return { ok: true, admin: row };
-    } catch {
-        return { ok: false, reason: "network" };
-    }
-}
-
-export async function getAdminLoginRoute(email) {
-    const caps = loadSchemaCaps() || await probeSchemaCapabilities();
-
-    if (caps.rpc) {
-        const result = await safeRpc("get_admin_login_route", { p_email: email });
-        if (result.ok && result.data) return result.data;
-    }
-
-    try {
-        const selectCols = caps.authUserId ? "auth_user_id,password" : "password";
-        const { data, error } = await supabase
-            .from("admins")
-            .select(selectCols)
-            .eq("email", email)
-            .limit(1);
-        if (error || !data?.length) return "unknown";
-        const row = data[0];
-        if (caps.authUserId && row.auth_user_id) return "auth";
-        if (row.password) return "legacy";
-        return caps.settings ? "auth" : "legacy";
-    } catch {
-        return "unknown";
-    }
-}
-
 export async function hasAdminSession() {
-    try {
-        const { data } = await supabase.auth.getSession();
-        return Boolean(data?.session?.user);
-    } catch {
+    const creds = loadLegacyCredentials();
+    const cached = JSON.parse(localStorage.getItem("admin") || "null");
+    if (!(creds?.email && creds?.password && cached?.id && cached?.status === "active")) {
         return false;
     }
+    const local = getLocalAdminSession();
+    return Boolean(local?.id && String(local.id) === String(cached.id));
+}
+
+export async function ensureAdminWriteSession() {
+    const creds = loadLegacyCredentials();
+    const local = getLocalAdminSession();
+    const cached = JSON.parse(localStorage.getItem("admin") || "null");
+
+    if (!(creds?.email && creds?.password)) return false;
+    if (!(local?.id && cached?.id && cached?.status === "active")) return false;
+
+    await syncWriteClient();
+    return true;
+}
+
+/** Attach stored admin credentials to the Supabase client once on dashboard load. */
+export async function ensureAdminWriteSessionOnLoad() {
+    const creds = loadLegacyCredentials();
+    if (!creds?.email || !creds?.password) return false;
+    if (!window[CLIENT_KEY]) {
+        supabase = await getSupabaseClient();
+    } else {
+        await syncWriteClient();
+    }
+    return true;
+}
+
+/** Explain why admin UI may be read-only despite appearing signed in. */
+export async function getAdminWriteCapability() {
+    if (await ensureAdminWriteSession()) {
+        return { canWrite: true };
+    }
+    return {
+        canWrite: false,
+        reason: "no_credentials",
+        message: "Sign in again to continue.",
+    };
 }
 
 export function mapCrudReason(reason) {
     if (!reason || reason === "not_configured") return "CMS is not configured.";
-    if (reason === "missing_table") return "Database table is missing. Run the migration.";
-    if (reason === "permission") return "Permission denied. Sign in with Supabase Auth.";
+    if (reason === "missing_table") return "This module is not available yet.";
+    if (reason === "permission") return "Could not save. Sign in again with your admin password.";
+    if (reason === "missing_rpc") return "Could not complete this action.";
+    if (reason === "no_credentials") return "Sign in again to continue.";
     if (reason === "network") return "Network error. Try again.";
     return "Could not complete this action.";
 }
@@ -686,19 +1295,22 @@ export function isAuthConfigured() {
 }
 
 export async function getSupabaseClient() {
-    if (window[CLIENT_KEY]) return window[CLIENT_KEY];
+    const fingerprint = getClientHeaderFingerprint();
+    if (window[CLIENT_KEY] && clientHeaderFingerprint === fingerprint) {
+        return window[CLIENT_KEY];
+    }
+
     await ensureSupabaseCdn();
     if (!window.supabase?.createClient) {
         throw new Error("Supabase SDK loaded, but createClient() is unavailable.");
     }
-    window[CLIENT_KEY] = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-        auth: {
-            persistSession: true,
-            autoRefreshToken: true,
-            detectSessionInUrl: true,
-            storage: window.localStorage,
-        },
-    });
+
+    window[CLIENT_KEY] = window.supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_PUBLISHABLE_KEY,
+        buildClientOptions(),
+    );
+    clientHeaderFingerprint = fingerprint;
     return window[CLIENT_KEY];
 }
 

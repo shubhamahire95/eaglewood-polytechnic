@@ -1,4 +1,5 @@
-﻿import { safeCount, safeDelete, safeFetch, safeInsert, safeUpdate, supabase, connectCms, safeAdminSelect, getCmsStatusLabel, resetCmsStatus, isCmsAvailable, getMissingTables, hasAdminSession, mapCrudReason, buildAdminUserFilter, setCmsAdminMode } from "../assets/js/supabase.js";
+﻿import { safeDelete, safeFetch, safeInsert, safeUpdate, supabase, connectCms, safeAdminSelect, safeCount, getCmsStatusLabel, resetCmsStatus, isCmsAvailable, getMissingTables, getCmsTableStats, getLastConnectionDiagnostics, hasAdminSession, ensureAdminWriteSession, ensureAdminWriteSessionOnLoad, getAdminWriteCapability, mapCrudReason, setCmsAdminMode, getTableStatus, clearCmsQueryCache, signOutAdmin, getAdminWriteClient, loadLegacyCredentials } from "../assets/js/supabase.js";
+import { bootstrapCmsContentIfNeeded, isCmsContentEmpty } from "../assets/js/cms-bootstrap.js";
 
 const localAdmin = await bootstrapAdminAccess();
 if (!localAdmin) {
@@ -8,52 +9,16 @@ if (!localAdmin) {
 
 async function bootstrapAdminAccess() {
     const cached = JSON.parse(localStorage.getItem("admin") || "null");
-    const { data: sessionData } = await supabase.auth.getSession();
-    const session = sessionData.session;
-
-    if (session?.user) {
-        const admin = await resolveAdmin(session.user, cached);
-        if (admin) return admin;
-        await supabase.auth.signOut();
+    const creds = loadLegacyCredentials();
+    if (!cached?.id || cached.status !== "active" || !creds?.email || !creds?.password) {
         localStorage.removeItem("admin");
         return null;
     }
-
-    if (cached?.status === "active" && cached?.id) {
-        return cached;
+    if (!(await hasAdminSession())) {
+        localStorage.removeItem("admin");
+        return null;
     }
-
-    return null;
-}
-
-async function resolveAdmin(user, cached) {
-    if (cached?.status === "active" && (cached.auth_user_id === user.id || cached.email === user.email)) {
-        return cached;
-    }
-
-    const { data, ok } = await safeAdminSelect("admins", (q) => q.select("*").or(buildAdminUserFilter(user)).limit(5), []);
-
-    if (!ok || !data?.length) return null;
-
-    const row = data.find((item) => {
-        if (item.status) return item.status === "active";
-        if (typeof item.active === "boolean") return item.active;
-        return true;
-    });
-
-    if (!row) return null;
-
-    const admin = {
-        id: row.id,
-        auth_user_id: row.auth_user_id || user.id,
-        email: row.email || user.email,
-        name: row.name || user.user_metadata?.name || row.email || user.email,
-        role: row.role || "admin",
-        status: row.status || "active",
-        auth_mode: "supabase",
-    };
-    localStorage.setItem("admin", JSON.stringify(admin));
-    return admin;
+    return cached;
 }
 
 const MODULES = [
@@ -63,13 +28,13 @@ const MODULES = [
     { key: "updates", label: "Updates", table: "updates", folder: "updates", group: "Website", fields: ["icon", "title", "description:rich", "image_url:image", "date:date", "category", "pinned:boolean", "button_label", "button_url", "color:color", "published:boolean", "status:select", "display_order:number"] },
     { key: "notices", label: "Important Notices", table: "notices", folder: "notices", group: "Website", fields: ["title", "description:rich", "pdf_url:file", "attachment_url:file", "image_url:image", "date:date", "expiry_date:date", "priority:priority", "important:boolean", "is_new:boolean", "published:boolean", "status:select", "display_order:number"] },
 
-    { key: "courses", label: "Courses", table: "courses", folder: "courses", group: "Academics", fields: ["department", "image_url:image", "title", "duration", "fees", "seats:number", "code", "description:rich", "eligibility:rich", "syllabus_pdf_url:file", "button_label", "button_url", "published:boolean", "status:select", "display_order:number"] },
-    { key: "departments", label: "Departments", table: "departments", folder: "departments", group: "Academics", fields: ["title", "hod_name", "hod_photo_url:image", "department_image_url:image", "description:rich", "labs:rich", "faculty_count:number", "students_count:number", "button_label", "button_url", "published:boolean", "status:select", "display_order:number"] },
-    { key: "faculty", label: "Faculty", table: "faculty", folder: "faculty", group: "Academics", fields: ["photo_url:image", "name", "qualification", "experience", "department", "subjects:rich", "email", "social_links:json", "published:boolean", "status:select", "display_order:number"] },
-    { key: "facilities", label: "Facilities", table: "facilities", folder: "facilities", group: "Institute", fields: ["title", "icon", "image_url:image", "description:rich", "category", "published:boolean", "status:select", "display_order:number"] },
-    { key: "placements", label: "Placements", table: "placements", folder: "placements", group: "Institute", fields: ["title", "recruiter", "company_logo_url:image", "image_url:image", "package", "highest_package", "average_package", "placed_students:number", "training_activities:rich", "testimonial:rich", "student_name", "course", "published:boolean", "status:select", "display_order:number"] },
-    { key: "gallery", label: "Gallery", table: "gallery", folder: "gallery", group: "Institute", fields: ["title", "album", "category:selectCategory", "image_url:image", "alt", "description:rich", "featured:boolean", "published:boolean", "status:select", "display_order:number"] },
-    { key: "media_library", label: "Media Library", table: "media_library", folder: "media", group: "Media", fields: ["file_url:file", "thumbnail_url:image", "title", "file_type:mediaType", "folder", "alt", "tags", "published:boolean", "status:select", "display_order:number"] },
+    { key: "courses", label: "Courses", table: "courses", folder: "courses", group: "Website", fields: ["department", "image_url:image", "title", "duration", "fees", "seats:number", "code", "description:rich", "eligibility:rich", "syllabus_pdf_url:file", "button_label", "button_url", "published:boolean", "status:select", "display_order:number"] },
+    { key: "departments", label: "Departments", table: "departments", folder: "departments", group: "Website", fields: ["title", "hod_name", "hod_photo_url:image", "department_image_url:image", "description:rich", "labs:rich", "faculty_count:number", "students_count:number", "button_label", "button_url", "published:boolean", "status:select", "display_order:number"] },
+    { key: "faculty", label: "Faculty", table: "faculty", folder: "faculty", group: "Website", fields: ["photo_url:image", "name", "qualification", "experience", "department", "subjects:rich", "email", "social_links:json", "published:boolean", "status:select", "display_order:number"] },
+    { key: "facilities", label: "Facilities", table: "facilities", folder: "facilities", group: "Website", fields: ["title", "icon", "image_url:image", "description:rich", "category", "published:boolean", "status:select", "display_order:number"] },
+    { key: "placements", label: "Placements", table: "placements", folder: "placements", group: "Website", fields: ["title", "recruiter", "company_logo_url:image", "image_url:image", "package", "highest_package", "average_package", "placed_students:number", "training_activities:rich", "testimonial:rich", "student_name", "course", "published:boolean", "status:select", "display_order:number"] },
+    { key: "gallery", label: "Gallery", table: "gallery", folder: "gallery", group: "Website", fields: ["title", "album", "category:selectCategory", "image_url:image", "alt", "description:rich", "featured:boolean", "published:boolean", "status:select", "display_order:number"] },
+    { key: "media_library", label: "Media Library", table: "media_library", folder: "media", group: "System", fields: ["file_url:file", "thumbnail_url:image", "title", "file_type:mediaType", "folder", "alt", "tags", "published:boolean", "status:select", "display_order:number"] },
 
     { key: "inquiries", label: "Inquiries", table: "inquiries", group: "Forms", export: true, fields: ["name", "phone", "email", "course", "message:rich", "assigned_to", "reply_status:reply", "status:lead"] },
     { key: "admissions", label: "Admissions", table: "admissions", group: "Forms", export: true, fields: ["student_name", "phone", "email", "course", "previous_school", "address:rich", "message:rich", "application_status:applicationStatus", "payment_status:paymentStatus", "status:lead"] },
@@ -77,7 +42,7 @@ const MODULES = [
 
     { key: "ai_knowledge_base", label: "AI Knowledge", table: "ai_knowledge_base", group: "AI Assistant", fields: ["question", "answer:rich", "category", "keywords", "version:number", "published:boolean", "status:select", "display_order:number"] },
     { key: "ai_prompts", label: "AI Assistant", table: "ai_prompts", group: "AI Assistant", fields: ["name", "prompt:rich", "greeting_message:rich", "fallback_response:rich", "quick_replies:json", "suggested_questions:json", "temperature:number", "token_limit:number", "response_delay:number", "published:boolean", "status:select", "display_order:number"] },
-    { key: "ai_conversations", label: "AI Conversations", table: "ai_conversations", group: "AI Assistant", export: true, fields: ["session_id", "visitor_name", "question:rich", "answer:rich", "rating:number", "status:select", "metadata:json"] },
+    { key: "ai_conversations", label: "AI Conversations", table: "ai_conversations", group: "AI Assistant", export: true, readonly: true, fields: ["session_id", "visitor_name", "question:rich", "answer:rich", "rating:number", "status:select", "metadata:json"] },
 
     { key: "settings", label: "Settings", table: "settings", group: "System", fields: ["key", "value:json", "published:boolean", "status:select", "display_order:number"] },
     { key: "home_slides", label: "Hero Slides", table: "home_slides", folder: "hero", group: "System", fields: ["title", "subtitle:rich", "image_url:image", "button_primary_label", "button_primary_url", "button_secondary_label", "button_secondary_url", "published:boolean", "status:select", "display_order:number"] },
@@ -87,7 +52,7 @@ const MODULES = [
 
 /** Modules shown on the dashboard home grid (real CMS modules only). */
 const DASHBOARD_MODULE_KEYS = [
-    "principal_message", "courses", "departments", "faculty", "facilities", "gallery", "placements",
+    "principal_message", "courses", "departments", "faculty", "facilities", "gallery", "placements", "home_slides", "footer_blocks",
     "admissions", "notices", "updates", "ai_prompts", "media_library", "contacts",
     "settings", "admins",
 ];
@@ -118,12 +83,14 @@ const NAV_ICONS = {
 
 const NAV_SECTIONS = [
     { id: "overview", label: "Overview", icon: "dashboard", keys: ["dashboard"] },
-    { id: "website", label: "Website", icon: "cms", keys: ["principal_message", "updates", "notices"] },
-    { id: "academics", label: "Academics", icon: "academics", keys: ["courses", "departments", "faculty"] },
-    { id: "institute", label: "Institute", icon: "media", keys: ["facilities", "placements", "gallery", "media_library"] },
+    { id: "website", label: "Website", icon: "cms", keys: [
+        "principal_message", "updates", "notices",
+        "courses", "departments", "faculty",
+        "facilities", "placements", "gallery",
+    ] },
     { id: "forms", label: "Admissions", icon: "admissions", keys: ["admissions", "contacts", "inquiries"] },
     { id: "ai", label: "AI Assistant", icon: "ai", keys: ["ai_knowledge_base", "ai_prompts", "ai_conversations"] },
-    { id: "system", label: "System", icon: "system", keys: ["settings", "home_slides", "footer_blocks", "admins"] },
+    { id: "system", label: "System", icon: "system", keys: ["settings", "home_slides", "footer_blocks", "media_library", "admins"] },
 ];
 
 let cmsConnection = { connected: false };
@@ -131,34 +98,37 @@ let chromeInitialized = false;
 
 document.addEventListener("DOMContentLoaded", async () => {
     setCmsAdminMode(true);
-    cmsConnection = await connectCms({ force: true });
+    await ensureAdminWriteSessionOnLoad();
+    cmsConnection = await connectCms();
     initChrome();
-    updateConnectionBanner();
+    await refreshPendingBar();
     renderNav();
     loadDashboard();
-    updatePendingBar();
+    await refreshPendingBar();
     updateSystemStatus();
     setInterval(updateLiveClock, 1000);
     updateLiveClock();
 
     document.addEventListener("visibilitychange", async () => {
-        if (document.visibilityState !== "visible" || isCmsAvailable()) return;
-        cmsConnection = await connectCms({ force: true });
-        if (!cmsConnection.connected) return;
-        updateConnectionBanner();
+        if (document.visibilityState !== "visible") return;
+        clearCmsQueryCache();
+        if (!isCmsAvailable()) {
+            cmsConnection = await connectCms();
+            if (!cmsConnection.connected) return;
+        }
+        await refreshPendingBar();
         loadDashboard();
-        updatePendingBar();
         updateSystemStatus();
     });
 });
 
-function updateConnectionBanner() {
+async function refreshPendingBar() {
     const bar = $("pendingBar");
-    if (!bar) return;
-    if (isCmsAvailable()) {
-        bar.hidden = true;
-        bar.textContent = "";
-    }
+    if (bar) bar.hidden = true;
+}
+
+function updateConnectionBanner() {
+    /* pending bar content is managed by refreshPendingBar() */
 }
 
 function initChrome() {
@@ -186,6 +156,8 @@ function initChrome() {
     $("sortFilter")?.addEventListener("change", () => { page = 1; renderTable(); });
     $("exportCsvBtn")?.addEventListener("click", exportCsv);
     $("bulkPublishBtn")?.addEventListener("click", bulkPublish);
+    $("bulkUnpublishBtn")?.addEventListener("click", bulkUnpublish);
+    $("bulkDeleteBtn")?.addEventListener("click", bulkDelete);
     $("themeToggle")?.addEventListener("click", toggleTheme);
     $("notificationBtn")?.addEventListener("click", () => switchModule("inquiries"));
     $("commandBtn")?.addEventListener("click", openCommandPalette);
@@ -252,7 +224,10 @@ async function updatePendingBar() {
     const bar = $("pendingBar");
     if (!bar) return;
     if (!isCmsAvailable()) return;
-    const [inq, contact] = await Promise.all([safeCount("inquiries"), safeCount("contacts")]);
+    const [inq, contact] = await Promise.all([
+        adminTableCount("inquiries"),
+        adminTableCount("contacts"),
+    ]);
     const pendingInq = inq.ok ? Math.min(inq.count || 0, 99) : 0;
     const pendingContact = contact.ok ? Math.min(contact.count || 0, 99) : 0;
     const total = pendingInq + pendingContact;
@@ -271,13 +246,12 @@ async function updateSystemStatus() {
     const online = label === "Connected";
     $("dbStatus")?.classList.toggle("online", online);
     $("dbStatus").textContent = label;
-    const media = await safeCount("media_library");
+    const media = await adminTableCount("media_library");
     $("storageStatus").textContent = media.ok ? `${media.count || 0} files` : "—";
 }
 
 async function logout() {
-    await supabase.auth.signOut();
-    localStorage.removeItem("admin");
+    await signOutAdmin();
     location.href = "login.html";
 }
 
@@ -347,7 +321,7 @@ async function loadDashboard() {
     const cmsReady = isCmsAvailable();
     const statuses = [];
     for (const mod of DASHBOARD_MODULES) {
-        statuses.push({ mod, ...(await safeCount(mod.table)) });
+        statuses.push({ mod, ...(await adminTableCount(mod.table)) });
     }
 
     const [
@@ -363,15 +337,15 @@ async function loadDashboard() {
         mediaFiles,
         recentChanges,
     ] = await Promise.all([
-        safeCount("inquiries"),
-        safeCount("admissions"),
-        safeCount("media_library"),
+        adminTableCount("inquiries"),
+        adminTableCount("admissions"),
+        adminTableCount("media_library"),
         selectRows("notices", 5),
         selectRows("admissions", 5),
         selectRows("inquiries", 50),
-        safeCount("ai_prompts"),
-        safeCount("ai_knowledge_base"),
-        safeCount("ai_conversations"),
+        adminTableCount("ai_prompts"),
+        adminTableCount("ai_knowledge_base"),
+        adminTableCount("ai_conversations"),
         fetchMediaStorage(),
         fetchRecentChanges(),
     ]);
@@ -387,6 +361,8 @@ async function loadDashboard() {
     renderLatestNotices(notices, cmsReady);
     renderLatestAdmissions(admissions, cmsReady);
     renderPendingInquiries(pendingInquiries, inquiriesProbe, cmsReady);
+    renderContentImportBanner(statuses);
+    await renderWriteCapabilityBanner();
 
     $("dashRefreshed").textContent = `Updated ${new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`;
     bindDashboardLinks();
@@ -403,9 +379,10 @@ function showDashboardSkeletons() {
 
 function renderCmsSetupCard() {
     const missing = getMissingTables();
+    const stats = getCmsTableStats();
     const detail = missing.length
-        ? `The database is missing <strong>${missing.length}</strong> CMS tables (including <code>settings</code>).`
-        : "The CMS schema has not been installed on this Supabase project.";
+        ? `The database is missing <strong>${missing.length}</strong> CMS table${missing.length === 1 ? "" : "s"}${missing.includes("settings") ? " (including <code>settings</code>)" : ""}.`
+        : "The CMS connection could not be verified. Click <strong>Check connection</strong> to retry.";
 
     $("overviewCards").innerHTML = "";
     $("quickActions").innerHTML = "";
@@ -421,22 +398,19 @@ function renderCmsSetupCard() {
         card.className = "glass-card cms-setup-card";
         setupHost.insertBefore(card, setupHost.querySelector(".overview-grid"));
     }
+    const diag = getLastConnectionDiagnostics();
+    const probeMeta = diag
+        ? `Tables found: ${stats.found}/${stats.total} · Storage: ${diag.storage?.ok ? "ready" : "unavailable"} · RPC: ${diag.rpc?.ok ? "ready" : "unavailable"}`
+        : `Tables found: ${stats.found}/${stats.total}`;
     card.innerHTML = `
         <div class="cms-setup-inner">
             <p class="eyebrow accent">Database setup</p>
             <h2>Install the CMS schema</h2>
-            <p class="dash-lead">${detail} Run the migration once in Supabase SQL Editor, then click <strong>Check connection</strong>.</p>
-            <ol class="cms-setup-steps">
-                <li>Open Supabase → SQL Editor</li>
-                <li>Paste the full contents of <code>supabase/RUN_ALL_MIGRATIONS.sql</code></li>
-                <li>Click <strong>Run</strong></li>
-                <li>Return here and verify the connection</li>
-            </ol>
+            <p class="dash-lead">${detail} Check your connection and try again.</p>
             <div class="cms-setup-actions">
-                <button type="button" class="btn-primary" id="retryCmsBtn">Check connection</button>
-                <button type="button" class="btn-ghost" onclick="window.open('../supabase/RUN_ALL_MIGRATIONS.sql','_blank')">Open migration file</button>
+                <button type="button" class="btn-primary" id="retryCmsBtn">Retry connection</button>
             </div>
-            <p class="muted cms-setup-meta">Project: rhqmquaojetmzdznbevz.supabase.co · First failing probe: <code>GET /rest/v1/settings</code> → HTTP 404 PGRST205</p>
+            <p class="muted cms-setup-meta">Project: rhqmquaojetmzdznbevz.supabase.co · ${esc(probeMeta)}</p>
         </div>`;
 }
 
@@ -565,13 +539,89 @@ function renderRecentChanges(items, cmsReady) {
     `).join("");
 }
 
+function renderContentImportBanner() {
+    const banner = $("contentImportBanner");
+    if (banner) banner.hidden = true;
+}
+
+function bindContentImportActions() {
+    const importBtn = $("importDefaultContentBtn");
+    const copyBtn = $("copyCmsSqlBtn");
+    if (importBtn && !importBtn.dataset.bound) {
+        importBtn.dataset.bound = "1";
+        importBtn.addEventListener("click", async () => {
+            importBtn.disabled = true;
+            importBtn.textContent = "Importing…";
+            try {
+                const result = await bootstrapCmsContentIfNeeded({ force: true });
+                if (result.seeded || result.reason === "already_has_content" || result.reason === "already_seeded") {
+                    clearCmsQueryCache();
+                    await loadDashboard();
+                    if (!isCmsAvailable()) return;
+                    const moduleKey = currentModule?.key;
+                    if (moduleKey && moduleKey !== "dashboard") await loadModule();
+                    return;
+                }
+                const msg = $("contentImportMessage");
+                if (msg) {
+                    msg.textContent = result.reason === "permission"
+                        ? "Could not import — sign in again, then retry."
+                        : `Import failed: ${mapCrudReason(result.reason || "error")}`;
+                }
+            } finally {
+                importBtn.disabled = false;
+                importBtn.textContent = "Import Website Content";
+            }
+        });
+    }
+    if (copyBtn && !copyBtn.dataset.bound) {
+        copyBtn.dataset.bound = "1";
+        copyBtn.hidden = true;
+    }
+}
+
+async function renderWriteCapabilityBanner() {
+    const bar = $("pendingBar");
+    if (bar) bar.hidden = true;
+}
+
+async function importDefaultWebsiteContent() {
+    const btn = $("importDefaultContentBtn");
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Importing…";
+    }
+    try {
+        const result = await bootstrapCmsContentIfNeeded({ force: true });
+        if (result.seeded || result.reason === "already_has_content" || result.reason === "already_seeded") {
+            clearCmsQueryCache();
+            toast(result.seeded ? "Website content imported successfully." : "CMS content is already in Supabase.");
+            await loadDashboard();
+            if (isCmsAvailable() && currentModule?.key && currentModule.key !== "dashboard") {
+                await loadModule();
+            }
+            return;
+        }
+        const hint = mapCrudReason(result.reason || "error");
+        toast(hint, true);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = "Import Website Content";
+        }
+    }
+}
+
 function renderDatabaseHealth({ summary, statuses, cmsReady }) {
+    const stats = getCmsTableStats();
     const missing = getMissingTables();
     const ready = statuses.filter((s) => s.ok).length;
+    const diag = getLastConnectionDiagnostics();
     const rows = [
-        ["Connection", summary.database],
-        ["Tables reachable", cmsReady ? `${ready} / ${statuses.length}` : `${ready} / ${statuses.length}`],
+        ["Connection", cmsReady ? "Connected" : summary.database],
+        ["Tables found", `${stats.found} / ${stats.total}`],
         ["Missing tables", missing.length ? missing.slice(0, 5).join(", ") + (missing.length > 5 ? ` +${missing.length - 5}` : "") : "None"],
+        ["Storage", diag?.storage?.ok ? "Ready" : (cmsReady ? "Ready" : "—")],
         ["Configured modules", cmsReady ? String(summary.configured) : String(statuses.filter((s) => (s.count || 0) > 0).length)],
         ["Needs attention", cmsReady ? String(summary.attention) : String(missing.length || summary.attention)],
     ];
@@ -581,11 +631,14 @@ function renderDatabaseHealth({ summary, statuses, cmsReady }) {
 }
 
 function renderStatusCards({ summary, mediaProbe, mediaFiles, aiPromptsProbe, aiKnowledgeProbe, aiConversationsProbe, cmsReady }) {
-    const cmsLabel = getCmsStatusLabel();
+    const stats = getCmsTableStats();
+    const diag = getLastConnectionDiagnostics();
+    const storageReady = diag?.storage?.ok || mediaProbe.ok;
+    const cmsLabel = cmsReady ? "Connected" : getCmsStatusLabel();
     const cmsDetail = cmsReady
-        ? `${summary.configured} modules with content`
+        ? `✓ Connected · ✓ ${stats.found}/${stats.total} Tables Found · ✓ ${storageReady ? "Storage Ready" : "Storage —"} · ✓ Database Ready`
         : (getMissingTables().length
-            ? `${getMissingTables().length} tables missing — run supabase/RUN_ALL_MIGRATIONS.sql`
+            ? `${getMissingTables().length} modules unavailable`
             : "Checking database…");
 
     const storageValue = mediaProbe.ok && mediaFiles.totalBytes > 0
@@ -713,6 +766,14 @@ function emptyState(message) {
     return `<p class="empty-state">${esc(message)}</p>`;
 }
 
+async function adminTableCount(table) {
+    const result = await safeCount(table, `admin:count:${table}`);
+    if (result.ok) {
+        return { count: result.count ?? 0, ok: true };
+    }
+    return { count: null, ok: false, reason: result.reason || "error" };
+}
+
 function formatBytes(bytes) {
     const value = Number(bytes) || 0;
     if (!value) return "0 B";
@@ -753,20 +814,33 @@ function resolveDashboardSummary(statuses) {
 }
 
 async function loadModule() {
-    if (!isCmsAvailable()) {
-        switchModule("dashboard");
-        return;
-    }
     $("moduleKicker").textContent = currentModule.group || "CMS Module";
     $("moduleTitle").textContent = currentModule.label;
     $("exportCsvBtn").hidden = !currentModule.export;
     $("bulkPublishBtn").hidden = !currentModule.fields?.some((f) => f.includes("published"));
+    $("bulkUnpublishBtn").hidden = $("bulkPublishBtn").hidden;
+    $("bulkDeleteBtn").hidden = Boolean(currentModule.readonly);
     $("addRecordBtn").style.display = currentModule.readonly ? "none" : "";
     $("moduleTable").innerHTML = skeletonTable();
     renderModuleContext();
-    const probe = await safeCount(currentModule.table);
+
+    if (!isCmsAvailable()) {
+        const missing = getTableStatus(currentModule.table) === "missing" || getMissingTables().includes(currentModule.table);
+        $("moduleTable").innerHTML = `<div class="empty-state setup-state"><strong>${missing ? "Module unavailable" : "CMS unavailable"}</strong><p>${missing ? `The <code>${esc(currentModule.table)}</code> table is not available.` : "Check your connection and try again."}</p><button class="btn-primary" type="button" id="moduleSetupRetry">Retry</button></div>`;
+        $("moduleSetupRetry")?.addEventListener("click", async () => {
+            resetCmsStatus();
+            cmsConnection = await connectCms({ force: true });
+            updateConnectionBanner();
+            updateSystemStatus();
+            if (isCmsAvailable()) loadModule();
+            else switchModule("dashboard");
+        });
+        return;
+    }
+
+    const probe = await adminTableCount(currentModule.table);
     if (!probe.ok && (probe.reason === "missing_table" || probe.reason === "not_configured")) {
-        $("moduleTable").innerHTML = `<div class="empty-state setup-state"><strong>Database table not configured</strong><p>Run <code>supabase/RUN_ALL_MIGRATIONS.sql</code> in your Supabase SQL Editor to enable ${esc(currentModule.label)}.</p><button class="btn-primary" type="button" onclick="window.open('../SUPABASE-SETUP.md','_blank')">View Setup Guide</button></div>`;
+        $("moduleTable").innerHTML = `<div class="empty-state setup-state"><strong>Module unavailable</strong><p>The <code>${esc(currentModule.table)}</code> table could not be reached. Check your connection and try again.</p><button class="btn-primary" type="button" id="moduleSetupRetry">Retry</button></div>`;
         return;
     }
     rows = await selectRows(currentModule.table, 250, false);
@@ -782,10 +856,14 @@ function renderModuleContext() {
         target.innerHTML = `<div class="context-card appearance-card">
             <div>
                 <p class="eyebrow">Website Settings</p>
-                <h3>Appearance</h3>
-                <p>Edit homepage hero slides and footer blocks here.</p>
+                <h3>Mission, Vision & Branding</h3>
+                <p>Edit institute mission, vision, objectives and footer developer credits via settings keys.</p>
             </div>
             <div class="appearance-actions">
+                <button type="button" class="btn-ghost" data-settings-key="mission">Mission</button>
+                <button type="button" class="btn-ghost" data-settings-key="vision">Vision</button>
+                <button type="button" class="btn-ghost" data-settings-key="objectives">Objectives</button>
+                <button type="button" class="btn-ghost" data-settings-key="core_values">Core Values</button>
                 <button type="button" class="btn-ghost" data-appearance="home_slides">Hero Slides</button>
                 <button type="button" class="btn-ghost" data-appearance="footer_blocks">Footer Blocks</button>
             </div>
@@ -795,6 +873,11 @@ function renderModuleContext() {
             <div><span>Institute Info</span><span>Contact</span><span>Social</span><span>Map</span></div>
         </div>`;
         target.querySelectorAll("[data-appearance]").forEach((btn) => btn.addEventListener("click", () => switchModule(btn.dataset.appearance)));
+        target.querySelectorAll("[data-settings-key]").forEach((btn) => btn.addEventListener("click", () => {
+            $("globalSearch").value = btn.dataset.settingsKey;
+            page = 1;
+            renderTable();
+        }));
         return;
     }
 
@@ -812,14 +895,29 @@ function renderModuleContext() {
     const items = templates[currentModule.key] || ["Draft / Publish", "Search", "Export"];
     target.innerHTML = `<div class="context-card"><div><p class="eyebrow">${esc(currentModule.group || "Module")}</p><h3>${esc(currentModule.label)}</h3><p>Manage records, publishing state, and metadata from Supabase.</p></div><div>${items.map((item) => `<span>${item}</span>`).join("")}</div></div>`;
 }
-async function selectRows(table, limit = 50, publishedOnly = false) {
-    const result = await safeFetch(table, (q) => {
+async function selectRows(table, limit = 250, publishedOnly = false) {
+    const result = await safeAdminSelect(table, (q) => {
         let query = q.select("*").limit(limit);
         if (publishedOnly) query = query.eq("published", true);
         if (hasDisplayOrder(table)) query = query.order("display_order", { ascending: true, nullsFirst: false });
         return query.order("created_at", { ascending: false });
     }, []);
-    return result.data || [];
+    if (result.ok && Array.isArray(result.data)) {
+        return result.data;
+    }
+    if (result.reason === "permission") {
+        const fallback = await safeFetch(table, (q) => {
+            let query = q.select("*").limit(limit);
+            if (publishedOnly) query = query.eq("published", true);
+            if (hasDisplayOrder(table)) query = query.order("display_order", { ascending: true, nullsFirst: false });
+            return query.order("created_at", { ascending: false });
+        }, [], `admin:fallback:${table}`);
+        if (fallback.ok && Array.isArray(fallback.data)) return fallback.data;
+    }
+    if (!result.ok) {
+        console.error(`[CMS] Admin read failed for ${table}:`, result.reason || "unknown");
+    }
+    return [];
 }
 
 function renderTable() {
@@ -829,19 +927,25 @@ function renderTable() {
     const data = filtered.slice((page - 1) * pageSize, page * pageSize);
     $("recordCount") && ($("recordCount").textContent = `${filtered.length} record${filtered.length === 1 ? "" : "s"}`);
     if (!data.length) {
-        $("moduleTable").innerHTML = `<p class="empty-state">No ${currentModule.label.toLowerCase()} records found.</p>`;
+        $("moduleTable").innerHTML = `<div class="empty-state setup-state"><strong>No content yet</strong><p>Create your first ${esc(currentModule.label)} record. Published items appear on the public website automatically.</p><button class="btn-primary" type="button" id="emptyAddBtn">Create New</button></div>`;
+        $("emptyAddBtn")?.addEventListener("click", () => openEditor());
         return;
     }
     const keys = visibleKeys(data[0]);
     const hasPublish = currentModule.fields?.some((f) => f.includes("published"));
-    $("moduleTable").innerHTML = `<table class="data-table"><thead><tr>${keys.map((k) => `<th>${label(k)}</th>`).join("")}<th>Actions</th></tr></thead><tbody>${data.map((row) => `<tr>${keys.map((k) => cell(row, k)).join("")}<td><div class="table-actions">
+    const canReorder = hasDisplayOrder(currentModule.table);
+    $("moduleTable").innerHTML = `<table class="data-table"><thead><tr>${canReorder ? "<th>Order</th>" : ""}${keys.map((k) => `<th>${label(k)}</th>`).join("")}<th>Actions</th></tr></thead><tbody>${data.map((row) => `<tr>${canReorder ? `<td class="reorder-cell"><button class="mini-btn" data-move-up="${row.id}" title="Move up">↑</button><button class="mini-btn" data-move-down="${row.id}" title="Move down">↓</button><span class="muted">${esc(String(row.display_order ?? ""))}</span></td>` : ""}${keys.map((k) => cell(row, k)).join("")}<td><div class="table-actions">
         <button class="mini-btn" data-edit="${row.id}">Edit</button>
+        <button class="mini-btn" data-preview="${row.id}">Preview</button>
         ${hasPublish ? `<button class="mini-btn" data-toggle="${row.id}">${row.published ? "Unpublish" : "Publish"}</button>` : ""}
         <button class="mini-btn" data-dup="${row.id}">Duplicate</button>
         <button class="mini-btn danger" data-delete="${row.id}">Delete</button>
     </div></td></tr>`).join("")}</tbody></table>
     <div class="pagination"><button class="mini-btn" id="prevPage" ${page === 1 ? "disabled" : ""}>Prev</button><span>Page ${page} of ${totalPages}</span><button class="mini-btn" id="nextPage" ${page === totalPages ? "disabled" : ""}>Next</button></div>`;
     $("moduleTable").querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", () => openEditor(rows.find((r) => String(r.id) === b.dataset.edit))));
+    $("moduleTable").querySelectorAll("[data-preview]").forEach((b) => b.addEventListener("click", () => previewRecord(b.dataset.preview)));
+    $("moduleTable").querySelectorAll("[data-move-up]").forEach((b) => b.addEventListener("click", () => reorderRecord(b.dataset.moveUp, -1)));
+    $("moduleTable").querySelectorAll("[data-move-down]").forEach((b) => b.addEventListener("click", () => reorderRecord(b.dataset.moveDown, 1)));
     $("moduleTable").querySelectorAll("[data-toggle]").forEach((b) => b.addEventListener("click", () => togglePublished(b.dataset.toggle)));
     $("moduleTable").querySelectorAll("[data-dup]").forEach((b) => b.addEventListener("click", () => duplicateRecord(b.dataset.dup)));
     $("moduleTable").querySelectorAll("[data-delete]").forEach((b) => b.addEventListener("click", () => deleteRecord(b.dataset.delete)));
@@ -853,7 +957,13 @@ function filterRows(source) {
     const q = ($("globalSearch")?.value || "").trim().toLowerCase();
     const status = window.__statusFilter || $("statusFilter")?.value || "";
     const sort = $("sortFilter")?.value || "newest";
-    let result = source.filter((row) => (!q || JSON.stringify(row).toLowerCase().includes(q)) && (!status || row.status === status || String(row.published) === status));
+    let result = source.filter((row) => {
+        if (q && !JSON.stringify(row).toLowerCase().includes(q)) return false;
+        if (!status) return true;
+        if (status === "published") return row.published !== false;
+        if (status === "draft") return row.published === false;
+        return row.status === status || String(row.published) === status;
+    });
     if (sort === "oldest") result = [...result].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
     else if (sort === "order") result = [...result].sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0));
     else result = [...result].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
@@ -896,7 +1006,7 @@ function renderField(def, row) {
     if (type === "rich") return `<label class="field${full}"><span>${label(name)}</span><div class="rich-tools"><button type="button" data-wrap="strong">B</button><button type="button" data-wrap="em">I</button></div><textarea name="${name}">${esc(value)}</textarea></label>`;
     if (type === "json") return `<label class="field full"><span>${label(name)}</span><textarea name="${name}">${esc(typeof value === "object" ? JSON.stringify(value, null, 2) : value)}</textarea></label>`;
     if (type === "image" || type === "file") return `<label class="field${full} upload-field"><span>${label(name)}</span>${value ? `<a href="${esc(value)}" target="_blank">Current file</a><img class="preview ${type === "file" ? "hide" : ""}" src="${esc(value)}" alt="Preview">` : `<img class="preview hide" alt="Preview">`}<input name="${name}" type="hidden" value="${esc(value)}"><input data-upload-for="${name}" type="file" accept="${type === "file" ? "application/pdf" : "image/*"}"><small>Drag/drop supported by browser file picker. Old Storage objects are deleted after replacement when they are in the cms bucket.</small></label>`;
-    if (["select", "selectCategory", "reply", "lead", "role", "userStatus"].includes(type)) return selectField(name, type, value);
+    if (["select", "selectCategory", "reply", "lead", "role", "userStatus", "priority", "applicationStatus", "paymentStatus", "mediaType"].includes(type)) return selectField(name, type, value);
     if (type === "boolean") return `<label class="field"><span>${label(name)}</span><select name="${name}"><option value="true" ${value !== false ? "selected" : ""}>Publish / Yes</option><option value="false" ${value === false ? "selected" : ""}>Hide / No</option></select></label>`;
     return `<label class="field${full}"><span>${label(name)}</span><input name="${name}" type="${type}" value="${esc(value)}"></label>`;
 }
@@ -957,7 +1067,11 @@ async function saveRecord(event) {
         const hiddenPending = hidden?.dataset.pendingUpload === "true";
         if (hiddenPending) {
             const fileInput = form.querySelector(`[data-upload-for="${name}"]`);
-            payload[name] = await uploadFile(name, fileInput?.files?.[0], editingRow?.[name]);
+            const file = fileInput?.files?.[0];
+            payload[name] = await uploadFile(name, file, editingRow?.[name]);
+            if (currentModule.table === "media_library" && file && name === "file_url") {
+                payload.size_bytes = file.size;
+            }
         } else if (type === "boolean") {
             payload[name] = control.value === "true";
         } else if (type === "number") {
@@ -972,6 +1086,16 @@ async function saveRecord(event) {
     Object.keys(payload).forEach((key) => {
         if (!allowed.has(key)) delete payload[key];
     });
+
+    if (!editingRow?.id) {
+        if (allowed.has("status") && (!payload.status || payload.status === "draft")) payload.status = "published";
+        if (allowed.has("published") && payload.published !== false) payload.published = true;
+        if (allowed.has("display_order") && !Number(payload.display_order)) {
+            const maxOrder = rows.reduce((max, row) => Math.max(max, Number(row.display_order || 0)), 0);
+            payload.display_order = maxOrder + 1;
+        }
+    }
+
     try {
         let result;
         if (editingRow?.id) {
@@ -991,13 +1115,15 @@ async function saveRecord(event) {
 }
 
 async function uploadFile(field, file, oldUrl) {
-    if (!(await requireWriteSession())) throw new Error("Permission denied. Sign in with Supabase Auth.");
+    if (!(await requireWriteSession())) throw new Error("Permission denied. Sign in again.");
+    const client = await getAdminWriteClient();
+    if (!client) throw new Error("Permission denied. Sign in again.");
     const folder = currentModule.folder || currentModule.key;
     const ext = file.name.split(".").pop();
     const path = `${folder}/${crypto.randomUUID()}.${ext}`;
-    const { error } = await supabase.storage.from("cms").upload(path, file, { cacheControl: "3600", upsert: false });
+    const { error } = await client.storage.from("cms").upload(path, file, { cacheControl: "3600", upsert: false });
     if (error) throw error;
-    const { data } = supabase.storage.from("cms").getPublicUrl(path);
+    const { data } = client.storage.from("cms").getPublicUrl(path);
     await deleteOldStorageObject(oldUrl);
     return data.publicUrl;
 }
@@ -1005,7 +1131,10 @@ async function uploadFile(field, file, oldUrl) {
 async function deleteOldStorageObject(url) {
     if (!url || !url.includes("/storage/v1/object/public/cms/")) return;
     const path = decodeURIComponent(url.split("/storage/v1/object/public/cms/")[1]);
-    try { await supabase.storage.from("cms").remove([path]); } catch {}
+    try {
+        const client = await getAdminWriteClient();
+        if (client) await client.storage.from("cms").remove([path]);
+    } catch {}
 }
 
 async function togglePublished(id) {
@@ -1014,6 +1143,7 @@ async function togglePublished(id) {
     if (!row) return;
     const result = await safeUpdate(currentModule.table, { published: !row.published, status: !row.published ? "published" : "hidden" }, { id });
     if (!result.ok) return toast(mapCrudReason(result.reason), true);
+    clearCmsQueryCache();
     toast(!row.published ? "Published." : "Unpublished.");
     await loadModule();
 }
@@ -1026,6 +1156,7 @@ async function deleteRecord(id) {
         for (const key of Object.keys(row || {})) if (key.endsWith("_url")) await deleteOldStorageObject(row[key]);
         const result = await safeDelete(currentModule.table, { id });
         if (!result.ok) throw new Error(mapCrudReason(result.reason));
+        clearCmsQueryCache();
         toast("Record deleted.");
         rows = rows.filter((r) => String(r.id) !== String(id));
         renderTable();
@@ -1045,7 +1176,7 @@ function exportCsv() {
     URL.revokeObjectURL(url);
 }
 
-function hasDisplayOrder(table) { return ["settings", "home_slides", "updates", "notices", "principal_message", "courses", "departments", "facilities", "placements", "gallery", "ai_knowledge_base", "ai_prompts", "footer_blocks"].includes(table); }
+function hasDisplayOrder(table) { return ["settings", "home_slides", "updates", "notices", "principal_message", "courses", "departments", "faculty", "facilities", "placements", "gallery", "ai_knowledge_base", "ai_prompts", "footer_blocks", "media_library"].includes(table); }
 function csvCell(value) { return `"${String(value ?? "").replace(/"/g, '""')}"`; }
 function showSkeleton(id, count) { $(id).innerHTML = Array.from({ length: count }, () => `<div class="skeleton"></div>`).join(""); }
 function skeletonTable() { return `<div class="skeleton table-skeleton"></div><div class="skeleton table-skeleton"></div><div class="skeleton table-skeleton"></div>`; }
@@ -1060,6 +1191,55 @@ function toast(message, error = false) {
     el.textContent = message;
     region.appendChild(el);
     setTimeout(() => el.remove(), 3200);
+}
+
+function previewRecord(id) {
+    const row = rows.find((r) => String(r.id) === String(id));
+    if (!row) return;
+    const image = row.image_url || row.photo_url || row.department_image_url || row.file_url || row.thumbnail_url;
+    if (image) {
+        window.open(image.startsWith("http") || image.startsWith("assets/") ? (image.startsWith("http") ? image : `../${image}`) : image, "_blank");
+        return;
+    }
+    const sectionMap = {
+        home_slides: "../index.html#hero",
+        updates: "../index.html#latest-updates",
+        notices: "../index.html#notice-board",
+        principal_message: "../index.html#principal",
+        courses: "../index.html#courses",
+        departments: "../index.html#departments",
+        facilities: "../index.html#facilities",
+        placements: "../index.html#placements",
+        gallery: "../index.html#gallery",
+        settings: "../index.html",
+        footer_blocks: "../index.html",
+        ai_knowledge_base: "../index.html",
+        ai_prompts: "../index.html",
+    };
+    const url = sectionMap[currentModule.table] || "../index.html";
+    window.open(url, "_blank");
+}
+
+async function reorderRecord(id, direction) {
+    if (!(await requireWriteSession())) return;
+    const sorted = [...filterRows(rows)].sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0));
+    const index = sorted.findIndex((r) => String(r.id) === String(id));
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= sorted.length) return;
+    const current = sorted[index];
+    const swap = sorted[target];
+    const currentOrder = Number(current.display_order ?? index);
+    const swapOrder = Number(swap.display_order ?? target);
+    try {
+        await Promise.all([
+            safeUpdate(currentModule.table, { display_order: swapOrder }, { id: current.id }),
+            safeUpdate(currentModule.table, { display_order: currentOrder }, { id: swap.id }),
+        ]);
+        toast("Order updated.");
+        await loadModule();
+    } catch (err) {
+        toast(err?.message || "Could not reorder.", true);
+    }
 }
 
 async function duplicateRecord(id) {
@@ -1091,6 +1271,7 @@ async function bulkPublish() {
     if (!(await confirmAction("Bulk publish?", `Publish ${draftRows.length} draft record(s)?`))) return;
     try {
         await Promise.all(draftRows.map((r) => safeUpdate(currentModule.table, { published: true, status: "published" }, { id: r.id })));
+        clearCmsQueryCache();
         toast(`${draftRows.length} record(s) published.`);
         await loadModule();
     } catch (err) {
@@ -1098,9 +1279,41 @@ async function bulkPublish() {
     }
 }
 
+async function bulkUnpublish() {
+    if (!(await requireWriteSession())) return;
+    if (!currentModule.fields?.some((f) => f.includes("published"))) return;
+    const publishedRows = filterRows(rows).filter((r) => r.published !== false);
+    if (!publishedRows.length) return toast("No published records to unpublish.");
+    if (!(await confirmAction("Bulk unpublish?", `Unpublish ${publishedRows.length} record(s)?`))) return;
+    try {
+        await Promise.all(publishedRows.map((r) => safeUpdate(currentModule.table, { published: false, status: "hidden" }, { id: r.id })));
+        clearCmsQueryCache();
+        toast(`${publishedRows.length} record(s) unpublished.`);
+        await loadModule();
+    } catch (err) {
+        toast(err?.message || "Bulk unpublish failed.", true);
+    }
+}
+
+async function bulkDelete() {
+    if (!(await requireWriteSession())) return;
+    if (currentModule.readonly) return;
+    const targets = filterRows(rows);
+    if (!targets.length) return toast("No records to delete.");
+    if (!(await confirmAction("Bulk delete?", `Permanently delete ${targets.length} record(s)?`))) return;
+    try {
+        await Promise.all(targets.map((r) => safeDelete(currentModule.table, { id: r.id })));
+        clearCmsQueryCache();
+        toast(`${targets.length} record(s) deleted.`);
+        await loadModule();
+    } catch (err) {
+        toast(err?.message || "Bulk delete failed.", true);
+    }
+}
+
 async function requireWriteSession() {
-    if (await hasAdminSession()) return true;
-    toast("Permission denied. Sign in with Supabase Auth.", true);
+    if (await ensureAdminWriteSession()) return true;
+    toast("Sign in again to continue.", true);
     return false;
 }
 

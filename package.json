@@ -5,9 +5,29 @@
   "scripts": {
     "audit:supabase": "node scripts/audit-supabase.js",
     "db:migrate": "node scripts/run-migrations.js",
-    "db:build": "node scripts/build-run-all-migrations.js"
+    "db:seed": "node scripts/import-default-content.js",
+    "cms:bootstrap": "node scripts/bootstrap-cms-content.js",
+    "cms:deploy": "node scripts/apply-cms-sync.js",
+    "cms:deploy:all": "node scripts/deploy-production-cms.js",
+    "cms:stabilize": "node scripts/deploy-production-cms.js",
+    "seed:rest": "node scripts/seed-cms-postgrest.js",
+    "db:seed:service": "node scripts/seed-via-service-role.js",
+    "db:seed:generate": "node scripts/generate-default-content-sql.js",
+    "verify:cms": "node scripts/verify-cms-content.js",
+    "verify:cms:e2e": "node scripts/verify-cms-e2e.js",
+    "audit:full": "node scripts/full-project-audit.js",
+    "admin:fix": "node scripts/apply-admin-write-fix.js",
+    "admin:rls": "node scripts/apply-admin-write-fix.js",
+    "cms:fix": "node scripts/apply-admin-write-fix.js",
+    "verify:admin-crud": "node scripts/verify-admin-crud.js",
+    "db:build": "node scripts/build-run-all-migrations.js",
+    "verify:site": "node scripts/verify-production.js",
+    "verify:auth": "node scripts/setup-admin-auth.js",
+    "verify:production-api": "node scripts/verify-production-api.js",
+    "verify:no-bootstrap-rpc": "node scripts/verify-no-bootstrap-rpc.js"
   },
   "devDependencies": {
-    "pg": "^8.22.0"
+    "pg": "^8.22.0",
+    "playwright": "^1.62.1"
   }
 }

@@ -5,7 +5,7 @@
 
 import CONFIG from "./config.js";
 import { debounce, throttle } from "./utils.js";
-import { safeFetch, ensureCmsReady, isCmsAvailable } from "./supabase.js";
+import { safeFetch, ensureCmsReady, isCmsAvailable, isCmsStrictMode } from "./supabase.js";
 
 const FOOTER_DEFAULTS = {
     institute_name: "Eaglewood Polytechnic Institute",
@@ -24,6 +24,8 @@ const FOOTER_QUICK_LINKS = [
     { label: "About", href: "about.html" },
     { label: "Courses", href: "courses.html" },
     { label: "Departments", href: "departments.html" },
+    { label: "Faculty", href: "faculty.html" },
+    { label: "Placements", href: "placements.html" },
     { label: "Gallery", href: "gallery.html" },
     { label: "Admissions", href: "admission.html" },
     { label: "Contact", href: "contact.html" },
@@ -33,7 +35,7 @@ const FOOTER_BOTTOM_LINKS = [
     { label: "Privacy", href: "contact.html#privacy" },
     { label: "Terms", href: "contact.html#terms" },
     { label: "Accessibility", href: "contact.html#accessibility" },
-    { label: "Sitemap", href: "index.html" },
+    { label: "Sitemap", href: "sitemap.html" },
 ];
 
 const SOCIAL_ICONS = {
@@ -69,7 +71,7 @@ const siteHeader = `
       </a>
       <button class="nav-toggle" type="button" aria-label="Toggle navigation" aria-expanded="false"><span></span><span></span><span></span></button>
       <ul class="nav-links">
-        <li><a href="index.html">Home</a></li><li><a href="about.html">About</a></li><li><a href="courses.html">Courses</a></li><li><a href="departments.html">Departments</a></li><li><a href="infrastructure.html">Infrastructure</a></li><li><a href="gallery.html">Gallery</a></li><li><a href="admission.html">Admission</a></li><li><a href="contact.html">Contact</a></li>
+        <li><a href="index.html">Home</a></li><li><a href="about.html">About</a></li><li><a href="courses.html">Courses</a></li><li><a href="departments.html">Departments</a></li><li><a href="faculty.html">Faculty</a></li><li><a href="placements.html">Placements</a></li><li><a href="infrastructure.html">Infrastructure</a></li><li><a href="gallery.html">Gallery</a></li><li><a href="admission.html">Admission</a></li><li><a href="contact.html">Contact</a></li>
       </ul>
       <a class="btn btn-sm nav-apply" href="admission.html">Admission <span>-&gt;</span></a>
     </nav>
@@ -106,7 +108,7 @@ const siteFooter = `
       <div class="epi-ft__bar">
         <div class="epi-ft__bar-left">
           <p class="epi-ft__copyright">© <span data-year></span> <span data-footer-copyright>Eaglewood Polytechnic Institute</span></p>
-          <p class="epi-ft__developer">Dev: <strong data-footer-developer>Shubham Ahire</strong> · <a data-footer-dev-phone href="tel:+917249868133">+91 7249868133</a></p>
+          <p class="epi-ft__developer">Designed &amp; Developed by <strong data-footer-developer>Shubham Ahire</strong> · <a data-footer-dev-phone href="tel:+917249868133">+91 7249868133</a></p>
         </div>
         <nav class="epi-ft__legal epi-ft__bar-mid" data-footer-bottom-links aria-label="Legal links"></nav>
         <button class="epi-ft__back-top" data-footer-back-top type="button" aria-label="Back to top">
@@ -176,32 +178,36 @@ function parseLinkList(value, fallback) {
 
 function applyFooterCMS(settings = {}, blocks = {}) {
     document.body.dataset.footerSettingsApplied = "true";
-    const block = blocks.footer_main || blocks.main || {};
-    const merged = { ...FOOTER_DEFAULTS, ...settings, ...block };
+    const cmsOnly = isCmsStrictMode();
+    const footerMain = blocks.footer_main || blocks.main || {};
+    const contact = blocks.contact_block || {};
+    const merged = cmsOnly
+        ? { ...contact, ...footerMain, ...settings }
+        : { ...FOOTER_DEFAULTS, ...settings, ...footerMain, ...contact };
 
-    const phone = merged.phone || FOOTER_DEFAULTS.phone;
-    const email = merged.email || FOOTER_DEFAULTS.email;
-    const address = merged.address || FOOTER_DEFAULTS.address;
-    const map = merged.google_map || FOOTER_DEFAULTS.google_map;
-    const tagline = merged.footer_tagline || merged.footer_approvals || FOOTER_DEFAULTS.footer_tagline;
+    const phone = merged.phone || (cmsOnly ? "" : FOOTER_DEFAULTS.phone);
+    const email = merged.email || (cmsOnly ? "" : FOOTER_DEFAULTS.email);
+    const address = merged.address || (cmsOnly ? "" : FOOTER_DEFAULTS.address);
+    const map = merged.google_map || (cmsOnly ? "" : FOOTER_DEFAULTS.google_map);
+    const tagline = merged.footer_tagline || merged.footer_approvals || merged.tagline || (cmsOnly ? "" : FOOTER_DEFAULTS.footer_tagline);
 
     const setText = (sel, val) => document.querySelectorAll(sel).forEach((el) => { el.textContent = val; });
 
-    setText("[data-footer-name]", merged.institute_name || FOOTER_DEFAULTS.institute_name);
+    setText("[data-footer-name]", merged.institute_name || (cmsOnly ? "" : FOOTER_DEFAULTS.institute_name));
     setText("[data-footer-tagline]", tagline);
-    setText("[data-footer-copyright]", merged.copyright_text || FOOTER_DEFAULTS.copyright_text);
-    setText("[data-footer-developer]", merged.developer_name || FOOTER_DEFAULTS.developer_name);
+    setText("[data-footer-copyright]", merged.copyright_text || (cmsOnly ? "" : FOOTER_DEFAULTS.copyright_text));
+    setText("[data-footer-developer]", merged.developer_name || (cmsOnly ? "" : FOOTER_DEFAULTS.developer_name));
     setText("[data-footer-address]", address);
 
-    const devPhone = merged.developer_phone || FOOTER_DEFAULTS.developer_phone;
+    const devPhone = merged.developer_phone || (cmsOnly ? "" : FOOTER_DEFAULTS.developer_phone);
     document.querySelectorAll("[data-footer-dev-phone]").forEach((el) => {
         el.textContent = devPhone;
         el.href = `tel:${String(devPhone).replace(/\s/g, "")}`;
     });
 
     document.querySelectorAll("[data-footer-logo]").forEach((el) => {
-        el.src = merged.logo_url || FOOTER_DEFAULTS.logo_url;
-        el.alt = `${merged.institute_name || FOOTER_DEFAULTS.institute_name} logo`;
+        el.src = merged.logo_url || (cmsOnly ? "assets/images/logo.jpg" : FOOTER_DEFAULTS.logo_url);
+        el.alt = `${merged.institute_name || (cmsOnly ? "Eaglewood Polytechnic Institute" : FOOTER_DEFAULTS.institute_name)} logo`;
     });
 
     document.querySelectorAll("[data-footer-phone]").forEach((el) => {
@@ -295,8 +301,8 @@ function initFooterFloatOffset() {
 }
 
 async function loadFooterCMS() {
-    await ensureCmsReady();
-    if (!isCmsAvailable()) {
+    await ensureCmsReady({ verifyFull: true });
+    if (!isCmsStrictMode()) {
         return;
     }
     try {
@@ -587,12 +593,143 @@ export function initLegacyUI() {
     initPageLoader();
     initNavigation();
     initScrollReveal();
+    initPremiumReveal();
     initLazyImages();
     initScrollHandlers();
     initYearStamp();
     void initFooterSettings();
     initPageTransitions();
+    initTabGroups();
+    initGalleryPage();
+    initFaqAccordion();
+    initButtonRipple();
 }
 
 export { siteHeader, siteFooter };
+
+/** Tab panels for courses and similar pages. */
+function initTabGroups() {
+    document.querySelectorAll("[data-tab-group]").forEach((group) => {
+        const buttons = [...group.querySelectorAll(".tab-btn[data-tab]")];
+        const panels = [...group.querySelectorAll(".tab-panel")];
+        if (!buttons.length || !panels.length) return;
+        const activate = (id) => {
+            buttons.forEach((btn) => {
+                const active = btn.dataset.tab === id;
+                btn.classList.toggle("active", active);
+                btn.setAttribute("aria-selected", String(active));
+            });
+            panels.forEach((panel) => {
+                const active = panel.id === id;
+                panel.classList.toggle("active", active);
+                panel.hidden = !active;
+            });
+        };
+        buttons.forEach((btn) => btn.addEventListener("click", () => activate(btn.dataset.tab)));
+        const initial = buttons.find((btn) => btn.classList.contains("active"))?.dataset.tab || buttons[0].dataset.tab;
+        activate(initial);
+    });
+}
+
+/** Premium reveal animation on all pages. */
+function initPremiumReveal() {
+    const items = document.querySelectorAll(".premium-reveal");
+    if (!items.length) return;
+    const observer = new IntersectionObserver((entries) => entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+            observer.unobserve(entry.target);
+        }
+    }), { threshold: 0.12 });
+    items.forEach((item) => observer.observe(item));
+}
+
+/** Gallery page: filters + lightbox. */
+function initGalleryPage() {
+    const items = [...document.querySelectorAll(".gallery-grid .gallery-item[data-lightbox]")];
+    if (!items.length) return;
+
+    items.forEach((item) => {
+        if (item.dataset.category) return;
+        const caption = (item.dataset.caption || item.querySelector(".gallery-caption")?.textContent || "").toLowerCase();
+        const category = inferGalleryCategory(caption);
+        item.dataset.category = category;
+    });
+
+    const filterButtons = [...document.querySelectorAll("[data-gallery-filter]")];
+    filterButtons.forEach((button) => button.addEventListener("click", () => {
+        const category = button.dataset.galleryFilter;
+        filterButtons.forEach((btn) => {
+            const active = btn === button;
+            btn.classList.toggle("active", active);
+            btn.setAttribute("aria-pressed", String(active));
+        });
+        items.forEach((item) => {
+            const show = category === "all" || item.dataset.category === category;
+            item.hidden = !show;
+            item.style.display = show ? "" : "none";
+        });
+    }));
+
+    const lightbox = document.querySelector(".lightbox");
+    if (!lightbox) return;
+    const lightboxImg = lightbox.querySelector("img");
+    const lightboxCaption = lightbox.querySelector("figure p");
+    const visibleItems = () => items.filter((item) => !item.hidden && item.style.display !== "none");
+    let currentIndex = 0;
+
+    const openLightbox = (index) => {
+        const list = visibleItems();
+        if (!list.length) return;
+        currentIndex = (index + list.length) % list.length;
+        const item = list[currentIndex];
+        const img = item.querySelector("img");
+        lightboxImg.src = img?.currentSrc || img?.src || "";
+        lightboxImg.alt = img?.alt || "Gallery image";
+        if (lightboxCaption) lightboxCaption.textContent = item.dataset.caption || img?.alt || "Eaglewood Polytechnic Institute";
+        lightbox.classList.add("open");
+        lightbox.setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+    };
+
+    const closeLightbox = () => {
+        lightbox.classList.remove("open");
+        lightbox.setAttribute("aria-hidden", "true");
+        document.body.style.overflow = "";
+    };
+
+    items.forEach((item, index) => item.addEventListener("click", () => openLightbox(index)));
+    lightbox.querySelector("[data-lightbox-close]")?.addEventListener("click", closeLightbox);
+    lightbox.querySelector("[data-lightbox-prev]")?.addEventListener("click", () => openLightbox(currentIndex - 1));
+    lightbox.querySelector("[data-lightbox-next]")?.addEventListener("click", () => openLightbox(currentIndex + 1));
+    lightbox.addEventListener("click", (event) => { if (event.target === lightbox) closeLightbox(); });
+    document.addEventListener("keydown", (event) => {
+        if (!lightbox.classList.contains("open")) return;
+        if (event.key === "Escape") closeLightbox();
+        if (event.key === "ArrowLeft") openLightbox(currentIndex - 1);
+        if (event.key === "ArrowRight") openLightbox(currentIndex + 1);
+    });
+}
+
+function inferGalleryCategory(caption) {
+    if (/lab|machine|computer|electrical|survey|chemistry|practical/.test(caption)) return "labs";
+    if (/workshop|fabrication|fitting/.test(caption)) return "workshop";
+    if (/hostel|dining|mess/.test(caption)) return "hostel";
+    if (/gathering|festival|sports|volleyball|yoga|republic|teacher|ganesh|women|ncc|blood|health|poster|engineer|drone|traditional|placement/.test(caption)) return "events";
+    return "campus";
+}
+
+/** FAQ accordion on about and similar pages. */
+function initFaqAccordion() {
+    document.querySelectorAll(".faq-item").forEach((item) => {
+        const trigger = item.querySelector(".faq-question, summary, button");
+        if (!trigger || trigger.dataset.faqBound) return;
+        trigger.dataset.faqBound = "true";
+        trigger.addEventListener("click", () => {
+            const open = !item.classList.contains("open");
+            item.classList.toggle("open", open);
+            trigger.setAttribute("aria-expanded", String(open));
+        });
+    });
+}
 

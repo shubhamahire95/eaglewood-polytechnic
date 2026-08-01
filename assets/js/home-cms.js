@@ -1,67 +1,27 @@
-import HOME_DATA from "./home-data.js";
-import { safeFetch, ensureCmsReady, isCmsAvailable } from "./supabase.js";
+import { safeFetch, ensureCmsReady, isCmsStrictMode, clearCmsQueryCache } from "./supabase.js";
 import { injectSiteChrome, initHomeUI, initFooterSettings } from "./ui.js";
+import { bindHomeInquiryForm } from "./page-forms.js";
 
-const FALLBACK = {
-    slides: HOME_DATA.hero.slides.map((slide, index) => ({
-        id: `fallback-${index}`,
-        title: index === 0 ? "Eaglewood Polytechnic Institute" : ["Hands-on engineering education", "Industry exposure from campus", "Build confidence beyond classrooms"][index - 1] || HOME_DATA.hero.title,
-        subtitle: [
-            "A modern engineering campus in Majalgaon focused on disciplined learning, practical labs and career-ready confidence.",
-            "Learn through workshops, laboratories, site visits, projects and mentoring from experienced faculty.",
-            "From sports and events to industrial visits, Eaglewood helps students grow as capable professionals.",
-            "From sports and events to industrial visits, Eaglewood helps students grow as capable professionals.",
-        ][index] || HOME_DATA.hero.description,
-        image_url: slide.src,
-        button_primary_label: "Apply for Admission",
-        button_primary_url: "admission.html",
-        button_secondary_label: "Latest Notice",
-        button_secondary_url: "#notice-board",
-    })),
-    updates: HOME_DATA.news.items.map((item, index) => ({
-        id: `u-${index}`,
-        icon: ["Admission", "Workshop", "Campus"][index] || "Update",
-        title: item.title,
-        description: item.summary,
-        image_url: ["assets/images/induction-programme.jpg", "assets/images/drone-workshop.jpg", "assets/images/annual-gathering.jpg"][index],
-        category: ["Admission", "Workshop", "Campus"][index] || "Update",
-        color: ["#005B5B", "#D4AF37", "#005B5B"][index % 3],
-        date: new Date().toISOString().slice(0, 10),
-        button_label: "Read More",
-        button_url: "#notice-board",
-    })),
-    notices: [
-        { id: "n-1", title: "Admissions Open 2026-27", description: "Admission guidance for diploma and degree engineering programs is available at the institute office.", date: new Date().toISOString().slice(0, 10), important: true, is_new: true, priority: "Important", pdf_url: "" },
-        { id: "n-2", title: "Document Verification Schedule", description: "Original certificates and admission documents will be verified at the admission counter on working days.", date: new Date().toISOString().slice(0, 10), important: false, is_new: true, priority: "Academic", category: "Admission" },
-        { id: "n-3", title: "Scholarship Guidance Desk", description: "Students may collect scholarship eligibility information from the admission office with required documents.", date: new Date().toISOString().slice(0, 10), important: false, is_new: false, priority: "Student Services", category: "Scholarship" },
-        { id: "n-4", title: "Anti-Ragging Awareness", description: "Eaglewood maintains a zero-tolerance policy against ragging. Contact the anti-ragging committee for support.", date: new Date().toISOString().slice(0, 10), important: true, is_new: false, priority: "Important", category: "Compliance" },
-        { id: "n-5", title: "Industrial Visit Registration", description: "Department-wise industrial visit registrations are open for eligible students through respective HODs.", date: new Date().toISOString().slice(0, 10), important: false, is_new: true, priority: "General", category: "Academics" },
-        { id: "n-6", title: "Examination Cell Notice", description: "Students should collect examination forms and timetable updates from the academic section.", date: new Date().toISOString().slice(0, 10), important: false, is_new: false, priority: "Examination", category: "Exam Cell" },
-    ],
-    principal: { photo_url: "", name: "Principal", designation: "Eaglewood Polytechnic Institute", message: "Welcome to Eaglewood Polytechnic Institute, where disciplined learning, practical exposure and student-centered mentoring shape capable engineering professionals.", signature: "Eaglewood Polytechnic" },
-    courses: HOME_DATA.courses.items.map((item, index) => ({ id: item.id, image_url: ["assets/images/civil-department.jpg", "assets/images/computer-department.jpg", "assets/images/electrical-department.jpg", "assets/images/ai-department.jpg"][index], title: item.title, duration: "3 Years", seats: 60, code: `EPI-${index + 1}`, description: item.description, eligibility: "10th / 12th as per admission pathway", button_label: "Read More", button_url: "courses.html" })),
-    departments: [
-        { id: "dept-civil", title: "Civil Engineering", hod_name: "HOD, Civil", department_image_url: "assets/images/civil-department.jpg", description: "Surveying, construction materials, site practice and infrastructure fundamentals.", labs: "Surveying, CAD & Materials Lab", faculty_count: 8, students_count: 180, button_label: "Explore Department", button_url: "departments.html" },
-        { id: "dept-computer", title: "Computer Engineering", hod_name: "HOD, Computer", department_image_url: "assets/images/computer-department.jpg", description: "Programming, networking, software development and digital problem solving.", labs: "Programming, Networking & DB Lab", faculty_count: 9, students_count: 200, button_label: "Explore Department", button_url: "departments.html" },
-        { id: "dept-electrical", title: "Electrical Engineering", hod_name: "HOD, Electrical", department_image_url: "assets/images/electrical-department.jpg", description: "Electrical machines, circuits, power systems and workshop-based learning.", labs: "Machines, Circuits & Power Lab", faculty_count: 8, students_count: 175, button_label: "Explore Department", button_url: "departments.html" },
-        { id: "dept-mechanical", title: "Mechanical Engineering", hod_name: "HOD, Mechanical", department_image_url: "assets/images/workshop.jpg", description: "Workshop practice, manufacturing processes and machine fundamentals.", labs: "Workshop, Manufacturing & CAD Lab", faculty_count: 7, students_count: 160, button_label: "Explore Department", button_url: "departments.html" },
-        { id: "dept-ai", title: "AI & Machine Learning", hod_name: "HOD, AI & ML", department_image_url: "assets/images/ai-department.jpg", description: "Data science, intelligent systems, NLP and database technologies.", labs: "AI, Data Science & NLP Lab", faculty_count: 6, students_count: 150, button_label: "Explore Department", button_url: "departments.html" },
-    ],
-    facilities: [
-        { title: "Modern Laboratories", icon: "Lab", description: "Well-equipped practical spaces for hands-on engineering learning.", image_url: "assets/images/workshop.jpg", category: "Labs" },
-        { title: "Library", icon: "Library", description: "Quiet reading and reference support for academic growth.", image_url: "assets/images/library.jpg", category: "Library" },
-        { title: "Hostel", icon: "Hostel", description: "Secure residential support for students.", image_url: "assets/images/hostel-building.jpg", category: "Hostel" },
-        { title: "Transport", icon: "Transport", description: "Bus routes connecting nearby towns and villages.", image_url: "assets/images/transport.jpg", category: "Transport" },
-        { title: "Sports", icon: "Sports", description: "Activities that build teamwork, discipline and confidence.", image_url: "assets/images/boys-volleyball.jpg", category: "Sports" },
-        { title: "Smart Classroom", icon: "Monitor", description: "Digital teaching aids for interactive learning.", image_url: "assets/images/computer-lab.jpg", category: "Smart Classroom" },
-        { title: "Workshop", icon: "Workshop", description: "Machine and fabrication workshops for practical skill building.", image_url: "assets/images/uploaded/workshop-front.jpg", category: "Workshop" },
-        { title: "Campus WiFi", icon: "WiFi", description: "Connected campus for academic resources and digital learning.", image_url: "assets/images/campus.jpg", category: "WiFi" },
-        { title: "Medical Support", icon: "Medical", description: "First-aid and health guidance support on campus.", image_url: "assets/images/campus.jpg", category: "Medical" },
-        { title: "Canteen", icon: "Cafe", description: "Hygienic refreshment space for students and staff.", image_url: "assets/images/uploaded/campus-life.jpg", category: "Canteen" },
-    ].map((item, index) => ({ id: `f-${index}`, ...item })),
-    placements: [{ id: "p-1", title: "Placement Support", description: "Placement guidance and workshops help students build interview confidence.", placed_students: 120, image_url: "assets/images/placement-interview.jpg" }],
-    gallery: HOME_DATA.gallery.items.concat(HOME_DATA.events.items).map((item, index) => ({ id: item.id, title: item.title, category: item.tag || "Campus", image_url: item.image?.src, alt: item.image?.alt || item.title, description: item.description, display_order: index })),
-};
+const CMS_SYNC_KEY = "ew_cms_updated_at";
+
+if (typeof window !== "undefined") {
+    window.addEventListener("storage", (event) => {
+        if (event.key === CMS_SYNC_KEY) {
+            clearCmsQueryCache();
+            void renderCmsHome();
+        }
+    });
+    window.addEventListener("focus", () => {
+        const stamp = localStorage.getItem(CMS_SYNC_KEY);
+        if (stamp && stamp !== window.__ewLastCmsSync) {
+            window.__ewLastCmsSync = stamp;
+            clearCmsQueryCache();
+            void renderCmsHome();
+        }
+    });
+}
+
+export const FALLBACK_IMAGE = "assets/images/campus.jpg";
 
 const TABLES = ["home_slides", "updates", "notices", "principal_message", "courses", "departments", "faculty", "facilities", "placements", "gallery"];
 
@@ -80,23 +40,29 @@ const HIGHLIGHT_ICONS = {
 export async function renderCmsHome() {
     injectSiteChrome();
     const data = await loadHomeData();
-    renderTopUtility(data.settings);
+    renderTopUtility(data.settings, data.cmsOnly);
     renderBreakingNews(data.notices);
     const main = document.getElementById("main");
     main.className = "premium-home eaglewood-home gov-home";
     main.innerHTML = `
-        ${hero(data.slides)}
+        ${hero(data)}
+        ${statsBand(data)}
         ${quickHighlights(data)}
-        ${missionVision(data.settings)}
-        ${principal(data.principal)}
-        ${departments(data.departments)}
-        ${courses(data.courses)}
-        ${facilities(data.facilities)}
-        ${notices(data.notices)}
+        ${missionVision(data.settings, data.cmsOnly)}
+        ${principal(data.principal, data.cmsOnly)}
         ${updates(data.updates)}
+        ${notices(data.notices)}
+        ${courses(data.courses)}
+        ${departments(data.departments)}
+        ${facilities(data.facilities)}
         ${placements(data.placements)}
-        ${studentResources()}
+        ${achievements(data, data.cmsOnly)}
+        ${campusHighlights(data, data.cmsOnly)}
         ${gallery(data.gallery)}
+        ${admissionProcess(data, data.cmsOnly)}
+        ${inquirySection(data)}
+        ${studentResources()}
+        ${premiumCta(data.settings)}
     `;
     initSlider();
     initLightbox();
@@ -106,53 +72,68 @@ export async function renderCmsHome() {
     initHomeGalleryFilters();
     initHomeCarousels();
     initFacilitiesSlider();
+    initHeroAiButton();
+    bindHomeInquiryForm(data.courses);
     runInit("departmentsSwiper", initDepartmentsSwiper);
     initHomeUI();
     void initFooterSettings();
 }
 
 async function loadHomeData() {
-    await ensureCmsReady();
-    if (!isCmsAvailable()) {
-        return fallbackHomeData();
-    }
+    clearCmsQueryCache();
+    window.__ewLastCmsSync = localStorage.getItem("ew_cms_updated_at") || "";
+    await ensureCmsReady({ verifyFull: true });
+
     const result = { settings: await settings() };
-    await Promise.allSettled(TABLES.map(async (table) => { result[keyFor(table)] = await rows(table); }));
+    const fetchMeta = {};
+    await Promise.allSettled(TABLES.map(async (table) => {
+        const key = keyFor(table);
+        const loaded = await rows(table);
+        result[key] = loaded.data;
+        fetchMeta[key] = loaded.ok;
+    }));
     TABLES.forEach((table) => { result[keyFor(table)] ||= []; });
+
+    const settingsMerged = { ...result.settings };
+    const cmsOnly = isCmsStrictMode();
+
     return {
-        settings: result.settings,
-        slides: result.slides.length ? result.slides : FALLBACK.slides,
-        updates: result.updates.length ? result.updates : FALLBACK.updates,
-        notices: result.notices.length ? result.notices : FALLBACK.notices,
-        principal: result.principal[0] || FALLBACK.principal,
-        courses: result.courses.length ? result.courses : FALLBACK.courses,
-        departments: result.departments.length ? result.departments : FALLBACK.departments,
-        faculty: result.faculty?.length ? result.faculty : [],
-        facilities: result.facilities.length ? result.facilities : FALLBACK.facilities,
-        placements: result.placements.length ? result.placements : FALLBACK.placements,
-        gallery: result.gallery.length ? result.gallery : FALLBACK.gallery,
+        settings: settingsMerged,
+        slides: result.slides,
+        updates: result.updates,
+        notices: result.notices,
+        principal: result.principal[0] || null,
+        courses: result.courses,
+        departments: result.departments,
+        faculty: result.faculty,
+        facilities: result.facilities,
+        placements: result.placements,
+        gallery: result.gallery,
+        achievements: parseAdmissionSteps(settingsMerged.achievements) || [],
+        admissionSteps: parseAdmissionSteps(settingsMerged.admission_steps) || [],
+        campusFacts: parseCampusFacts(settingsMerged.campus_facts),
+        cmsOnly,
     };
 }
 
-function fallbackHomeData() {
-    return {
-        settings: {},
-        slides: FALLBACK.slides,
-        updates: FALLBACK.updates,
-        notices: FALLBACK.notices,
-        principal: FALLBACK.principal,
-        courses: FALLBACK.courses,
-        departments: FALLBACK.departments,
-        faculty: [],
-        facilities: FALLBACK.facilities,
-        placements: FALLBACK.placements,
-        gallery: FALLBACK.gallery,
-    };
+function parseCampusFacts(value) {
+    const raw = parseSettingValue(value);
+    if (Array.isArray(raw) && raw.length) return raw;
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+        return Object.entries(raw).map(([label, val]) => ({ label, value: String(val) }));
+    }
+    return [];
+}
+
+function parseAdmissionSteps(value) {
+    const raw = parseSettingValue(value);
+    if (Array.isArray(raw) && raw.length) return raw;
+    return null;
 }
 
 async function rows(table) {
     const result = await safeFetch(table, (q) => q.select("*").eq("published", true).order("display_order", { ascending: true }).order("created_at", { ascending: false }), [], `home:${table}`);
-    return result.data || [];
+    return { data: result.data || [], ok: result.ok === true };
 }
 
 async function settings() {
@@ -161,7 +142,7 @@ async function settings() {
 }
 
 function runInit(name, fn) {
-    try { fn(); } catch (error) { console.warn(`[INIT:${name}]`, error); }
+    try { fn(); } catch { /* non-critical init */ }
 }
 function localDebounce(fn, wait = 100) {
     let timer;
@@ -177,14 +158,14 @@ function keyFor(table) {
     return table;
 }
 function img(src) {
-    const value = src || "assets/images/campus.jpg";
-    return value;
+    const value = (src && String(src).trim()) ? String(src).trim() : FALLBACK_IMAGE;
+    return value.startsWith("http") || value.startsWith("assets/") || value.startsWith("/") ? value : FALLBACK_IMAGE;
 }
 
 function imgTag(src, alt = "", lazy = true) {
     const safe = esc(img(src));
     const lazyAttrs = lazy ? 'loading="lazy" decoding="async"' : "";
-    return `<img ${lazyAttrs} src="${safe}" alt="${esc(alt)}" onerror="this.onerror=null;this.src='assets/images/campus.jpg';">`;
+    return `<img ${lazyAttrs} src="${safe}" alt="${esc(alt)}" onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}';">`;
 }
 function esc(v) { const div = document.createElement("div"); div.textContent = v ?? ""; return div.innerHTML; }
 function date(v) { return v ? new Date(v).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : ""; }
@@ -226,7 +207,7 @@ function listBits(value) {
 function renderBreakingNews(notices = []) {
     const host = document.getElementById("breaking-news");
     if (!host) return;
-    const items = (notices.length ? notices : FALLBACK.notices).slice(0, 6);
+    const items = notices.slice(0, 6);
     if (!items.length) { host.remove(); return; }
     host.className = "breaking-news";
     host.innerHTML = `<div class="container breaking-news-inner"><span class="breaking-news-label">Latest</span><div class="breaking-news-track" id="breakingNewsTrack">${items.map((n) => `<a href="${esc(n.attachment_url || n.pdf_url || n.file_url || "index.html#notice-board")}">${esc(n.title)}</a>`).join('<span class="breaking-news-sep">|</span>')}</div></div>`;
@@ -234,32 +215,55 @@ function renderBreakingNews(notices = []) {
     if (track) track.innerHTML = `${track.innerHTML} <span class="breaking-news-sep">|</span> ${track.innerHTML}`;
 }
 
-function renderTopUtility(settings) {
+function renderTopUtility(settings, cmsOnly = false) {
     const top = document.getElementById("top-bar");
     if (!top) return;
+    const phone = settings.phone || "";
+    const email = settings.email || "";
+    const approval = parseSettingValue(settings.approval) || "Approved by AICTE, DTE & Govt. of Maharashtra";
+    const affiliation = parseSettingValue(settings.affiliation) || "Affiliated to MSBTE & DBATU";
+    const dte = parseSettingValue(settings.dte_code) || "2634";
+    const msbte = parseSettingValue(settings.msbte_code) || "51307";
+    if (cmsOnly && !phone && !email && !approval) {
+        top.remove();
+        return;
+    }
     top.className = "top-bar premium-topbar";
-    top.innerHTML = `<div class="container top-inner"><div class="top-left"><span>Approved by AICTE, DTE & Govt. of Maharashtra</span><span>Affiliated to MSBTE & DBATU</span><span>DTE 2634 | MSBTE 51307</span></div><div class="top-right"><a href="tel:${esc(settings.phone || HOME_DATA.topBar.phone)}">${esc(settings.phone || HOME_DATA.topBar.phone)}</a><a href="mailto:${esc(settings.email || HOME_DATA.topBar.email)}">${esc(settings.email || HOME_DATA.topBar.email)}</a><a href="contact.html">Contact Office</a></div></div>`;
+    top.innerHTML = `<div class="container top-inner"><div class="top-left"><span>${esc(approval)}</span><span>${esc(affiliation)}</span><span>DTE ${esc(dte)} | MSBTE ${esc(msbte)}</span></div><div class="top-right">${phone ? `<a href="tel:${esc(phone)}">${esc(phone)}</a>` : ""}${email ? `<a href="mailto:${esc(email)}">${esc(email)}</a>` : ""}<a href="contact.html">Contact Office</a></div></div>`;
 }
 
 function sectionHead(kicker, title, lead = "") {
     return `<div class="section-head-pro premium-reveal"><span>${kicker}</span><h2>${title}</h2>${lead ? `<p>${lead}</p>` : ""}</div>`;
 }
 
-function hero(items) {
+function hero(data) {
+    const items = data.slides || [];
+    if (!items.length) return "";
+    const stats = [
+        ["600+", "Students"],
+        ["5", "Departments"],
+        ["85%", "Placement Focus"],
+        ["12+", "Bus Routes"],
+    ];
     return `<section class="premium-hero gov-hero" id="hero" aria-label="Eaglewood Polytechnic Institute">
         <div class="hero-pattern" aria-hidden="true"></div>
+        <div class="hero-orbit one" aria-hidden="true"></div>
+        <div class="hero-orbit two" aria-hidden="true"></div>
         <div class="hero-slider-shell">${items.map((slide, i) => `<article class="premium-slide ${i === 0 ? "active" : ""}" aria-hidden="${i === 0 ? "false" : "true"}">
-            <img ${i === 0 ? "" : "loading=\"lazy\" decoding=\"async\""} src="${esc(img(slide.image_url))}" alt="${esc(slide.title)}">
+            <img ${i === 0 ? "" : "loading=\"lazy\" decoding=\"async\""} src="${esc(img(slide.image_url))}" alt="${esc(slide.title)}" onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}';">
             <div class="hero-copy premium-reveal">
+                <div class="hero-badge">Admissions Open 2026-27</div>
                 <div class="hero-trust-badges"><span>AICTE Approved</span><span>DTE 2634</span><span>MSBTE 51307</span><span>Govt. of Maharashtra</span></div>
                 <h1>${esc(slide.title)}</h1>
                 <p class="animated-subtitle">${esc(slide.subtitle)}</p>
                 <div class="hero-actions">
-                    <a class="btn btn-primary btn-ripple" href="${esc(slide.button_primary_url || "admission.html")}">${esc(slide.button_primary_label || "Admission Information")}</a>
+                    <a class="btn btn-primary btn-ripple" href="${esc(slide.button_primary_url || "admission.html")}">${esc(slide.button_primary_label || "Apply for Admission")}</a>
                     <a class="btn btn-secondary btn-ripple" href="${esc(slide.button_secondary_url || "#notice-board")}">${esc(slide.button_secondary_label || "Important Notices")}</a>
+                    <button class="btn btn-secondary btn-ripple" type="button" data-open-ai-assistant>Ask AI Assistant</button>
                 </div>
             </div>
         </article>`).join("")}
+        <div class="hero-float-grid premium-reveal" aria-hidden="true">${stats.map(([value, label]) => `<div class="hero-float-card"><strong data-count="${String(value).replace(/[^0-9]/g, "") || 0}" data-suffix="${String(value).replace(/[0-9]/g, "") || ""}">${esc(value)}</strong><span>${esc(label)}</span></div>`).join("")}</div>
         <button class="slide-nav prev" data-prev type="button" aria-label="Previous slide">‹</button>
         <button class="slide-nav next" data-next type="button" aria-label="Next slide">›</button>
         <div class="slide-dots">${items.map((_, i) => `<button class="${i === 0 ? "active" : ""}" data-dot="${i}" type="button" aria-label="Show slide ${i + 1}"></button>`).join("")}</div>
@@ -268,22 +272,46 @@ function hero(items) {
         </div></section>`;
 }
 
+function statsBand(data) {
+    const facultyCount = data.faculty?.length || data.departments.reduce((s, d) => s + Number(d.faculty_count || 0), 0);
+    const students = data.departments.reduce((s, d) => s + Number(d.students_count || 0), 0);
+    const dteCode = parseSettingValue(data.settings?.dte_code) || "";
+    const rows = [
+        [students, "", "Students Enrolled"],
+        [data.departments.length, "", "Departments"],
+        [facultyCount, "", "Faculty Members"],
+        [dteCode || "—", "", "DTE Institute Code"],
+    ];
+    if (data.cmsOnly && !students && !data.departments.length && !facultyCount && !dteCode) return "";
+    return `<section class="stats-band" id="stats-band" aria-label="Institute statistics"><div class="container"><div class="stats-premium-grid premium-reveal">${rows.map(([value, suffix, label]) => `<div><strong data-count="${value}" data-suffix="${suffix}">${value}${suffix}</strong><span>${esc(label)}</span></div>`).join("")}</div></div></section>`;
+}
+
+function initHeroAiButton() {
+    document.querySelectorAll("[data-open-ai-assistant]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+            const { openAiAssistant } = await import("./ai-assistant.js");
+            openAiAssistant();
+        });
+    });
+}
+
 function quickHighlights(data) {
-    const facultyCount = data.faculty?.length || data.departments.reduce((s, d) => s + Number(d.faculty_count || 0), 0) || 32;
-    const students = data.departments.reduce((s, d) => s + Number(d.students_count || 0), 0) || 600;
-    const placementPct = data.placements[0]?.placement_percentage || data.placements[0]?.package || "85%";
+    const facultyCount = data.faculty?.length || data.departments.reduce((s, d) => s + Number(d.faculty_count || 0), 0);
+    const students = data.departments.reduce((s, d) => s + Number(d.students_count || 0), 0);
+    const placementPct = data.placements[0]?.placement_percentage || data.placements[0]?.package || "";
     const cards = [
         ["students", students, "Students"],
-        ["departments", data.departments.length || 5, "Departments"],
+        ["departments", data.departments.length, "Departments"],
         ["faculty", facultyCount, "Faculty"],
         ["placement", placementPct, "Placement Focus"],
-        ["hostel", "Available", "Hostel"],
-        ["transport", "12+", "Bus Routes"],
-        ["library", "Digital", "Library"],
-        ["lab", "10+", "Computer Labs"],
-        ["lab", "6+", "AI & Tech Labs"],
-        ["scholarship", "Govt.", "Scholarships"],
-    ];
+        ["hostel", parseSettingValue(data.settings?.hostel_status) || "", "Hostel"],
+        ["transport", parseSettingValue(data.settings?.transport_routes) || "", "Bus Routes"],
+        ["library", parseSettingValue(data.settings?.library_status) || "", "Library"],
+        ["lab", parseSettingValue(data.settings?.computer_labs) || "", "Computer Labs"],
+        ["lab", parseSettingValue(data.settings?.tech_labs) || "", "AI & Tech Labs"],
+        ["scholarship", parseSettingValue(data.settings?.scholarship_status) || "", "Scholarships"],
+    ].filter(([, value]) => value !== "" && value !== 0);
+    if (data.cmsOnly && !cards.length) return "";
     return `<section class="gov-highlights premium-section white" id="highlights" aria-labelledby="highlights-title">
         <div class="container">
             ${sectionHead("Institute at a Glance", "Quick Highlights", "Key academic strengths, student support and campus infrastructure at Eaglewood Polytechnic Institute.")}
@@ -315,15 +343,12 @@ function parseSettingList(value) {
     return [];
 }
 
-function missionVision(settings = {}) {
-    const mission = parseSettingValue(settings.mission) || "To deliver industry-oriented engineering education with discipline, practical exposure and ethical values.";
-    const vision = parseSettingValue(settings.vision) || "To be a leading polytechnic nurturing confident engineers for society and industry.";
-    const objectives = parseSettingList(settings.objectives).length
-        ? parseSettingList(settings.objectives)
-        : ["Hands-on laboratory learning", "Industry-aligned curriculum", "Student mentoring and placement support", "Inclusive campus culture"];
-    const values = parseSettingList(settings.core_values).length
-        ? parseSettingList(settings.core_values)
-        : ["Integrity", "Innovation", "Discipline", "Excellence", "Service"];
+function missionVision(settings = {}, cmsOnly = false) {
+    const mission = parseSettingValue(settings.mission);
+    const vision = parseSettingValue(settings.vision);
+    const objectives = parseSettingList(settings.objectives);
+    const values = parseSettingList(settings.core_values);
+    if (cmsOnly && !mission && !vision && !objectives.length && !values.length) return "";
     return `<section class="premium-section gov-mission-section" id="mission-vision" aria-labelledby="mission-title">
         <div class="container">
             ${sectionHead("Institute", "Mission & Vision", "Our purpose, direction and values that guide every student at Eaglewood.")}
@@ -336,12 +361,14 @@ function missionVision(settings = {}) {
         </div></section>`;
 }
 
-function principal(p) {
+function principal(p, cmsOnly = false) {
+    if (!p) return "";
     const name = p.name || "Principal";
     const designation = p.designation || "Principal, Eaglewood Polytechnic Institute";
     const qualification = p.qualification ? `<span class="gov-principal-qual">${esc(p.qualification)}</span>` : "";
     const hasPhoto = usablePrincipalPhoto(p.photo_url);
-    const message = String(p.message || "").replace(/<[^>]+>/g, " ").trim() || "At Eaglewood Polytechnic Institute, we are committed to disciplined learning, practical engineering education and student-centred mentoring for industry-ready professionals.";
+    const message = String(p.message || "").replace(/<[^>]+>/g, " ").trim();
+    if (!message) return "";
     const excerpt = message.length > 320 ? `${message.slice(0, 320)}…` : message;
     const signature = p.signature || name;
     return `<section class="premium-section gray gov-principal-section" id="principal" aria-labelledby="principal-title">
@@ -368,6 +395,7 @@ function principal(p) {
 }
 
 function departments(items) {
+    if (!items?.length) return "";
     return `<section class="premium-section blue gov-departments-section" id="departments" aria-labelledby="departments-title">
         <div class="container">
             ${sectionHead("Academics", "Engineering Departments", "Specialized departments with laboratories, mentoring and practical learning pathways.")}
@@ -380,9 +408,11 @@ function departments(items) {
                                 <div class="gov-dept-body">
                                     <span class="gov-dept-tag">Department</span>
                                     <h3 id="${d.id === items[0]?.id ? "departments-title" : ""}">${esc(d.title)}</h3>
+                                    <p class="gov-dept-hod">${esc(d.hod_name || "Head of Department")}</p>
                                     <p>${plain(d.description)}</p>
                                     <div class="gov-dept-stats">
                                         <span>${esc(d.faculty_count || 0)} Faculty</span>
+                                        <span>${esc(d.students_count || 0)} Students</span>
                                         <span class="gov-dept-labs">${esc(d.labs || "Dedicated Labs")}</span>
                                     </div>
                                     <a class="btn btn-teal btn-ripple" href="${esc(d.button_url || "departments.html")}">${esc(d.button_label || "Explore Department")}</a>
@@ -398,47 +428,56 @@ function departments(items) {
         </div></section>`;
 }
 function updates(items) {
+    if (!items?.length) return "";
     const images = ["assets/images/induction-programme.jpg", "assets/images/drone-workshop.jpg", "assets/images/industrial-visit-plant.jpg", "assets/images/annual-gathering.jpg", "assets/images/placement-guidance.jpg"];
     return `<section class="premium-section blue updates-section gov-updates-section" id="latest-updates"><div class="container"><div class="section-split-head">${sectionHead("Latest Updates", "Recent campus events and academic highlights", "Official institute updates presented as a live academic news desk.")}<a class="section-view-all" href="index.html#latest-updates">View All</a></div><div class="swiper gov-swiper gov-updates-carousel premium-reveal" data-gov-slider data-autoplay="5000" data-loop="true"><button class="gov-slider-arrow prev" type="button" data-slider-prev aria-label="Previous update">&lt;</button><div class="swiper-wrapper gov-slider-track">${items.slice(0, 9).map((u, index) => `<article class="swiper-slide gov-update-card"><a class="gov-update-media" href="${esc(u.button_url || "index.html#latest-updates")}"><img loading="lazy" decoding="async" src="${esc(img(u.image_url || images[index % images.length]))}" alt="${esc(u.title)}"><span>${esc(u.category || u.icon || "Campus Update")}</span></a><div class="gov-update-body"><div class="gov-update-meta"><time>${date(u.date || u.created_at)}</time><span>${esc(u.category || "Update")}</span></div><h3>${esc(u.title)}</h3><p>${plain(u.description)}</p><div class="gov-update-actions"><a href="${esc(u.button_url || "index.html#latest-updates")}">${esc(u.button_label || "Read More")}</a></div></div></article>`).join("")}</div><button class="gov-slider-arrow next" type="button" data-slider-next aria-label="Next update">&gt;</button><div class="swiper-pagination gov-slider-dots" data-slider-dots></div></div></div></section>`;
 }
 function notices(items) {
+    if (!items?.length) return "";
     return `<section class="premium-section white notices-section gov-notices-section" id="notice-board"><div class="container"><div class="section-split-head">${sectionHead("Important Notices", "Official notice board and downloads", "Pinned notices, deadlines and attachments remain easy to scan for students and parents.")}<a class="section-view-all" href="admission.html">Admission Info</a></div><div class="swiper gov-swiper gov-notices-carousel premium-reveal" data-gov-slider data-autoplay="5000" data-loop="true"><button class="gov-slider-arrow prev" type="button" data-slider-prev aria-label="Previous notice">&lt;</button><div class="swiper-wrapper gov-slider-track">${items.slice(0, 10).map((n, i) => { const file = n.attachment_url || n.pdf_url || n.file_url || ""; const priority = n.priority || (n.important ? "Important" : "General"); return `<article class="swiper-slide gov-notice-card ${i === 0 || n.important ? "is-pinned" : ""}"><div class="gov-notice-strip"></div><div class="gov-notice-head"><div class="gov-notice-badges">${i === 0 || n.important ? `<span class="pin">Pinned</span>` : ""}<span class="priority">${esc(priority)}</span>${n.is_new ? `<span class="new">New</span>` : ""}<span class="status">${esc(n.status || (n.published === false ? "Draft" : "Published"))}</span></div><time>${date(n.date || n.created_at)}</time></div><h3>${esc(n.title)}</h3><p>${plain(n.description)}</p><div class="gov-notice-foot"><span>${n.expiry_date ? `Valid till ${date(n.expiry_date)}` : "Official notice"}</span><span>${Number(n.download_count || n.views || 0)} downloads</span></div><div class="gov-notice-actions">${file ? `<a class="download" href="${esc(file)}" target="_blank" rel="noopener noreferrer"><b>PDF</b> Download</a>` : ""}<a href="${esc(file ? file : "index.html#notice-board")}"${file ? ' target="_blank" rel="noopener noreferrer"' : ""}>${file ? "Open PDF" : "View Notice"}</a></div></article>`; }).join("")}</div><button class="gov-slider-arrow next" type="button" data-slider-next aria-label="Next notice">&gt;</button><div class="swiper-pagination gov-slider-dots" data-slider-dots></div></div>        </div></section>`;
 }
 
 function courses(items) {
-    const rows = (items.length ? items : FALLBACK.courses).slice(0, 4);
+    if (!items?.length) return "";
+    const rows = items.slice(0, 6);
     return `<section class="premium-section white gov-courses-section" id="courses">
         <div class="container">
             <div class="section-split-head">${sectionHead("Programs", "Engineering Courses", "Diploma and degree pathways with practical training, laboratories and industry exposure.")}<a class="section-view-all" href="courses.html">All Courses</a></div>
-            <div class="gov-course-grid premium-reveal">${rows.map((c) => `<article class="gov-course-card glass-card">
-                <a class="gov-course-media" href="${esc(c.button_url || "courses.html")}">${imgTag(c.image_url, c.title)}</a>
+            <div class="gov-course-grid premium-course-grid premium-reveal">${rows.map((c) => `<article class="gov-course-card premium-course glass-card">
+                <a class="gov-course-media course-image" href="${esc(c.button_url || "courses.html")}">${imgTag(c.image_url, c.title)}</a>
                 <div class="gov-course-body">
                     <span class="gov-course-meta">${esc(c.duration || "3 Years")} · ${esc(c.seats || 60)} Seats</span>
                     <h3>${esc(c.title)}</h3>
                     <p>${plain(c.description)}</p>
-                    <a class="btn btn-teal btn-sm btn-ripple" href="${esc(c.button_url || "courses.html")}">${esc(c.button_label || "View Course")}</a>
+                    <ul>
+                        <li><span>Eligibility</span><strong>${esc(c.eligibility || "As per DTE norms")}</strong></li>
+                        <li><span>Code</span><strong>${esc(c.code || "—")}</strong></li>
+                    </ul>
+                    <a class="btn btn-teal btn-sm btn-ripple" href="${esc(c.button_url || "courses.html")}">${esc(c.button_label || "Read More")}</a>
                 </div>
             </article>`).join("")}</div>
         </div></section>`;
 }
 
 function facilities(items) {
-    const rows = (items.length ? items : FALLBACK.facilities).slice(0, 10);
-    return `<section class="premium-section gray facilities-section facilities-slider-section" id="facilities"><div class="container"><div class="facilities-slider-head premium-reveal"><div><span>CAMPUS FACILITIES</span><h2>Everything Students Need to Succeed</h2><p>Modern infrastructure, practical learning spaces and student-focused campus facilities.</p></div><div class="facilities-slider-controls"><button type="button" data-facility-prev aria-label="Previous facility">&lt;</button><button type="button" data-facility-next aria-label="Next facility">&gt;</button></div></div><div class="facilities-slider premium-reveal" data-facilities-slider data-autoplay="4500"><div class="facilities-track">${rows.map((f) => `<article class="facility-slide-card"><a class="facility-media" href="${esc(f.link || f.button_url || "infrastructure.html")}"><img loading="lazy" decoding="async" src="${esc(img(f.image_url))}" alt="${esc(f.title)}" onerror="this.onerror=null;this.src='assets/images/campus.jpg'"><span class="facility-overlay"></span></a><div class="facility-card-body"><span class="facility-badge">${facilityIcon(f.icon || f.title)}${esc(f.short_title || f.category || "Facility")}</span><h3>${esc(f.title)}</h3><p>${plain(f.description)}</p><a class="facility-link" href="${esc(f.link || f.button_url || "infrastructure.html")}">Explore Facility</a></div></article>`).join("")}</div><div class="facilities-dots" data-facility-dots></div></div></div></section>`;
+    if (!items?.length) return "";
+    const rows = items.slice(0, 10);
+    return `<section class="premium-section gray facilities-section facilities-slider-section" id="facilities"><div class="container"><div class="facilities-slider-head premium-reveal"><div><span>CAMPUS FACILITIES</span><h2>Everything Students Need to Succeed</h2><p>Modern infrastructure, practical learning spaces and student-focused campus facilities.</p></div><div class="facilities-slider-controls"><button type="button" data-facility-prev aria-label="Previous facility">&lt;</button><button type="button" data-facility-next aria-label="Next facility">&gt;</button></div></div><div class="facilities-slider premium-reveal" data-facilities-slider data-autoplay="4500"><div class="facilities-track">${rows.map((f) => `<article class="facility-slide-card"><a class="facility-media" href="${esc(f.link || f.button_url || "infrastructure.html")}"><img loading="lazy" decoding="async" src="${esc(img(f.image_url))}" alt="${esc(f.title)}" onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}'"><span class="facility-overlay"></span></a><div class="facility-card-body"><span class="facility-badge">${facilityIcon(f.icon || f.title)}${esc(f.short_title || f.category || "Facility")}</span><h3>${esc(f.title)}</h3><p>${plain(f.description)}</p><a class="facility-link" href="${esc(f.link || f.button_url || "infrastructure.html")}">Explore Facility</a></div></article>`).join("")}</div><div class="facilities-dots" data-facility-dots></div></div></div></section>`;
 }
 
 function placements(items) {
+    if (!items?.length) return "";
     const top = items[0] || {};
     const placementImage = top.image_url || "assets/images/placement-interview.jpg";
     const highest = top.highest_package || "₹6 LPA";
     const average = top.average_package || "₹3.2 LPA";
     const placed = top.placed_students || 120;
     const recruiters = [top.recruiter, top.company_logo_url, top.student_name].filter(Boolean);
-    const recruiterLabels = recruiters.length ? recruiters : ["TCS", "Infosys", "Wipro", "L&T", "Local Industry"];
+    const recruiterLabels = recruiters.length ? recruiters : [];
     const testimonials = items.filter((p) => p.testimonial).slice(0, 2);
     const testimonialCards = testimonials.length
         ? testimonials.map((t) => `<blockquote class="gov-placement-quote glass-card"><p>${plain(t.testimonial)}</p><footer><strong>${esc(t.student_name || "Student")}</strong><span>${esc(t.course || "Alumni")}</span></footer></blockquote>`).join("")
-        : `<blockquote class="gov-placement-quote glass-card"><p>Placement guidance and interview preparation helped me approach campus recruitment with confidence.</p><footer><strong>Eaglewood Student</strong><span>Engineering Graduate</span></footer></blockquote>`;
+        : "";
     return `<section class="premium-section white gov-placement-section" id="placements">
         <div class="container">
             ${sectionHead("Training & Placement", "Placement Highlights", "Career readiness through aptitude training, technical skills and industry interaction.")}
@@ -453,7 +492,7 @@ function placements(items) {
             </div>
             <div class="gov-recruiter-row premium-reveal"><span>Recruiters & Partners</span><div>${recruiterLabels.map((r) => `<strong>${esc(String(r).slice(0, 24))}</strong>`).join("")}</div></div>
             <div class="gov-placement-testimonials premium-reveal">${testimonialCards}</div>
-            <div class="gov-placement-actions"><a class="btn btn-primary btn-ripple" href="gallery.html">Placement Gallery</a><a class="btn btn-secondary btn-ripple" href="contact.html">Contact Placement Cell</a></div>
+            <div class="gov-placement-actions"><a class="btn btn-primary btn-ripple" href="placements.html">Placement Details</a><a class="btn btn-secondary btn-ripple" href="contact.html">Contact Placement Cell</a></div>
         </div></section>`;
 }
 
@@ -476,8 +515,121 @@ function studentResources() {
         </div></section>`;
 }
 function gallery(items) {
+    if (!items?.length) return "";
     const categories = ["All", ...new Set(items.map((g) => categoryFor(g.category || "Campus")).filter(Boolean))].slice(0, 6);
     return `<section class="premium-section blue gallery-section" id="gallery"><div class="container"><div class="section-split-head">${sectionHead("Gallery", "Campus life, workshops and student moments", "Filterable masonry preview with lightbox interactions and editorial overlays.")}<a class="section-view-all" href="gallery.html">Open Gallery</a></div><div class="home-gallery-filters" aria-label="Filter gallery preview">${categories.map((cat, i) => `<button type="button" class="${i === 0 ? "active" : ""}" data-home-gallery-filter="${esc(cat)}">${esc(cat)}</button>`).join("")}</div><div class="premium-gallery-grid">${items.slice(0, 9).map((g, i) => `<button class="premium-gallery-tile premium-reveal ${i === 0 ? "large" : ""}" data-category="${esc(categoryFor(g.category || "Campus"))}" data-full="${esc(img(g.image_url))}" type="button"><img loading="lazy" src="${esc(img(g.image_url))}" alt="${esc(g.alt || g.title)}"><span>${esc(g.category || "Campus")}</span><strong>${esc(g.title)}</strong></button>`).join("")}</div></div></section>`;
+}
+
+function achievements(data, cmsOnly = false) {
+    const items = data.achievements || [];
+    if (!items.length) return cmsOnly ? "" : "";
+    return `<section class="premium-section white gov-achievements-section" id="achievements">
+        <div class="container">
+            ${sectionHead("Recognition", "Achievements & Milestones", "Awards, affiliations, rankings and student accomplishments that reflect Eaglewood's academic excellence.")}
+            <div class="gov-achievement-grid premium-reveal">${items.map((item) => `<article class="gov-achievement-card glass-card">
+                <span class="gov-achievement-icon" aria-hidden="true">${esc(item.icon || "★")}</span>
+                <span class="gov-achievement-year">${esc(item.year || "2025")}</span>
+                <h3>${esc(item.title)}</h3>
+                <p>${plain(item.description)}</p>
+            </article>`).join("")}</div>
+        </div></section>`;
+}
+
+function campusHighlights(data, cmsOnly = false) {
+    const galleryItems = data.gallery || [];
+    const images = galleryItems.slice(0, 3).map((g) => g.image_url).filter(Boolean);
+    if (cmsOnly && !images.length && !data.campusFacts?.length && !parseSettingValue(data.settings?.about_summary)) return "";
+    const displayImages = images.length
+        ? images
+        : (cmsOnly ? [] : ["assets/images/campus.jpg", "assets/images/annual-gathering.jpg", "assets/images/workshop.jpg"]);
+    const videoUrl = parseSettingValue(data.settings?.campus_video_url) || "";
+    const facts = data.campusFacts || [];
+    return `<section class="premium-section gray gov-campus-section" id="campus-highlights">
+        <div class="container">
+            ${sectionHead("Campus", "Campus Highlights", "Explore our disciplined campus environment, modern infrastructure and vibrant student life.")}
+            <div class="gov-campus-grid premium-reveal">
+                <div class="gov-campus-media">
+                    <div class="gov-campus-images">${displayImages.map((src, i) => `<img loading="lazy" decoding="async" src="${esc(img(src))}" alt="Campus view ${i + 1}" class="${i === 0 ? "primary" : ""}">`).join("")}</div>
+                    ${videoUrl ? `<a class="gov-campus-video glass-card" href="${esc(videoUrl)}" target="_blank" rel="noopener noreferrer"><span>▶</span><strong>Campus Video Tour</strong><small>Watch on YouTube</small></a>` : `<div class="gov-campus-video glass-card is-static"><span>🏫</span><strong>Visit Our Campus</strong><small>Majalgaon, District Beed</small></div>`}
+                </div>
+                <div class="gov-campus-facts glass-card">
+                    <h3>Quick Facts</h3>
+                    <ul>${facts.map((f) => `<li><span>${esc(f.label)}</span><strong>${esc(f.value)}</strong></li>`).join("")}</ul>
+                    <p>${plain(parseSettingValue(data.settings?.about_summary) || "")}</p>
+                    <a class="btn btn-primary btn-ripple" href="infrastructure.html">Explore Infrastructure</a>
+                </div>
+            </div>
+        </div></section>`;
+}
+
+function admissionProcess(data, cmsOnly = false) {
+    const steps = data.admissionSteps || [];
+    if (!steps.length) return cmsOnly ? "" : "";
+    return `<section class="premium-section blue gov-admission-section" id="admission-process">
+        <div class="container">
+            <div class="section-split-head">${sectionHead("Admissions", "Admission Process", "A clear step-by-step pathway from eligibility check to joining campus.")}<a class="section-view-all" href="admission.html">Full Admission Guide</a></div>
+            <div class="timeline-list premium-reveal">${steps.map((step) => `<article class="timeline-item premium-card glass-card">
+                <div class="timeline-dot" aria-hidden="true">${esc(String(step.icon || step.step || ""))}</div>
+                <div>
+                    <time>Step ${esc(String(step.step || ""))}</time>
+                    <h3>${esc(step.title)}</h3>
+                    <p>${plain(step.description)}</p>
+                </div>
+            </article>`).join("")}</div>
+            <div class="section-link premium-reveal"><a class="btn btn-primary btn-ripple" href="admission.html">Apply for Admission</a></div>
+        </div></section>`;
+}
+
+function inquirySection(data) {
+    const courseOptions = (data.courses || []).slice(0, 8);
+    const phone = parseSettingValue(data.settings?.phone) || "+91 94237 16230";
+    const email = parseSettingValue(data.settings?.email) || "eaglewoodpoly@gmail.com";
+    return `<section class="premium-section white inquiry-section" id="inquiry">
+        <div class="container">
+            ${sectionHead("Contact", "Admission Inquiry", "Submit your question and our admissions team will respond with course details, eligibility and next steps.")}
+            <div class="inquiry-grid premium-reveal">
+                <aside class="inquiry-info glass-card">
+                    <img loading="lazy" decoding="async" src="assets/images/campus.jpg" alt="Eaglewood Polytechnic campus">
+                    <div>
+                        <h3>Talk to Admissions</h3>
+                        <p>Call <a href="tel:+919423716230">${esc(phone)}</a> or email <a href="mailto:eaglewoodpoly@gmail.com">${esc(email)}</a> for admission guidance.</p>
+                        <ul>
+                            <li>Course eligibility &amp; seats</li>
+                            <li>Document checklist</li>
+                            <li>Hostel &amp; transport</li>
+                            <li>Scholarship information</li>
+                        </ul>
+                    </div>
+                </aside>
+                <form id="home-inquiry-form" class="premium-form form-glass glass-card" novalidate>
+                    <h3>Quick Inquiry Form</h3>
+                    <label><span class="sr-only">Name</span><input name="name" type="text" placeholder="Your Name" autocomplete="name" required></label>
+                    <label><span class="sr-only">Phone</span><input name="phone" type="tel" placeholder="Phone Number" autocomplete="tel" required></label>
+                    <label><span class="sr-only">Email</span><input name="email" type="email" placeholder="Email (optional)" autocomplete="email"></label>
+                    <label><span class="sr-only">Course</span><select name="course"><option value="">Select Course</option>${courseOptions.map((c) => `<option value="${esc(c.title)}">${esc(c.title)}</option>`).join("")}</select></label>
+                    <label class="full"><span class="sr-only">Message</span><textarea name="message" placeholder="Your question about admission, courses or campus" required></textarea></label>
+                    <button class="btn btn-primary btn-ripple full" type="submit">Submit Inquiry</button>
+                    <p class="form-status" aria-live="polite"></p>
+                </form>
+            </div>
+        </div></section>`;
+}
+
+function premiumCta(settings = {}) {
+    const heading = parseSettingValue(settings.cta_heading) || "Your engineering journey starts at Eaglewood.";
+    const text = parseSettingValue(settings.cta_text) || "Apply for admission, explore courses and speak with our academic team for guidance on diploma and degree pathways.";
+    return `<section class="premium-cta" id="premium-cta" aria-label="Call to action">
+        <div class="container premium-reveal">
+            <div>
+                <p class="eyebrow">Admissions 2026-27</p>
+                <h2>${esc(heading)}</h2>
+                <p>${esc(text)}</p>
+            </div>
+            <div class="hero-actions">
+                <a class="btn btn-secondary btn-ripple" href="admission.html">Apply Now</a>
+                <a class="btn btn-secondary btn-ripple" href="contact.html">Contact Office</a>
+            </div>
+        </div></section>`;
 }
 
 function initSlider() {

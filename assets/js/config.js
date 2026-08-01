@@ -47,6 +47,23 @@ export const CONFIG = {
         enabled: true,
         storageBucket: "cms",
     },
+
+    /** Admin authentication — legacy admins table only until Supabase Auth migration. */
+    auth: {
+        mode: "legacy",
+        storageKey: "ew-supabase-auth",
+        legacyPasswordLogin: true,
+        supabaseAuth: false,
+        devLegacyFallback: true,
+    },
+
+    /**
+     * Runtime environment. Auto-detects localhost; set to "production" before deploy.
+     * Dev legacy fallback is NEVER enabled when env === "production".
+     */
+    env: (typeof location !== "undefined" && /^(localhost|127\.0\.0\.1)$/i.test(location.hostname))
+        ? "development"
+        : "production",
 };
 
 export default CONFIG;
