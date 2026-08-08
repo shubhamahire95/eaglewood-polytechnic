@@ -4634,3 +4634,212 @@ body[data-home] .socials {
 .gov-home img.is-loaded {
     background: none
 }
+
+/* Client content updates: hero duo stats, program badges, dual principals */
+.hero-float-grid--duo {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    max-width: 520px;
+    gap: 14px !important;
+}
+
+.hero-float-card--duo {
+    min-height: 96px;
+    padding: 18px 16px !important;
+    border-radius: 20px !important;
+    box-shadow: 0 22px 54px rgba(15, 45, 55, .18);
+    transition: transform .28s ease, box-shadow .28s ease;
+}
+
+.hero-float-card--duo:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 28px 70px rgba(15, 118, 110, .22);
+}
+
+.hero-float-card--duo strong {
+    font-size: clamp(1.6rem, 4.8vw, 2.2rem) !important;
+}
+
+.stats-premium-grid--four {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+}
+
+.gov-program-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.gov-program-badge--diploma {
+    background: #e8f7f5;
+    color: var(--epi-primary);
+}
+
+.gov-program-badge--degree {
+    background: #fff7df;
+    color: #8a6200;
+}
+
+.gov-dept-badges,
+.gov-course-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.gov-dept-card--program,
+.gov-course-card {
+    transition: transform .32s ease, box-shadow .32s ease, border-color .32s ease;
+}
+
+.gov-dept-card--program:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 30px 78px rgba(15, 118, 110, .16);
+}
+
+.gov-principals-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(18px, 3vw, 28px);
+    align-items: stretch;
+}
+
+.gov-principal-card-wrap {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    gap: 18px;
+    height: 100%;
+    padding: clamp(20px, 3vw, 28px);
+    transition: transform .32s ease, box-shadow .32s ease;
+}
+
+.gov-principal-card-wrap:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 28px 72px rgba(15, 118, 110, .14);
+}
+
+.gov-principal-card-wrap .gov-principal-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.gov-principal-kicker {
+    margin: 0;
+    color: var(--epi-primary);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+}
+
+.gov-download-card:hover {
+    transform: translateY(-6px);
+    border-color: rgba(15, 118, 110, .2);
+}
+
+.principals-about-grid {
+    display: grid;
+    gap: clamp(28px, 4vw, 42px);
+}
+
+.principal-about-block {
+    display: grid;
+    grid-template-columns: minmax(220px, 280px) 1fr;
+    gap: clamp(20px, 3vw, 32px);
+    align-items: start;
+}
+
+.principal-about-institute {
+    margin: -6px 0 10px;
+    color: var(--epi-primary);
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.contact-email-label {
+    display: block;
+    margin-bottom: 2px;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+[data-contact-phones] {
+    display: grid;
+    gap: 6px;
+}
+
+@media (max-width: 1024px) {
+    .stats-premium-grid--four {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    .gov-principals-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .hero-float-grid--duo {
+        max-width: 100%;
+    }
+
+    .stats-premium-grid--four {
+        grid-template-columns: 1fr !important;
+    }
+
+    .principal-about-block {
+        grid-template-columns: 1fr;
+    }
+
+    .gov-principals-shell {
+        overflow-x: clip;
+        max-width: 100%;
+    }
+
+    .gov-principals-grid {
+        grid-template-columns: 1fr;
+        min-width: 0;
+    }
+
+    .gov-principal-card-wrap {
+        min-width: 0;
+        overflow: hidden;
+    }
+
+    .gov-principal-content blockquote p,
+    .gov-principal-institute-line {
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
+    .gov-principal-meta {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+.gov-principals-shell {
+    overflow-x: clip;
+    max-width: 100%;
+}
+
+.gov-principal-institute-line {
+    margin: 0 0 10px;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .03em;
+}

@@ -46,6 +46,15 @@ async function tableIsEmpty(table) {
     return result.ok && (result.count || 0) === 0;
 }
 
+function stripSeedRow(row) {
+    const clean = { ...row };
+    delete clean.id;
+    delete clean._seed;
+    delete clean._local;
+    delete clean._queued;
+    return clean;
+}
+
 const WRITE_BLOCKED_KEY = "ew_cms_writes_blocked";
 
 /** Insert seed rows via admin write session (legacy header auth). */
@@ -80,7 +89,7 @@ export async function seedCmsViaDirectInsert() {
         if (!rows.length) continue;
 
         for (const row of rows) {
-            const result = await safeInsert(table, row);
+            const result = await safeInsert(table, stripSeedRow(row));
             if (!result.ok) {
                 if (result.reason === "permission") {
                     try {

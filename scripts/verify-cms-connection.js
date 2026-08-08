@@ -9,7 +9,7 @@ const headers = { apikey: KEY, Authorization: `Bearer ${KEY}`, "Content-Type": "
 const CMS_TABLES = [
     "admins", "settings", "home_slides", "updates", "notices", "principal_message",
     "courses", "departments", "faculty", "facilities", "placements", "gallery",
-    "media_library", "footer_blocks", "contacts", "inquiries", "admissions",
+    "downloads", "media_library", "footer_blocks", "contacts", "inquiries", "admissions",
     "ai_knowledge_base", "ai_prompts", "ai_conversations",
 ];
 
@@ -59,7 +59,7 @@ async function main() {
         console.error("\nFAIL: not all tables reachable");
         process.exit(1);
     }
-    console.log("\nPASS: 20/20 tables found");
+    console.log("\nPASS: " + `${found}/${CMS_TABLES.length}` + " tables found");
 }
 
 main().catch((err) => {

@@ -1,7 +1,6 @@
 /**
- * Unified CMS data layer — Supabase is authoritative when it has rows.
- * When a table is empty in Supabase, serve bundled seed JSON for reads only.
- * Admin edits in local overlay always merge on top (until writes persist).
+ * CMS data layer — Supabase is the only source of truth for admin reads/writes.
+ * Public pages may render bundled seed JSON when the database is empty (display-only, no ids).
  */
 import {
     safeFetch,
@@ -10,13 +9,15 @@ import {
     safeUpdate,
     safeDelete,
     safeCount,
-    safePublicInsert,
     notifyCmsDataChanged,
     clearCmsQueryCache,
     tableHasDisplayOrder,
 } from "./supabase.js";
+import { sanitizeWritePayload } from "./cms-schema.js";
 
-const LOCAL_STORE_KEY = "ew_cms_local_overlay";
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SEED_URL = "/assets/data/cms-seed-data.json";
+const LEGACY_OVERLAY_KEY = "ew_cms_local_overlay";
 
 export const CONTENT_TABLES = new Set([
     "home_slides",
@@ -29,59 +30,63 @@ export const CONTENT_TABLES = new Set([
     "facilities",
     "placements",
     "gallery",
+    "downloads",
     "footer_blocks",
     "ai_prompts",
     "ai_knowledge_base",
 ]);
 
+export const BOOTSTRAP_TABLES = [
+    "home_slides",
+    "updates",
+    "notices",
+    "courses",
+    "departments",
+    "faculty",
+    "facilities",
+    "placements",
+    "gallery",
+    "downloads",
+    "footer_blocks",
+];
+
 let seedCache = null;
 let seedPromise = null;
-
-const SEED_URL = "/assets/data/cms-seed-data.json";
+const bootstrapInflight = new Map();
 
 export function isContentTable(table) {
     return CONTENT_TABLES.has(table);
 }
 
-function loadOverlay() {
-    try {
-        return JSON.parse(localStorage.getItem(LOCAL_STORE_KEY) || "{}");
-    } catch {
-        return {};
-    }
+/** True only for real Postgres UUID primary keys. */
+export function isUuid(id) {
+    return typeof id === "string" && UUID_RE.test(id);
 }
 
-function saveOverlay(overlay) {
+export function stripWritePayload(payload) {
+    const clean = { ...(payload || {}) };
+    delete clean.id;
+    delete clean._displayOnly;
+    delete clean._displayIndex;
+    delete clean._seed;
+    delete clean._local;
+    delete clean._queued;
+    delete clean.category; // legacy seed field on notices (not in DB)
+    return clean;
+}
+
+function prepareWritePayload(table, payload) {
+    return sanitizeWritePayload(table, stripWritePayload(payload)).payload;
+}
+
+/** Remove legacy overlay / fake-id caches from older builds. */
+export function clearCmsLocalCache() {
     try {
-        localStorage.setItem(LOCAL_STORE_KEY, JSON.stringify(overlay));
-        localStorage.setItem("ew_cms_updated_at", String(Date.now()));
+        localStorage.removeItem(LEGACY_OVERLAY_KEY);
     } catch {
         /* ignore */
     }
-}
-
-function tableOverlay(table) {
-    const overlay = loadOverlay();
-    if (!overlay[table]) overlay[table] = { upserts: {}, deleted: [] };
-    return overlay[table];
-}
-
-function persistTableOverlay(table, slice) {
-    const overlay = loadOverlay();
-    overlay[table] = slice;
-    saveOverlay(overlay);
-}
-
-function normalizeSeedRows(table, raw) {
-    if (!raw) return [];
-    const rows = Array.isArray(raw) ? raw : [raw];
-    const now = new Date().toISOString();
-    return rows.map((row, index) => ({
-        ...row,
-        id: row.id || `local-${table}-${index}`,
-        created_at: row.created_at || now,
-        updated_at: row.updated_at || row.created_at || now,
-    }));
+    clearCmsQueryCache();
 }
 
 function sortRows(rows) {
@@ -97,18 +102,18 @@ function filterPublished(rows, publishedOnly) {
     return rows.filter((row) => row.published !== false);
 }
 
-function mergeSeedAndLocal(seedRows, slice) {
-    const upserts = slice?.upserts || {};
-    const deleted = new Set((slice?.deleted || []).map(String));
-    const merged = seedRows
-        .filter((row) => !deleted.has(String(row.id)))
-        .map((row) => (upserts[String(row.id)] ? { ...row, ...upserts[String(row.id)] } : row));
-
-    const existing = new Set(merged.map((row) => String(row.id)));
-    Object.entries(upserts).forEach(([id, row]) => {
-        if (!existing.has(id) && !deleted.has(id)) merged.push(row);
-    });
-    return merged;
+/** Display-only seed rows for the public site — never assigned database ids. */
+function normalizeDisplaySeed(raw) {
+    if (!raw) return [];
+    const rows = Array.isArray(raw) ? raw : [raw];
+    const now = new Date().toISOString();
+    return rows.map((row, index) => ({
+        ...stripWritePayload(row),
+        _displayOnly: true,
+        _displayIndex: index,
+        created_at: row.created_at || now,
+        updated_at: row.updated_at || row.created_at || now,
+    }));
 }
 
 async function fetchSupabaseRows(table, { admin = false, publishedOnly = false, limit = 250 } = {}) {
@@ -131,7 +136,7 @@ async function fetchSupabaseRows(table, { admin = false, publishedOnly = false, 
     return safeFetch(table, builder, [], `cms-store:${table}:${publishedOnly ? "pub" : "all"}`);
 }
 
-/** Read CMS rows: Supabase → seed (when empty) → local overlay merge. */
+/** Read rows: admin always from Supabase; public uses seed only when DB is empty (display-only). */
 export async function fetchCmsRows(table, { admin = false, publishedOnly = false, limit = 250 } = {}) {
     if (!isContentTable(table)) {
         const result = admin
@@ -150,134 +155,174 @@ export async function fetchCmsRows(table, { admin = false, publishedOnly = false
 
     const remote = await fetchSupabaseRows(table, { admin, publishedOnly, limit });
     const remoteRows = Array.isArray(remote.data) ? remote.data : [];
-    const remoteCount = remoteRows.length;
-    const slice = tableOverlay(table);
-    const hasOverlay = Boolean(
-        Object.keys(slice?.upserts || {}).length
-        || (slice?.deleted || []).length,
-    );
 
-    let baseRows = remoteRows;
-    let usedSeed = false;
-    if (remoteCount === 0) {
-        const seed = await loadSeedData();
-        const seedRows = normalizeSeedRows(table, seed[table]);
-        if (seedRows.length) {
-            baseRows = seedRows;
-            usedSeed = true;
-        }
-    }
-
-    const merged = mergeSeedAndLocal(baseRows, slice);
-    const data = filterPublished(sortRows(merged), publishedOnly).slice(0, limit);
-
-    let source = "none";
-    if (remoteCount > 0) {
-        source = hasOverlay ? "supabase+overlay" : "supabase";
-    } else if (usedSeed) {
-        source = hasOverlay ? "seed+overlay" : "seed";
-    } else if (hasOverlay) {
-        source = "overlay";
-    }
-
-    return {
-        data,
-        ok: remote.ok === true || usedSeed || hasOverlay || data.length > 0,
-        source,
-        fallback: remoteCount === 0 && (usedSeed || hasOverlay),
-    };
-}
-
-/** Count effective CMS rows (Supabase, or seed/overlay when Supabase is empty). */
-export async function cmsTableCount(table) {
-    if (!isContentTable(table)) {
-        const result = await safeCount(table, `cms-store:count:${table}`);
-        return { count: result.ok ? (result.count ?? 0) : null, ok: result.ok === true, reason: result.reason };
-    }
-
-    const remote = await safeCount(table, `cms-store:count:${table}`);
-    if (remote.ok && (remote.count || 0) > 0) {
+    if (admin || remoteRows.length > 0) {
+        const data = filterPublished(sortRows(remoteRows), publishedOnly).slice(0, limit);
         return {
-            count: remote.count ?? 0,
-            ok: true,
+            data,
+            ok: remote.ok === true || (admin && data.length > 0),
             source: "supabase",
             fallback: false,
-            reason: remote.reason,
         };
     }
 
-    const { data } = await fetchCmsRows(table, { admin: true, publishedOnly: false, limit: 10000 });
-    const count = data.length;
+    const seed = await loadSeedData();
+    const raw = seed[table];
+    const displayRows = normalizeDisplaySeed(raw);
+    const data = filterPublished(sortRows(displayRows), publishedOnly).slice(0, limit);
     return {
-        count,
-        ok: remote.ok === true || count > 0,
-        source: count > 0 && !(remote.count > 0) ? "seed" : "supabase",
-        fallback: count > 0 && !(remote.count > 0),
-        reason: remote.reason,
+        data,
+        ok: data.length > 0,
+        source: data.length ? "seed" : "none",
+        fallback: data.length > 0,
     };
 }
 
-function localUpsert(table, row) {
-    const slice = tableOverlay(table);
-    slice.upserts[String(row.id)] = {
-        ...row,
-        updated_at: new Date().toISOString(),
+/** Row count from Supabase only. */
+export async function cmsTableCount(table) {
+    const result = await safeCount(table, `cms-store:count:${table}`);
+    return {
+        count: result.ok ? (result.count ?? 0) : 0,
+        ok: result.ok === true,
+        source: "supabase",
+        fallback: false,
+        reason: result.reason,
+        message: result.message,
     };
-    const deleted = slice.deleted.filter((id) => String(id) !== String(row.id));
-    persistTableOverlay(table, { upserts: slice.upserts, deleted });
-    clearCmsQueryCache();
 }
 
-function localDelete(table, id) {
-    const slice = tableOverlay(table);
-    const key = String(id);
-    delete slice.upserts[key];
-    if (!slice.deleted.includes(key)) slice.deleted.push(key);
-    persistTableOverlay(table, { upserts: slice.upserts, deleted: slice.deleted });
-    clearCmsQueryCache();
+/**
+ * Upsert: UPDATE when editing row has a valid UUID, otherwise INSERT.
+ * Never PATCH non-UUID ids. Never update an unrelated row.
+ */
+export async function cmsUpsert(table, payload, existingRow = null) {
+    const rowId = existingRow?.id ?? null;
+    const clean = prepareWritePayload(table, payload);
+
+    if (isUuid(rowId)) {
+        const result = await safeUpdate(table, clean, { id: rowId });
+        return {
+            ...result,
+            inserted: false,
+            id: rowId,
+            source: "supabase",
+        };
+    }
+
+    const insertPayload = prepareWritePayload(table, payload);
+    const result = await safeInsert(table, insertPayload);
+    return {
+        ...result,
+        inserted: true,
+        id: result.data?.id ?? null,
+        source: "supabase",
+    };
 }
 
-/** Insert — persists to Supabase only (no local overlay fallback). */
+export const cmsSave = cmsUpsert;
+
 export async function cmsInsert(table, payload) {
-    const result = await safeInsert(table, payload);
-    if (result.ok) {
-        return { ...result, source: "supabase", localOnly: false };
-    }
-    return result;
+    const result = await safeInsert(table, prepareWritePayload(table, payload));
+    return {
+        ...result,
+        inserted: true,
+        id: result.data?.id ?? null,
+        source: "supabase",
+    };
 }
 
-/** Update — persists to Supabase only (no local overlay fallback). */
 export async function cmsUpdate(table, payload, match) {
-    const result = await safeUpdate(table, payload, match);
-    if (result.ok) {
-        return { ...result, source: "supabase", localOnly: false };
+    const id = match?.id;
+    if (!isUuid(id)) {
+        return cmsUpsert(table, payload, null);
     }
-    return result;
+    const result = await safeUpdate(table, prepareWritePayload(table, payload), { id });
+    return { ...result, inserted: false, id, source: "supabase" };
 }
 
-/** Delete — persists to Supabase only (no local overlay fallback). */
 export async function cmsDelete(table, match) {
-    const result = await safeDelete(table, match);
-    if (result.ok) {
-        return { ...result, source: "supabase", localOnly: false };
+    const id = match?.id;
+    if (!isUuid(id)) {
+        return {
+            ok: false,
+            reason: "invalid_id",
+            message: "Cannot delete a row without a database id.",
+        };
     }
-    return result;
+    const result = await safeDelete(table, { id });
+    return { ...result, source: "supabase" };
 }
 
-/** Whether CMS tables still have no Supabase rows (bootstrap may be needed). */
+/** Insert seed defaults when table is empty — requires working admin RLS. */
+export async function bootstrapTableIfEmpty(table) {
+    if (!isContentTable(table)) {
+        return { ok: true, bootstrapped: false, skipped: true };
+    }
+
+    const countResult = await safeCount(table, `bootstrap:count:${table}`);
+    if (countResult.ok && (countResult.count || 0) > 0) {
+        return { ok: true, bootstrapped: false, count: countResult.count };
+    }
+
+    if (bootstrapInflight.has(table)) {
+        return bootstrapInflight.get(table);
+    }
+
+    const job = (async () => {
+        const seed = await loadSeedData();
+        const raw = seed[table];
+        const rows = Array.isArray(raw) ? raw : raw ? [raw] : [];
+        if (!rows.length) {
+            return { ok: true, bootstrapped: false, reason: "no_seed" };
+        }
+
+        let inserted = 0;
+        let lastRow = null;
+        for (const row of rows) {
+            const result = await safeInsert(table, prepareWritePayload(table, row));
+            if (!result.ok) {
+                return {
+                    ok: false,
+                    bootstrapped: false,
+                    reason: result.reason,
+                    message: result.message,
+                    inserted,
+                };
+            }
+            inserted += 1;
+            lastRow = result.data;
+        }
+
+        clearCmsQueryCache();
+        notifyCmsDataChanged();
+        return { ok: true, bootstrapped: true, inserted, data: lastRow };
+    })();
+
+    bootstrapInflight.set(table, job);
+    try {
+        return await job;
+    } finally {
+        bootstrapInflight.delete(table);
+    }
+}
+
+export async function bootstrapAllContentTables() {
+    const results = {};
+    for (const table of BOOTSTRAP_TABLES) {
+        results[table] = await bootstrapTableIfEmpty(table);
+    }
+    clearCmsQueryCache();
+    return results;
+}
+
 export async function isUsingSeedFallback() {
-    const tables = [
-        "home_slides", "principal_message", "updates", "notices",
-        "courses", "departments", "facilities", "placements", "gallery",
-    ];
-    for (const table of tables) {
+    for (const table of BOOTSTRAP_TABLES) {
         const remote = await safeCount(table, `cms-store:probe:${table}`);
         if (remote.ok && (remote.count || 0) > 0) return false;
     }
     return true;
 }
 
-/** Bundled default content used when Supabase returns zero rows for a table. */
 export async function loadSeedData() {
     if (seedCache) return seedCache;
     if (!seedPromise) {
@@ -294,5 +339,3 @@ export async function loadSeedData() {
     }
     return seedPromise;
 }
-
-export { normalizeSeedRows, mergeSeedAndLocal };

@@ -5,10 +5,14 @@ import { ensureCmsReady, isCmsStrictMode } from "./supabase.js";
 import { fetchCmsRows, isContentTable } from "./cms-store.js";
 import { ensureMediaMap, resolveAdminPreviewUrl } from "./media-url.js";
 import {
-    fetchPrincipalMessage,
+    fetchPrincipalMessages,
     principalPhotoMarkup,
     principalMessageParagraphs,
+    principalAnchorId,
+    principalProgramLabel,
+    sortPrincipalRows,
 } from "./principal-content.js";
+import { instituteLabel } from "./site-settings.js";
 
 async function loadPublished(table) {
     await ensureCmsReady({ verifyFull: true });
@@ -23,43 +27,38 @@ function emptyState(label) {
     return `<div class="empty-state"><strong>No ${esc(label)} published yet</strong><p>Content will appear here after records are created and published in the admin panel.</p></div>`;
 }
 
-export async function renderAboutPrincipal() {
-    const host = document.getElementById("principal-about-root");
-    if (!host) return;
-
-    await ensureCmsReady({ verifyFull: true });
-    await ensureMediaMap();
-    const principal = await fetchPrincipalMessage({ admin: false });
-    if (!principal) return;
-
+function renderAboutPrincipalCard(principal) {
     const name = principal.name || "Principal";
-    const designation = principal.designation || "Principal, Eaglewood Polytechnic Institute";
+    const program = principalProgramLabel(principal);
+    const designation = principal.designation || `Principal - ${program}`;
     const qualification = principal.qualification
         ? `<span class="principal-about-qual">${esc(principal.qualification)}</span>`
         : "";
     const signature = principal.signature || name;
     const paragraphs = principalMessageParagraphs(principal.message);
-    if (!paragraphs.length) return;
+    if (!paragraphs.length) return "";
+    const anchor = principalAnchorId(principal);
 
     const photo = principalPhotoMarkup({
         photoUrl: principal.photo_url,
         name,
         className: "principal-about-photo",
         placeholderClass: "principal-about-fallback",
-        loading: "eager",
+        loading: "lazy",
     });
 
-    host.innerHTML = `
-        <div class="principal-about-portrait reveal">
+    return `<div class="principal-about-block reveal" id="${esc(anchor)}">
+        <div class="principal-about-portrait">
             <div class="principal-about-frame">
                 <div class="principal-about-ring" aria-hidden="true"></div>
                 ${photo}
-                <span class="principal-about-badge">Principal</span>
+                <span class="principal-about-badge gov-program-badge gov-program-badge--${program === "Degree" ? "degree" : "diploma"}">${esc(program)}</span>
             </div>
         </div>
-        <article class="content-copy reveal">
+        <article class="content-copy">
             <p class="eyebrow">Leadership</p>
-            <h2>Principal's Message</h2>
+            <h2>${esc(designation)}</h2>
+            <p class="principal-about-institute">${esc(instituteLabel(principal.institute))}</p>
             ${paragraphs.map((p) => `<p>${esc(p)}</p>`).join("")}
             <p class="principal-about-signoff">
                 <strong>${esc(name)}</strong>
@@ -67,7 +66,30 @@ export async function renderAboutPrincipal() {
                 <span>${esc(designation)}</span>
                 ${signature !== name ? `<em>${esc(signature)}</em>` : ""}
             </p>
-        </article>`;
+        </article>
+    </div>`;
+}
+
+export async function renderAboutPrincipal() {
+    const host = document.getElementById("principal-about-root");
+    if (!host) return;
+
+    await ensureCmsReady({ verifyFull: true });
+    await ensureMediaMap();
+    const principals = sortPrincipalRows(await fetchPrincipalMessages({ admin: false, limit: 2 }));
+    if (!principals.length) {
+        host.innerHTML = emptyState("principal messages");
+        return;
+    }
+
+    const cards = principals.map((principal) => renderAboutPrincipalCard(principal)).filter(Boolean);
+    if (!cards.length) {
+        host.innerHTML = emptyState("principal messages");
+        return;
+    }
+
+    host.className = "container principals-about-grid";
+    host.innerHTML = cards.join("");
 }
 
 export async function renderFacultyPage() {

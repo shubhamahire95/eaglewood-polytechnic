@@ -7,16 +7,17 @@ import {
     SUPABASE_URL,
     DEFAULT_ADMIN_EMAIL,
     DEFAULT_ADMIN_PASSWORD,
-    buildAdminAuthHeaders,
+    buildAdminJsonHeaders,
     buildPublicAuthHeaders,
     checkAdminWritePermission,
+    stripBodyHeaders,
 } from "./lib/admin-rest.js";
 
-const ADMIN_HEADERS = buildAdminAuthHeaders(DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD, {
+const ADMIN_HEADERS = buildAdminJsonHeaders(DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD, {
     Prefer: "return=representation",
 });
 
-const PUBLIC_HEADERS = buildPublicAuthHeaders({ Prefer: "return=representation" });
+const PUBLIC_HEADERS = buildPublicAuthHeaders({ Prefer: "return=minimal" });
 
 const CONTENT_TABLES = [
     "home_slides", "principal_message", "updates", "notices", "courses",
@@ -54,7 +55,7 @@ async function publicInsert(table, payload) {
 async function adminDelete(table, id) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
         method: "DELETE",
-        headers: ADMIN_HEADERS,
+        headers: stripBodyHeaders(ADMIN_HEADERS),
     });
     return res.ok;
 }
@@ -102,8 +103,15 @@ async function main() {
         if (!ins.ok) failures.push(`${table} insert: ${ins.status} ${ins.body}`);
         else {
             console.log(`✓ Public form insert (${table})`);
-            const row = JSON.parse(ins.body)[0];
-            if (row?.id) await adminDelete(table, row.id);
+            const cleanup = await fetch(`${SUPABASE_URL}/rest/v1/${table}?email=eq.api@test.com&select=id&limit=5`, {
+                headers: ADMIN_HEADERS,
+            });
+            if (cleanup.ok) {
+                const rows = await cleanup.json();
+                for (const row of rows) {
+                    if (row?.id) await adminDelete(table, row.id);
+                }
+            }
         }
     }
 
@@ -125,12 +133,6 @@ async function main() {
         if (!ok) failures.push(`${table} empty`);
     }
 
-    const storage = await fetch(`${SUPABASE_URL}/storage/v1/bucket/cms`, {
-        headers: buildPublicAuthHeaders(),
-    });
-    if (!storage.ok) failures.push(`storage bucket cms: ${storage.status}`);
-    else console.log("✓ Storage bucket cms");
-
     const storagePath = `probe/api-${Date.now()}.png`;
     const upload = await fetch(`${SUPABASE_URL}/storage/v1/object/cms/${storagePath}`, {
         method: "POST",
@@ -144,10 +146,11 @@ async function main() {
         const body = await upload.text();
         failures.push(`storage upload: ${upload.status} ${body}`);
     } else {
-        console.log("✓ Admin storage upload");
+        console.log("✓ Storage bucket cms (verified via upload)");
+        const delHeaders = stripBodyHeaders(ADMIN_HEADERS);
         await fetch(`${SUPABASE_URL}/storage/v1/object/cms/${storagePath}`, {
             method: "DELETE",
-            headers: ADMIN_HEADERS,
+            headers: delHeaders,
         });
     }
 

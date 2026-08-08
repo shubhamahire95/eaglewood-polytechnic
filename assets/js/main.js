@@ -5,9 +5,11 @@
 
 import { dismissPageLoader, preloadSiteLogo } from "./page-loader.js";
 import { applyStorageImageMapToDom } from "./media-url.js";
+import { installGlobalErrorHandlers } from "./errors.js";
 
 preloadSiteLogo();
 void applyStorageImageMapToDom();
+installGlobalErrorHandlers();
 
 async function initAssistant() {
     try {
@@ -24,7 +26,15 @@ function renderBootFallback() {
     main.innerHTML = `<section class="section"><div class="container"><p class="eyebrow">Eaglewood Polytechnic Institute</p><h1>Welcome to Eaglewood Polytechnic Institute</h1><p>The website is loading local institute information. Please use the contact links for admission support.</p><a class="btn" href="tel:+919423716230">Call Office</a></div></section>`;
 }
 
-document.addEventListener("DOMContentLoaded", async () => {
+function runWhenDocumentReady(fn) {
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", () => { void fn(); });
+        return;
+    }
+    void fn();
+}
+
+runWhenDocumentReady(async () => {
     const isHomePage = document.body.hasAttribute("data-home");
     try {
         const { initLegacyUI } = await import("./ui.js");

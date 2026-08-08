@@ -3,19 +3,52 @@
  */
 import { fetchCmsRows } from "./cms-store.js";
 import { ensureMediaMap, resolveAdminPreviewUrl } from "./media-url.js";
+import { instituteLabel, programTypeLabel } from "./site-settings.js";
 
-/** Fetch the latest published principal message from Supabase. */
-export async function fetchPrincipalMessage({ admin = false } = {}) {
+const INSTITUTE_SORT = { polytechnic: 0, diploma: 0, engineering: 1, degree: 1 };
+
+/** Normalize institute column to polytechnic (diploma) or engineering (degree). */
+export function principalInstituteKey(row = {}) {
+    const key = String(row.institute || "polytechnic").toLowerCase();
+    if (key === "engineering" || key === "degree") return "engineering";
+    return "polytechnic";
+}
+
+/** Short program label for badges: Diploma | Degree */
+export function principalProgramLabel(row = {}) {
+    return programTypeLabel(principalInstituteKey(row) === "engineering" ? "degree" : "diploma");
+}
+
+/** Stable anchor id for about-page deep links. */
+export function principalAnchorId(row = {}) {
+    return principalInstituteKey(row) === "engineering" ? "principal-degree" : "principal-diploma";
+}
+
+/** Diploma first, then degree; then display_order. */
+export function sortPrincipalRows(rows = []) {
+    return [...rows].sort((a, b) => {
+        const orderDiff = Number(a.display_order || 0) - Number(b.display_order || 0);
+        if (orderDiff !== 0) return orderDiff;
+        return (INSTITUTE_SORT[principalInstituteKey(a)] ?? 0) - (INSTITUTE_SORT[principalInstituteKey(b)] ?? 0);
+    });
+}
+
+/** Fetch published principal messages (supports dual principals). */
+export async function fetchPrincipalMessages({ admin = false, limit = 2 } = {}) {
     await ensureMediaMap();
     const result = await fetchCmsRows("principal_message", {
         admin,
         publishedOnly: !admin,
-        limit: 10,
+        limit: Math.max(limit, 10),
     });
     const rows = Array.isArray(result.data) ? result.data : [];
-    return rows
-        .filter((row) => admin || row.published !== false)
-        .sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0))[0] || null;
+    return sortPrincipalRows(rows.filter((row) => admin || row.published !== false)).slice(0, limit);
+}
+
+/** Fetch the latest published principal message from Supabase. */
+export async function fetchPrincipalMessage(options = {}) {
+    const rows = await fetchPrincipalMessages({ ...options, limit: 1 });
+    return rows[0] || null;
 }
 
 /** Use the exact stored URL (Supabase Storage public URL when uploaded). */
@@ -84,3 +117,5 @@ function esc(value) {
     div.textContent = value ?? "";
     return div.innerHTML;
 }
+
+export { instituteLabel, programTypeLabel };

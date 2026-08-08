@@ -5,10 +5,25 @@ import { bindHomeInquiryForm } from "./page-forms.js";
 import { markCmsReady } from "./page-loader.js";
 import { ensureMediaMap, resolveAdminPreviewUrl } from "./media-url.js";
 import {
-    fetchPrincipalMessage,
+    fetchPrincipalMessages,
     principalPhotoMarkup,
     principalMessageParagraphs,
+    principalAnchorId,
+    principalProgramLabel,
+    sortPrincipalRows,
 } from "./principal-content.js";
+import {
+    parseSettingValue,
+    parseSettingList,
+    getInstituteStats,
+    programTypeLabel,
+    noticeFileMeta,
+    instituteLabel,
+    parseContactPhones,
+    parseInstituteEmails,
+    telHref,
+} from "./site-settings.js";
+import { bootResponsiveSwiper, destroyResponsiveSwiper } from "./swiper-utils.js";
 
 const CMS_SYNC_KEY = "ew_cms_updated_at";
 
@@ -31,7 +46,7 @@ if (typeof window !== "undefined") {
 
 export const FALLBACK_IMAGE = "assets/images/campus.jpg";
 
-const TABLES = ["home_slides", "updates", "notices", "courses", "departments", "faculty", "facilities", "placements", "gallery"];
+const TABLES = ["home_slides", "updates", "notices", "courses", "departments", "faculty", "facilities", "placements", "gallery", "downloads"];
 
 const HIGHLIGHT_ICONS = {
     students: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
@@ -43,6 +58,7 @@ const HIGHLIGHT_ICONS = {
     library: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v17H6.5A2.5 2.5 0 0 1 4 17.5z"/><path d="M8 7h8M8 11h8"/></svg>',
     lab: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 2h6M10 2v6l-5 9a3 3 0 0 0 2.6 4.5h8.8A3 3 0 0 0 19 17l-5-9V2"/></svg>',
     scholarship: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3 7 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1 3-7z"/></svg>',
+    code: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 18 22 12 16 6"/><path d="M8 6 2 12l6 6"/></svg>',
 };
 
 let homeRenderPromise = null;
@@ -68,7 +84,7 @@ async function renderCmsHomeInner() {
         ${statsBand(data)}
         ${quickHighlights(data)}
         ${missionVision(data.settings, data.cmsOnly)}
-        ${principal(data.principal, data.cmsOnly)}
+        ${principals(data.principals, data.cmsOnly)}
         ${updates(data.updates)}
         ${notices(data.notices)}
         ${courses(data.courses)}
@@ -80,13 +96,13 @@ async function renderCmsHomeInner() {
         ${gallery(data.gallery)}
         ${admissionProcess(data, data.cmsOnly)}
         ${inquirySection(data)}
-        ${studentResources()}
+        ${studentResources(data.downloads)}
         ${premiumCta(data.settings)}
     `;
     initSlider();
     initLightbox();
     initPremiumReveal();
-    initPremiumInteractions();
+    bindPremiumInteractionsOnce();
     initHighlightCounters();
     initHomeGalleryFilters();
     initHomeCarousels();
@@ -96,9 +112,18 @@ async function renderCmsHomeInner() {
     bindHomeInquiryForm(data.courses);
     runInit("departmentsSwiper", initDepartmentsSwiper);
     runInit("programsSwiper", initProgramsSwiper);
-    initHomeUI();
-    void initFooterSettings();
+    bindHomeChromeOnce();
     markCmsReady();
+}
+
+let homeSliderTimer = null;
+
+function bindHomeChromeOnce() {
+    if (!window.__ewHomeChromeBound) {
+        window.__ewHomeChromeBound = true;
+        initHomeUI();
+        void initFooterSettings();
+    }
 }
 
 async function loadHomeData() {
@@ -116,23 +141,28 @@ async function loadHomeData() {
     }));
     TABLES.forEach((table) => { result[keyFor(table)] ||= []; });
 
-    const principal = await fetchPrincipalMessage({ admin: false });
+    const principals = await fetchPrincipalMessages({ admin: false, limit: 2 });
 
     const settingsMerged = { ...result.settings };
     const cmsOnly = isCmsStrictMode();
+    const sortedNotices = [...(result.notices || [])].sort((a, b) =>
+        new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0)
+    );
 
     return {
         settings: settingsMerged,
         slides: result.slides,
         updates: result.updates,
-        notices: result.notices,
-        principal,
+        notices: sortedNotices,
+        principals,
+        principal: principals[0] || null,
         courses: result.courses,
         departments: result.departments,
         faculty: result.faculty,
         facilities: result.facilities,
         placements: result.placements,
         gallery: result.gallery,
+        downloads: result.downloads,
         achievements: parseAdmissionSteps(settingsMerged.achievements) || [],
         admissionSteps: parseAdmissionSteps(settingsMerged.admission_steps) || [],
         campusFacts: parseCampusFacts(settingsMerged.campus_facts),
@@ -246,8 +276,10 @@ function renderBreakingNews(notices = []) {
 function renderTopUtility(settings, cmsOnly = false) {
     const top = document.getElementById("top-bar");
     if (!top) return;
-    const phone = settings.phone || "";
-    const email = settings.email || "";
+    const phones = parseContactPhones(settings);
+    const phone = phones[0] || parseSettingValue(settings.phone) || "";
+    const emails = parseInstituteEmails(settings);
+    const email = emails[0]?.value || parseSettingValue(settings.email) || "";
     const approval = parseSettingValue(settings.approval) || "Approved by AICTE, DTE & Govt. of Maharashtra";
     const affiliation = parseSettingValue(settings.affiliation) || "Affiliated to MSBTE & DBATU";
     const dte = parseSettingValue(settings.dte_code) || "2634";
@@ -267,16 +299,13 @@ function sectionHead(kicker, title, lead = "") {
 function hero(data) {
     const items = data.slides || [];
     if (!items.length) return "";
-    const facultyCount = data.faculty?.length || data.departments.reduce((s, d) => s + Number(d.faculty_count || 0), 0);
-    const students = data.departments.reduce((s, d) => s + Number(d.students_count || 0), 0);
-    const placementPct = data.placements[0]?.placement_percentage || data.placements[0]?.package || "";
-    const transport = parseSettingValue(data.settings?.transport_routes) || "";
+    const statsConfig = getInstituteStats(data.settings || {}, {
+        departments: data.departments?.length || "",
+        placements: data.placements?.[0]?.placement_percentage || data.placements?.[0]?.package || "",
+    });
     const stats = [
-        [students || "", students ? "" : "", "Students"],
-        [data.departments.length || "", "", "Departments"],
-        [facultyCount || "", "", "Faculty"],
-        [placementPct || "", "", "Placement Focus"],
-        [transport || "", "", "Bus Routes"],
+        [statsConfig.departments, "", "Departments"],
+        [statsConfig.placements, "", "Placements"],
     ].filter(([value]) => value !== "" && value !== 0);
     const dte = parseSettingValue(data.settings?.dte_code) || "";
     const msbte = parseSettingValue(data.settings?.msbte_code) || "";
@@ -300,7 +329,7 @@ function hero(data) {
                 </div>
             </div>
         </article>`).join("")}
-        <div class="hero-float-grid premium-reveal" aria-hidden="true">${stats.length ? stats.map(([value, suffix, label]) => `<div class="hero-float-card"><strong data-count="${String(value).replace(/[^0-9]/g, "") || 0}" data-suffix="${String(value).replace(/[0-9]/g, "") || suffix}">${esc(String(value))}${esc(suffix)}</strong><span>${esc(label)}</span></div>`).join("") : ""}</div>
+        <div class="hero-float-grid hero-float-grid--duo premium-reveal" aria-hidden="true">${stats.length ? stats.map(([value, suffix, label]) => `<div class="hero-float-card hero-float-card--duo"><strong data-count="${String(value).replace(/[^0-9]/g, "") || 0}" data-suffix="${String(value).replace(/[0-9]/g, "") || suffix}">${esc(String(value))}${esc(suffix)}</strong><span>${esc(label)}</span></div>`).join("") : ""}</div>
         <button class="slide-nav prev" data-prev type="button" aria-label="Previous slide">‹</button>
         <button class="slide-nav next" data-next type="button" aria-label="Next slide">›</button>
         <div class="slide-dots">${items.map((_, i) => `<button class="${i === 0 ? "active" : ""}" data-dot="${i}" type="button" aria-label="Show slide ${i + 1}"></button>`).join("")}</div>
@@ -310,17 +339,20 @@ function hero(data) {
 }
 
 function statsBand(data) {
-    const facultyCount = data.faculty?.length || data.departments.reduce((s, d) => s + Number(d.faculty_count || 0), 0);
-    const students = data.departments.reduce((s, d) => s + Number(d.students_count || 0), 0);
-    const dteCode = parseSettingValue(data.settings?.dte_code) || "";
+    const statsConfig = getInstituteStats(data.settings || {}, {
+        departments: data.departments?.length || "—",
+        placements: data.placements?.[0]?.placement_percentage || data.placements?.[0]?.package || "—",
+        faculty: data.faculty?.length || data.departments?.reduce((s, d) => s + Number(d.faculty_count || 0), 0) || "—",
+        instituteCode: parseSettingValue(data.settings?.dte_code) || "—",
+    });
     const rows = [
-        [students, "", "Students Enrolled"],
-        [data.departments.length, "", "Departments"],
-        [facultyCount, "", "Faculty Members"],
-        [dteCode || "—", "", "DTE Institute Code"],
+        [statsConfig.departments, "", "Departments"],
+        [statsConfig.placements, "", "Placements"],
+        [statsConfig.faculty, "", "Faculty Members"],
+        [statsConfig.instituteCode, "", "Institute Code"],
     ];
-    if (data.cmsOnly && !students && !data.departments.length && !facultyCount && !dteCode) return "";
-    return `<section class="stats-band" id="stats-band" aria-label="Institute statistics"><div class="container"><div class="stats-premium-grid premium-reveal">${rows.map(([value, suffix, label]) => `<div><strong data-count="${value}" data-suffix="${suffix}">${value}${suffix}</strong><span>${esc(label)}</span></div>`).join("")}</div></div></section>`;
+    if (data.cmsOnly && rows.every(([value]) => !value || value === "—")) return "";
+    return `<section class="stats-band" id="stats-band" aria-label="Institute statistics"><div class="container"><div class="stats-premium-grid stats-premium-grid--four premium-reveal">${rows.map(([value, suffix, label]) => `<div><strong data-count="${String(value).replace(/[^0-9]/g, "") || 0}" data-suffix="${String(value).replace(/[0-9]/g, "") || suffix}">${esc(String(value))}${esc(suffix)}</strong><span>${esc(label)}</span></div>`).join("")}</div></div></section>`;
 }
 
 function initHeroAiButton() {
@@ -333,20 +365,17 @@ function initHeroAiButton() {
 }
 
 function quickHighlights(data) {
-    const facultyCount = data.faculty?.length || data.departments.reduce((s, d) => s + Number(d.faculty_count || 0), 0);
-    const students = data.departments.reduce((s, d) => s + Number(d.students_count || 0), 0);
-    const placementPct = data.placements[0]?.placement_percentage || data.placements[0]?.package || "";
+    const statsConfig = getInstituteStats(data.settings || {}, {
+        departments: data.departments?.length || "",
+        placements: data.placements?.[0]?.placement_percentage || data.placements?.[0]?.package || "",
+        faculty: data.faculty?.length || data.departments?.reduce((s, d) => s + Number(d.faculty_count || 0), 0) || "",
+        instituteCode: parseSettingValue(data.settings?.dte_code) || "",
+    });
     const cards = [
-        ["students", students, "Students"],
-        ["departments", data.departments.length, "Departments"],
-        ["faculty", facultyCount, "Faculty"],
-        ["placement", placementPct, "Placement Focus"],
-        ["hostel", parseSettingValue(data.settings?.hostel_status) || "", "Hostel"],
-        ["transport", parseSettingValue(data.settings?.transport_routes) || "", "Bus Routes"],
-        ["library", parseSettingValue(data.settings?.library_status) || "", "Library"],
-        ["lab", parseSettingValue(data.settings?.computer_labs) || "", "Computer Labs"],
-        ["lab", parseSettingValue(data.settings?.tech_labs) || "", "AI & Tech Labs"],
-        ["scholarship", parseSettingValue(data.settings?.scholarship_status) || "", "Scholarships"],
+        ["departments", statsConfig.departments, "Departments"],
+        ["placement", statsConfig.placements, "Placements"],
+        ["faculty", statsConfig.faculty, "Faculty Members"],
+        ["code", statsConfig.instituteCode, "Institute Code"],
     ].filter(([, value]) => value !== "" && value !== 0);
     if (data.cmsOnly && !cards.length) return "";
     return `<section class="gov-highlights premium-section white" id="highlights" aria-labelledby="highlights-title">
@@ -360,25 +389,6 @@ function quickHighlights(data) {
         </div></section>`;
 }
 
-function parseSettingValue(value) {
-    if (value == null) return "";
-    if (typeof value === "string") {
-        try {
-            const parsed = JSON.parse(value);
-            return typeof parsed === "string" ? parsed : parsed;
-        } catch {
-            return value;
-        }
-    }
-    return value;
-}
-
-function parseSettingList(value) {
-    const raw = parseSettingValue(value);
-    if (Array.isArray(raw)) return raw;
-    if (typeof raw === "string") return raw.split(/\n|,/).map((s) => s.trim()).filter(Boolean);
-    return [];
-}
 
 function missionVision(settings = {}, cmsOnly = false) {
     const mission = parseSettingValue(settings.mission);
@@ -398,38 +408,52 @@ function missionVision(settings = {}, cmsOnly = false) {
         </div></section>`;
 }
 
-function principal(p, cmsOnly = false) {
+function principalCard(p, cmsOnly = false) {
     if (!p || p.published === false) return "";
     const name = p.name || "Principal";
-    const designation = p.designation || "Principal, Eaglewood Polytechnic Institute";
+    const program = principalProgramLabel(p);
+    const designation = p.designation || `Principal - ${program}`;
     const qualification = p.qualification ? `<span class="gov-principal-qual">${esc(p.qualification)}</span>` : "";
-    const messageParts = principalMessageParagraphs(p.message, { excerpt: true, maxLength: 320 });
+    const messageParts = principalMessageParagraphs(p.message, { excerpt: true, maxLength: 220 });
     if (!messageParts.length) return "";
     const excerpt = messageParts[0];
     const signature = p.signature || name;
+    const anchor = principalAnchorId(p);
     const photo = principalPhotoMarkup({
         photoUrl: p.photo_url,
         name,
         className: "gov-principal-photo",
-        loading: "eager",
+        loading: "lazy",
     });
+    return `<article class="gov-principal-card-wrap glass-card" id="${esc(anchor)}" data-principal-program="${esc(program.toLowerCase())}">
+        <div class="gov-principal-frame">
+            <div class="gov-principal-ring" aria-hidden="true"></div>
+            ${photo}
+            <span class="gov-principal-badge gov-program-badge gov-program-badge--${program === "Degree" ? "degree" : "diploma"}">${esc(program)}</span>
+        </div>
+        <div class="gov-principal-content">
+            <p class="gov-principal-kicker">${esc(designation)}</p>
+            <p class="gov-principal-institute-line">${esc(instituteLabel(p.institute))}</p>
+            <blockquote><p>${esc(excerpt)}</p></blockquote>
+            <footer class="gov-principal-meta">
+                <div><strong>${esc(name)}</strong>${qualification}<span>${esc(designation)}</span></div>
+                <em class="gov-principal-signature">${esc(signature)}</em>
+            </footer>
+            <a class="btn btn-primary btn-ripple" href="about.html#${esc(anchor)}">Read Full Message</a>
+        </div>
+    </article>`;
+}
+
+function principals(items, cmsOnly = false) {
+    const rows = sortPrincipalRows(Array.isArray(items) ? items.filter((p) => p && p.published !== false) : []);
+    if (!rows.length) return "";
+    const cards = rows.slice(0, 2).map((p) => principalCard(p, cmsOnly)).filter(Boolean);
+    if (!cards.length) return "";
     return `<section class="premium-section gray gov-principal-section" id="principal" aria-labelledby="principal-title">
-        <div class="container">
-            ${sectionHead("Leadership", "Principal's Message", "A message from the academic leadership guiding Eaglewood Polytechnic Institute.")}
-            <div class="gov-principal-layout premium-reveal">
-                <div class="gov-principal-frame">
-                    <div class="gov-principal-ring" aria-hidden="true"></div>
-                    ${photo}
-                    <span class="gov-principal-badge">Principal</span>
-                </div>
-                <article class="gov-principal-content glass-card">
-                    <blockquote><p id="principal-title">${esc(excerpt)}</p></blockquote>
-                    <footer class="gov-principal-meta">
-                        <div><strong>${esc(name)}</strong>${qualification}<span>${esc(designation)}</span></div>
-                        <em class="gov-principal-signature">${esc(signature)}</em>
-                    </footer>
-                    <a class="btn btn-primary btn-ripple" href="about.html#principal">Read Full Message</a>
-                </article>
+        <div class="container gov-principals-shell">
+            ${sectionHead("Leadership", "Principal's Message", "Messages from the academic leadership guiding Eaglewood Polytechnic (Diploma) and Eaglewood College of Engineering (Degree).")}
+            <div class="gov-principals-grid premium-reveal" id="principal-title">
+                ${cards.join("")}
             </div>
         </div></section>`;
 }
@@ -442,23 +466,29 @@ function departments(items) {
             <div class="dept-swiper-shell premium-reveal">
                 <div class="swiper dept-swiper" id="deptSwiper" aria-label="Engineering departments carousel">
                     <div class="swiper-wrapper">
-                        ${items.map((d) => `<div class="swiper-slide">
-                            <article class="gov-dept-card glass-card">
+                        ${items.map((d) => {
+                            const program = String(d.program_type || "diploma").toLowerCase();
+                            const programLabel = programTypeLabel(program);
+                            return `<div class="swiper-slide">
+                            <article class="gov-dept-card glass-card gov-dept-card--program">
                                 <div class="gov-dept-media"><img loading="lazy" decoding="async" src="${esc(img(d.department_image_url))}" alt="${esc(d.title)}"></div>
                                 <div class="gov-dept-body">
-                                    <span class="gov-dept-tag">Department</span>
+                                    <div class="gov-dept-badges">
+                                        <span class="gov-dept-tag">Department</span>
+                                        <span class="gov-program-badge gov-program-badge--${program}">${esc(programLabel)}</span>
+                                    </div>
                                     <h3 id="${d.id === items[0]?.id ? "departments-title" : ""}">${esc(d.title)}</h3>
                                     <p class="gov-dept-hod">${esc(d.hod_name || "Head of Department")}</p>
                                     <p>${plain(d.description)}</p>
                                     <div class="gov-dept-stats">
                                         <span>${esc(d.faculty_count || 0)} Faculty</span>
-                                        <span>${esc(d.students_count || 0)} Students</span>
                                         <span class="gov-dept-labs">${esc(d.labs || "Dedicated Labs")}</span>
                                     </div>
                                     <a class="btn btn-teal btn-ripple" href="${esc(d.button_url || "departments.html")}">${esc(d.button_label || "Explore Department")}</a>
                                 </div>
                             </article>
-                        </div>`).join("")}
+                        </div>`;
+                        }).join("")}
                     </div>
                     <button class="dept-swiper-prev" type="button" aria-label="Previous department">‹</button>
                     <button class="dept-swiper-next" type="button" aria-label="Next department">›</button>
@@ -474,23 +504,35 @@ function updates(items) {
 }
 function notices(items) {
     if (!items?.length) return "";
-    return `<section class="premium-section white notices-section gov-notices-section" id="notice-board"><div class="container"><div class="section-split-head">${sectionHead("Important Notices", "Official notice board and downloads", "Pinned notices, deadlines and attachments remain easy to scan for students and parents.")}<a class="section-view-all" href="admission.html">Admission Info</a></div><div class="swiper gov-swiper gov-notices-carousel premium-reveal" data-gov-slider data-autoplay="5000" data-loop="true"><button class="gov-slider-arrow prev" type="button" data-slider-prev aria-label="Previous notice">&lt;</button><div class="swiper-wrapper gov-slider-track">${items.slice(0, 10).map((n, i) => { const file = n.attachment_url || n.pdf_url || n.file_url || ""; const priority = n.priority || (n.important ? "Important" : "General"); return `<article class="swiper-slide gov-notice-card ${i === 0 || n.important ? "is-pinned" : ""}"><div class="gov-notice-strip"></div><div class="gov-notice-head"><div class="gov-notice-badges">${i === 0 || n.important ? `<span class="pin">Pinned</span>` : ""}<span class="priority">${esc(priority)}</span>${n.is_new ? `<span class="new">New</span>` : ""}<span class="status">${esc(n.status || (n.published === false ? "Draft" : "Published"))}</span></div><time>${date(n.date || n.created_at)}</time></div><h3>${esc(n.title)}</h3><p>${plain(n.description)}</p><div class="gov-notice-foot"><span>${n.expiry_date ? `Valid till ${date(n.expiry_date)}` : "Official notice"}</span><span>${Number(n.download_count || n.views || 0)} downloads</span></div><div class="gov-notice-actions">${file ? `<a class="download" href="${esc(file)}" target="_blank" rel="noopener noreferrer"><b>PDF</b> Download</a>` : ""}<a href="${esc(file ? file : "index.html#notice-board")}"${file ? ' target="_blank" rel="noopener noreferrer"' : ""}>${file ? "Open PDF" : "View Notice"}</a></div></article>`; }).join("")}</div><button class="gov-slider-arrow next" type="button" data-slider-next aria-label="Next notice">&gt;</button><div class="swiper-pagination gov-slider-dots" data-slider-dots></div></div>        </div></section>`;
+    const sorted = [...items].sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0));
+    return `<section class="premium-section white notices-section gov-notices-section" id="notice-board"><div class="container"><div class="section-split-head">${sectionHead("Important Notices", "Official notice board and downloads", "Pinned notices, deadlines and attachments remain easy to scan for students and parents.")}<a class="section-view-all" href="admission.html">Admission Info</a></div><div class="swiper gov-swiper gov-notices-carousel premium-reveal" data-gov-slider data-autoplay="5000" data-loop="true"><button class="gov-slider-arrow prev" type="button" data-slider-prev aria-label="Previous notice">&lt;</button><div class="swiper-wrapper gov-slider-track">${sorted.slice(0, 10).map((n, i) => {
+        const file = n.attachment_url || n.pdf_url || n.file_url || "";
+        const priority = n.priority || (n.important ? "Important" : "General");
+        const fileMeta = noticeFileMeta(file, n.file_type);
+        return `<article class="swiper-slide gov-notice-card ${i === 0 || n.important ? "is-pinned" : ""}"><div class="gov-notice-strip"></div><div class="gov-notice-head"><div class="gov-notice-badges">${i === 0 || n.important ? `<span class="pin">Pinned</span>` : ""}<span class="priority">${esc(priority)}</span>${n.is_new ? `<span class="new">New</span>` : ""}<span class="status">${esc(n.status || (n.published === false ? "Draft" : "Published"))}</span></div><time>${date(n.date || n.created_at)}</time></div><h3>${esc(n.title)}</h3><p>${plain(n.description)}</p><div class="gov-notice-foot"><span>${n.expiry_date ? `Valid till ${date(n.expiry_date)}` : "Official notice"}</span><span>Latest first</span></div><div class="gov-notice-actions">${file ? `<a class="download gov-download--${fileMeta.className}" href="${esc(file)}" target="_blank" rel="noopener noreferrer" download><b>${fileMeta.badge}</b> Download</a>` : ""}<a href="${esc(file ? file : "index.html#notice-board")}"${file ? ' target="_blank" rel="noopener noreferrer"' : ""}>${file ? `Open ${fileMeta.label}` : "View Notice"}</a></div></article>`;
+    }).join("")}</div><button class="gov-slider-arrow next" type="button" data-slider-next aria-label="Next notice">&gt;</button><div class="swiper-pagination gov-slider-dots" data-slider-dots></div></div>        </div></section>`;
 }
 
 function courses(items) {
     if (!items?.length) return "";
-    const rows = items.slice(0, 12);
+    const rows = items.slice(0, 8);
     return `<section class="premium-section white gov-courses-section programs-carousel-section" id="courses">
         <div class="container">
             <div class="section-split-head">${sectionHead("Programs", "Engineering Courses", "Diploma and degree pathways with practical training, laboratories and industry exposure.")}<a class="section-view-all" href="courses.html">All Courses</a></div>
             <div class="programs-swiper-shell premium-reveal">
                 <div class="swiper programs-swiper" id="programsSwiper" aria-label="Engineering programs carousel">
                     <div class="swiper-wrapper">
-                        ${rows.map((c) => `<div class="swiper-slide">
+                        ${rows.map((c) => {
+                            const program = String(c.program_type || "diploma").toLowerCase();
+                            const programLabel = programTypeLabel(program);
+                            return `<div class="swiper-slide">
                             <article class="gov-course-card premium-course glass-card">
                                 <a class="gov-course-media course-image" href="${esc(c.button_url || "courses.html")}">${imgTag(c.image_url, c.title)}</a>
                                 <div class="gov-course-body">
-                                    <span class="gov-course-meta">${esc(c.duration || "3 Years")} · ${esc(c.seats || 60)} Seats</span>
+                                    <div class="gov-course-badges">
+                                        <span class="gov-course-meta">${esc(c.duration || "3 Years")} · ${esc(c.seats || 60)} Seats</span>
+                                        <span class="gov-program-badge gov-program-badge--${program}">${esc(programLabel)}</span>
+                                    </div>
                                     <h3>${esc(c.title)}</h3>
                                     <p>${plain(c.description)}</p>
                                     <ul>
@@ -500,7 +542,8 @@ function courses(items) {
                                     <a class="btn btn-teal btn-sm btn-ripple" href="${esc(c.button_url || "courses.html")}">${esc(c.button_label || "Read More")}</a>
                                 </div>
                             </article>
-                        </div>`).join("")}
+                        </div>`;
+                        }).join("")}
                     </div>
                     <button class="programs-swiper-prev" type="button" aria-label="Previous program">‹</button>
                     <button class="programs-swiper-next" type="button" aria-label="Next program">›</button>
@@ -583,22 +626,43 @@ function placements(items) {
         </div></section>`;
 }
 
-function studentResources() {
+function studentResources(downloads = []) {
+    const categoryLabels = {
+        admission_forms: "Admission Forms",
+        circulars: "Circulars",
+        prospectus: "Prospectus",
+    };
+    const downloadCards = (downloads || [])
+        .filter((item) => item?.file_url)
+        .slice(0, 6)
+        .map((item) => {
+            const meta = noticeFileMeta(item.file_url, item.file_type);
+            const category = categoryLabels[item.category] || "Download";
+            return `<a class="gov-resource-card glass-card gov-download-card" href="${esc(item.file_url)}" target="_blank" rel="noopener noreferrer" download>
+                <span class="gov-resource-icon" aria-hidden="true">${meta.badge}</span>
+                <strong>${esc(item.title)}</strong>
+                <span class="gov-resource-link">${esc(category)} · ${esc(meta.label)}</span>
+            </a>`;
+        });
     const resources = [
         ["Time Table", "contact.html", "calendar"],
         ["Syllabus", "courses.html", "book"],
         ["Exam Notices", "index.html#notice-board", "bell"],
         ["Results", "contact.html", "chart"],
-        ["Downloads", "admission.html", "download"],
         ["Scholarships", "admission.html", "scholarship"],
         ["Academic Calendar", "contact.html", "calendar"],
         ["Anti Ragging", "contact.html", "shield"],
     ];
     const icons = { calendar: "📅", book: "📘", bell: "🔔", chart: "📊", download: "⬇", scholarship: "⭐", shield: "🛡" };
+    const staticCards = resources.map(([title, href, icon]) => `<a class="gov-resource-card glass-card" href="${href}"><span class="gov-resource-icon" aria-hidden="true">${icons[icon] || "📄"}</span><strong>${esc(title)}</strong><span class="gov-resource-link">Student Resource</span></a>`).join("");
+    const dynamicCards = downloadCards.join("");
     return `<section class="premium-section gray gov-resources-section" id="student-resources">
         <div class="container">
-            ${sectionHead("Student Services", "Student Resources", "Quick access to academic documents, notices and student support services.")}
-            <div class="gov-resource-grid premium-reveal">${resources.map(([title, href, icon]) => `<a class="gov-resource-card glass-card" href="${esc(href)}"><span class="gov-resource-icon" aria-hidden="true">${icons[icon] || "📄"}</span><strong>${esc(title)}</strong><span class="gov-resource-link">Open</span></a>`).join("")}</div>
+            ${sectionHead("Student Resources", "Downloads & Quick Links", "Admission forms, circulars, prospectus and essential student resources in one place.")}
+            <div class="gov-resource-grid premium-reveal">
+                ${dynamicCards || `<a class="gov-resource-card glass-card" href="admission.html"><span class="gov-resource-icon" aria-hidden="true">⬇</span><strong>Downloads</strong><span class="gov-resource-link">Admission Forms</span></a>`}
+                ${staticCards}
+            </div>
         </div></section>`;
 }
 function gallery(items) {
@@ -671,8 +735,12 @@ function admissionProcess(data, cmsOnly = false) {
 
 function inquirySection(data) {
     const courseOptions = (data.courses || []).slice(0, 8);
-    const phone = parseSettingValue(data.settings?.phone) || "+91 94237 16230";
-    const email = parseSettingValue(data.settings?.email) || "eaglewoodpoly@gmail.com";
+    const phones = parseContactPhones(data.settings || {});
+    const phone = phones[0] || parseSettingValue(data.settings?.phone) || "+91 94237 16230";
+    const emails = parseInstituteEmails(data.settings || {});
+    const emailLine = emails.length
+        ? emails.map((row) => `<a href="mailto:${esc(row.value)}">${esc(row.value)}</a>`).join(" · ")
+        : `<a href="mailto:eaglewoodpoly@gmail.com">${esc(parseSettingValue(data.settings?.email) || "eaglewoodpoly@gmail.com")}</a>`;
     return `<section class="premium-section white inquiry-section" id="inquiry">
         <div class="container">
             ${sectionHead("Contact", "Admission Inquiry", "Submit your question and our admissions team will respond with course details, eligibility and next steps.")}
@@ -681,7 +749,7 @@ function inquirySection(data) {
                     <img loading="lazy" decoding="async" src="assets/images/campus.jpg" alt="Eaglewood Polytechnic campus">
                     <div>
                         <h3>Talk to Admissions</h3>
-                        <p>Call <a href="tel:+919423716230">${esc(phone)}</a> or email <a href="mailto:eaglewoodpoly@gmail.com">${esc(email)}</a> for admission guidance.</p>
+                        <p>Call <a href="${telHref(phone)}">${esc(phone)}</a> or email ${emailLine} for admission guidance.</p>
                         <ul>
                             <li>Course eligibility &amp; seats</li>
                             <li>Document checklist</li>
@@ -722,6 +790,10 @@ function premiumCta(settings = {}) {
 }
 
 function initSlider() {
+    if (homeSliderTimer) {
+        clearInterval(homeSliderTimer);
+        homeSliderTimer = null;
+    }
     const slides = [...document.querySelectorAll(".premium-slide")];
     if (!slides.length) return;
     const dots = [...document.querySelectorAll("[data-dot]")];
@@ -730,7 +802,7 @@ function initSlider() {
     document.querySelector("[data-prev]")?.addEventListener("click", () => show(index - 1));
     document.querySelector("[data-next]")?.addEventListener("click", () => show(index + 1));
     dots.forEach((dot) => dot.addEventListener("click", () => show(Number(dot.dataset.dot))));
-    setInterval(() => show(index + 1), 6500);
+    homeSliderTimer = setInterval(() => show(index + 1), 6500);
 }
 
 function initLightbox() {
@@ -785,7 +857,10 @@ function initPremiumReveal() {
 
 
 
-function initPremiumInteractions() {
+function bindPremiumInteractionsOnce() {
+    if (window.__ewPremiumInteractionsBound) return;
+    window.__ewPremiumInteractionsBound = true;
+
     document.addEventListener("click", (event) => {
         const button = event.target.closest(".btn");
         if (!button) return;
@@ -798,78 +873,68 @@ function initPremiumInteractions() {
         ripple.addEventListener("animationend", () => ripple.remove(), { once: true });
     });
 
-    const hero = document.querySelector(".premium-hero");
-    if (!hero || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    window.addEventListener("scroll", () => {
-        const y = Math.min(scrollY, innerHeight);
-        hero.style.setProperty("--hero-parallax", `${y * 0.08}px`);
-        document.querySelectorAll(".premium-slide img").forEach((image) => {
-            image.style.transform = `translateY(${y * 0.04}px) scale(1.04)`;
-        });
-    }, { passive: true });
+    const bindHeroParallax = () => {
+        const hero = document.querySelector(".premium-hero");
+        if (!hero || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        if (hero.dataset.parallaxBound === "1") return;
+        hero.dataset.parallaxBound = "1";
+        window.addEventListener("scroll", () => {
+            const y = Math.min(scrollY, innerHeight);
+            hero.style.setProperty("--hero-parallax", `${y * 0.08}px`);
+            document.querySelectorAll(".premium-slide img").forEach((image) => {
+                image.style.transform = `translateY(${y * 0.04}px) scale(1.04)`;
+            });
+        }, { passive: true });
+    };
+    bindHeroParallax();
 }
 
-
-
+function destroySwiper(el) {
+    destroyResponsiveSwiper(el);
+}
 
 function initProgramsSwiper() {
     const el = document.querySelector(".programs-swiper");
     if (!el) return;
-    const boot = () => {
-        if (!window.Swiper) return false;
-        new window.Swiper(el, {
-            slidesPerView: 1,
-            spaceBetween: 20,
-            loop: true,
-            speed: 700,
-            grabCursor: true,
-            autoplay: { delay: 4200, disableOnInteraction: false, pauseOnMouseEnter: true },
-            keyboard: { enabled: true, onlyInViewport: true },
-            a11y: { enabled: true },
-            pagination: { el: ".programs-swiper-pagination", clickable: true },
-            navigation: { nextEl: ".programs-swiper-next", prevEl: ".programs-swiper-prev" },
-            breakpoints: {
-                0: { slidesPerView: 1, spaceBetween: 16 },
-                768: { slidesPerView: 2, spaceBetween: 20 },
-                1200: { slidesPerView: 4, spaceBetween: 24 },
-            },
-        });
-        return true;
-    };
-    if (!boot()) {
-        const wait = setInterval(() => { if (boot()) clearInterval(wait); }, 60);
-        setTimeout(() => clearInterval(wait), 8000);
-    }
+    destroySwiper(el);
+    bootResponsiveSwiper(el, () => ({
+        slidesPerView: 1,
+        spaceBetween: 20,
+        speed: 700,
+        grabCursor: true,
+        autoplay: { delay: 4200, disableOnInteraction: false, pauseOnMouseEnter: true },
+        keyboard: { enabled: true, onlyInViewport: true },
+        a11y: { enabled: true },
+        pagination: { el: ".programs-swiper-pagination", clickable: true },
+        navigation: { nextEl: ".programs-swiper-next", prevEl: ".programs-swiper-prev" },
+        breakpoints: {
+            0: { slidesPerView: 1, spaceBetween: 16 },
+            768: { slidesPerView: 2, spaceBetween: 20 },
+            1200: { slidesPerView: 4, spaceBetween: 24 },
+        },
+    }));
 }
 
 function initDepartmentsSwiper() {
     const el = document.querySelector(".dept-swiper");
     if (!el) return;
-    const boot = () => {
-        if (!window.Swiper) return false;
-        new window.Swiper(el, {
-            slidesPerView: 1,
-            spaceBetween: 20,
-            loop: true,
-            speed: 650,
-            grabCursor: true,
-            autoplay: { delay: 4800, disableOnInteraction: false, pauseOnMouseEnter: true },
-            keyboard: { enabled: true, onlyInViewport: true },
-            a11y: { enabled: true },
-            pagination: { el: ".dept-swiper-pagination", clickable: true },
-            navigation: { nextEl: ".dept-swiper-next", prevEl: ".dept-swiper-prev" },
-            breakpoints: {
-                640: { slidesPerView: 1.12, spaceBetween: 18 },
-                900: { slidesPerView: 2, spaceBetween: 22 },
-                1200: { slidesPerView: 3, spaceBetween: 24 },
-            },
-        });
-        return true;
-    };
-    if (!boot()) {
-        const wait = setInterval(() => { if (boot()) clearInterval(wait); }, 60);
-        setTimeout(() => clearInterval(wait), 8000);
-    }
+    destroySwiper(el);
+    bootResponsiveSwiper(el, () => ({
+        slidesPerView: 1,
+        spaceBetween: 20,
+        speed: 650,
+        grabCursor: true,
+        autoplay: { delay: 4800, disableOnInteraction: false, pauseOnMouseEnter: true },
+        keyboard: { enabled: true, onlyInViewport: true },
+        a11y: { enabled: true },
+        pagination: { el: ".dept-swiper-pagination", clickable: true },
+        navigation: { nextEl: ".dept-swiper-next", prevEl: ".dept-swiper-prev" },
+        breakpoints: {
+            640: { slidesPerView: 1.12, spaceBetween: 18 },
+            900: { slidesPerView: 2, spaceBetween: 22 },
+            1200: { slidesPerView: 3, spaceBetween: 24 },
+        },
+    }));
 }
 
 function initHomeCarousels() {
@@ -935,26 +1000,18 @@ function initPlacementsSwiper() {
 function initGenericSwiper(selector, { prev, next, pagination, breakpoints }) {
     const el = document.querySelector(selector);
     if (!el) return;
-    const boot = () => {
-        if (!window.Swiper) return false;
-        new window.Swiper(el, {
-            slidesPerView: 1,
-            spaceBetween: 16,
-            loop: true,
-            speed: 700,
-            grabCursor: true,
-            autoplay: { delay: 4500, disableOnInteraction: false, pauseOnMouseEnter: true },
-            keyboard: { enabled: true, onlyInViewport: true },
-            pagination: { el: pagination, clickable: true },
-            navigation: { nextEl: next, prevEl: prev },
-            breakpoints,
-        });
-        return true;
-    };
-    if (!boot()) {
-        const wait = setInterval(() => { if (boot()) clearInterval(wait); }, 60);
-        setTimeout(() => clearInterval(wait), 8000);
-    }
+    destroySwiper(el);
+    bootResponsiveSwiper(el, () => ({
+        slidesPerView: 1,
+        spaceBetween: 16,
+        speed: 700,
+        grabCursor: true,
+        autoplay: { delay: 4500, disableOnInteraction: false, pauseOnMouseEnter: true },
+        keyboard: { enabled: true, onlyInViewport: true },
+        pagination: { el: pagination, clickable: true },
+        navigation: { nextEl: next, prevEl: prev },
+        breakpoints,
+    }));
 }
 
 function initHomeGalleryFilters() {

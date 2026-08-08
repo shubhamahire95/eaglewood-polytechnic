@@ -22,6 +22,8 @@ const ORDER = [
     "008_bootstrap_cms_content.sql",
     "009_production_stabilize.sql",
     "010_admin_auth_storage_fix.sql",
+    "011_client_content_fields.sql",
+    "012_create_downloads.sql",
 ];
 
 const files = ORDER.filter((f) => {

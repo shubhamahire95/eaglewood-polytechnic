@@ -12,7 +12,7 @@ const sql = readFileSync(join(root, "supabase", "RUN_ALL_MIGRATIONS.sql"), "utf8
 
 const CMS_TABLES = [
     "admins", "settings", "home_slides", "updates", "notices", "principal_message",
-    "courses", "departments", "faculty", "facilities", "placements", "gallery",
+    "courses", "departments", "faculty", "facilities", "placements", "gallery", "downloads",
     "media_library", "footer_blocks", "inquiries", "admissions", "contacts",
     "ai_knowledge_base", "ai_prompts", "ai_conversations",
 ];

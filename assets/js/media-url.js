@@ -1,8 +1,9 @@
 /**
  * Resolve local asset paths to Supabase Storage public URLs when mapped.
  */
+import { getCmsStoragePublicUrl } from "./supabase.js";
 
-export const CMS_STORAGE_PUBLIC_BASE = "https://rhqmquaojetmzdznbevz.supabase.co/storage/v1/object/public/cms/";
+export const CMS_STORAGE_PUBLIC_BASE = getCmsStoragePublicUrl("");
 
 let mapPromise = null;
 let cachedMap = {};

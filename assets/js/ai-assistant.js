@@ -34,18 +34,33 @@ const FALLBACK_QUESTIONS = [
 ];
 
 let initPromise;
+let unreadCount = 0;
+let mobileViewportBound = false;
+const MOBILE_BP = 768;
+const PANEL_HEIGHT_KEY = "ew_ai_panel_height";
+
 let state = {
     questions: [],
     settings: DEFAULT_SETTINGS,
     messages: [],
-    sessionId: localStorage.getItem("ew_ai_session") || crypto.randomUUID(),
+    sessionId: readAiSessionId(),
     lastAnswer: null,
     lastQuestion: "",
     isOpen: false,
     isLoading: false,
 };
 
-localStorage.setItem("ew_ai_session", state.sessionId);
+function readAiSessionId() {
+    try {
+        return localStorage.getItem("ew_ai_session") || crypto.randomUUID();
+    } catch {
+        return crypto.randomUUID();
+    }
+}
+
+try {
+    localStorage.setItem("ew_ai_session", state.sessionId);
+} catch { /* ignore quota/private mode */ }
 restoreHistory();
 
 const AI_ICON_SVG = `<svg class="ew-ai__fab-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -99,7 +114,9 @@ function restoreHistory() {
 }
 
 function saveHistory() {
-    localStorage.setItem("ew_ai_messages", JSON.stringify(state.messages.slice(-40)));
+    try {
+        localStorage.setItem("ew_ai_messages", JSON.stringify(state.messages.slice(-40)));
+    } catch { /* ignore quota/private mode */ }
 }
 
 function timeGreeting() {
@@ -170,9 +187,10 @@ function renderAssistant() {
             <div class="ew-ai__fab-wrap">
                 <button class="ew-ai__fab" id="ewAiFab" type="button" aria-label="Open ${esc(displayName)}" aria-expanded="false" aria-controls="ewAiPanel">
                     <span class="ew-ai__fab-icon">${FAB_ICON}</span>
+                    <span class="ew-ai__badge" id="ewAiBadge" aria-hidden="true"></span>
                 </button>
             </div>
-            <section class="ew-ai__panel" id="ewAiPanel" aria-label="${esc(displayName)}" role="dialog" aria-modal="true" hidden>
+            <section class="ew-ai__panel ew-ai__panel--mobile-full" id="ewAiPanel" aria-label="${esc(displayName)}" role="dialog" aria-modal="true" hidden>
                 <header class="ew-ai__head">
                     <div class="ew-ai__avatar" aria-hidden="true">${FAB_ICON}</div>
                     <div class="ew-ai__meta">
@@ -201,8 +219,9 @@ function renderAssistant() {
                     <div class="ew-ai__instant" id="ewAiInstant" hidden></div>
                     <div class="ew-ai__messages" id="ewAiMessages"></div>
                 </div>
+                <button type="button" class="ew-ai__resize" id="ewAiResize" aria-label="Resize chat panel" tabindex="-1"></button>
                 <form class="ew-ai__composer" id="ewAiComposer">
-                    <textarea id="ewAiInput" rows="1" autocomplete="off" placeholder="Ask anything about Eaglewood..." aria-label="Ask Eaglewood AI"></textarea>
+                    <textarea id="ewAiInput" rows="1" autocomplete="off" placeholder="Ask anything about Eaglewood..." aria-label="Ask Eaglewood AI" enterkeyhint="send"></textarea>
                     <button class="ew-ai__send" id="ewAiSend" type="submit" aria-label="Send message">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9z"/></svg>
                     </button>
@@ -226,17 +245,24 @@ function bindAssistant() {
 
     const open = async () => {
         await loadKnowledgeBase();
+        clearUnreadBadge();
         panel.hidden = false;
         backdrop.hidden = false;
         panel.classList.remove("is-minimized");
         root.classList.add("open");
         state.isOpen = true;
         fab.setAttribute("aria-expanded", "true");
+        if (isMobileView()) {
+            document.body.classList.add("no-scroll");
+            panel.classList.add("ew-ai__panel--mobile-full");
+            bindMobileViewport();
+        }
+        applySavedPanelHeight();
         requestAnimationFrame(() => {
             panel.classList.add("is-visible");
             backdrop.classList.add("is-visible");
         });
-        setTimeout(() => input.focus(), 180);
+        setTimeout(() => input.focus({ preventScroll: true }), 180);
         scrollToBottom();
     };
 
@@ -246,6 +272,7 @@ function bindAssistant() {
         root.classList.remove("open");
         state.isOpen = false;
         fab.setAttribute("aria-expanded", "false");
+        document.body.classList.remove("no-scroll");
         setTimeout(() => {
             panel.hidden = true;
             backdrop.hidden = true;
@@ -279,9 +306,115 @@ function bindAssistant() {
         input.style.height = `${Math.min(input.scrollHeight, 110)}px`;
         renderInstantSuggestions(input.value);
     }, 160));
-    document.getElementById("ewAiComposer").addEventListener("submit", (event) => { event.preventDefault(); submitQuestion(); });
-    input.addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submitQuestion(); } });
+    document.getElementById("ewAiComposer").addEventListener("submit", (event) => {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        submitQuestion();
+    });
+    input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            submitQuestion();
+        }
+    });
     document.addEventListener("keydown", (event) => { if (event.key === "Escape" && state.isOpen) close(); });
+    bindPanelResize();
+}
+
+function isMobileView() {
+    return window.matchMedia(`(max-width: ${MOBILE_BP}px)`).matches;
+}
+
+function bindMobileViewport() {
+    if (mobileViewportBound || !window.visualViewport) return;
+    mobileViewportBound = true;
+    const sync = () => {
+        if (!state.isOpen || !isMobileView()) return;
+        const vv = window.visualViewport;
+        const height = vv ? vv.height : window.innerHeight;
+        document.documentElement.style.setProperty("--ew-ai-vh", `${height}px`);
+        const offset = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
+        const panel = document.getElementById("ewAiPanel");
+        const composer = document.getElementById("ewAiComposer");
+        if (panel) panel.style.setProperty("--ew-ai-kb-offset", `${offset}px`);
+        if (composer) composer.style.marginBottom = offset > 0 ? `${offset}px` : "";
+        scrollToBottom();
+    };
+    window.visualViewport.addEventListener("resize", sync);
+    window.visualViewport.addEventListener("scroll", sync);
+    sync();
+}
+
+function bindPanelResize() {
+    const grip = document.getElementById("ewAiResize");
+    const panel = document.getElementById("ewAiPanel");
+    if (!grip || !panel) return;
+    let startY = 0;
+    let startH = 0;
+    const onMove = (event) => {
+        const y = event.touches ? event.touches[0].clientY : event.clientY;
+        const next = Math.min(window.innerHeight - 120, Math.max(420, startH + (startY - y)));
+        panel.style.height = `${next}px`;
+        panel.style.maxHeight = `${next}px`;
+    };
+    const onEnd = () => {
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onEnd);
+        document.removeEventListener("touchmove", onMove);
+        document.removeEventListener("touchend", onEnd);
+        try {
+            localStorage.setItem(PANEL_HEIGHT_KEY, String(parseInt(panel.style.height, 10) || 0));
+        } catch { /* ignore */ }
+    };
+    grip.addEventListener("mousedown", (event) => {
+        if (isMobileView()) return;
+        startY = event.clientY;
+        startH = panel.getBoundingClientRect().height;
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onEnd);
+    });
+    grip.addEventListener("touchstart", (event) => {
+        if (isMobileView()) return;
+        startY = event.touches[0].clientY;
+        startH = panel.getBoundingClientRect().height;
+        document.addEventListener("touchmove", onMove, { passive: true });
+        document.addEventListener("touchend", onEnd);
+    }, { passive: true });
+}
+
+function applySavedPanelHeight() {
+    if (isMobileView()) return;
+    const panel = document.getElementById("ewAiPanel");
+    if (!panel) return;
+    try {
+        const saved = Number(localStorage.getItem(PANEL_HEIGHT_KEY) || 0);
+        if (saved >= 420 && saved <= window.innerHeight - 80) {
+            panel.style.height = `${saved}px`;
+            panel.style.maxHeight = `${saved}px`;
+        }
+    } catch { /* ignore */ }
+}
+
+function setUnreadBadge(count) {
+    unreadCount = Math.max(0, count);
+    const badge = document.getElementById("ewAiBadge");
+    if (!badge) return;
+    if (!unreadCount || state.isOpen) {
+        badge.textContent = "";
+        badge.classList.remove("is-visible");
+        return;
+    }
+    badge.textContent = unreadCount > 9 ? "9+" : String(unreadCount);
+    badge.classList.add("is-visible");
+}
+
+function clearUnreadBadge() {
+    setUnreadBadge(0);
+}
+
+function bumpUnreadBadge() {
+    if (state.isOpen) return;
+    setUnreadBadge(unreadCount + 1);
 }
 
 function clearChat() {
@@ -306,8 +439,10 @@ function renderHistory() {
 }
 
 function submitQuestion() {
+    if (state.isLoading) return;
     const input = document.getElementById("ewAiInput");
     const value = input.value;
+    if (!sanitize(value)) return;
     input.value = "";
     input.style.height = "auto";
     hideInstant();
@@ -319,7 +454,7 @@ function handleAssistantClick(event) {
     if (question) ask(question);
     if (event.target.closest("[data-copy]")) copyText(state.lastAnswer?.answer || "");
     if (event.target.closest("[data-share]")) shareAnswer();
-    if (event.target.closest("[data-rating]")) saveFeedback(event);
+    if (event.target.closest("[data-rating]")) void saveFeedback(event).catch(() => {});
     if (event.target.closest("[data-retry]")) ask(state.lastQuestion);
     if (event.target.closest("[data-ask-again]")) ask(state.lastQuestion);
 }
@@ -398,6 +533,7 @@ function renderAnswerCard(result, persist = true) {
         state.messages.push({ role: "answer", payload: result, time });
         saveHistory();
     }
+    if (!state.isOpen) bumpUnreadBadge();
     scrollToBottom();
 }
 
@@ -469,14 +605,19 @@ function clean(text) { return String(text || "").toLowerCase().replace(/[^a-z0-9
 function sanitize(text) { return String(text || "").replace(/[<>]/g, "").trim().slice(0, 500); }
 
 function formatAnswer(text) {
-    let html = esc(text);
-    html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-    html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
-    html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
-    html = html.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
-    html = html.replace(/\n/g, "<br>");
-    return html;
+    let raw = esc(text);
+    raw = raw.replace(/```([\s\S]*?)```/g, (_, code) => `<pre><code>${code.trim()}</code></pre>`);
+    raw = raw.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+    raw = raw.replace(/\*(.*?)\*/g, "<em>$1</em>");
+    raw = raw.replace(/`([^`]+)`/g, "<code>$1</code>");
+    raw = raw.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    raw = raw.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+    raw = raw.replace(/^\s*[-*]\s+(.+)$/gm, "<li>$1</li>");
+    raw = raw.replace(/(<li>.*<\/li>)/gs, (match) => `<ul>${match}</ul>`);
+    raw = raw.replace(/\n/g, "<br>");
+    raw = raw.replace(/<br><ul>/g, "<ul>");
+    raw = raw.replace(/<\/ul><br>/g, "</ul>");
+    return raw;
 }
 
 function toArray(value) { return Array.isArray(value) ? value : typeof value === "string" ? value.split(/\n|,/).map((x) => x.trim()).filter(Boolean) : []; }
@@ -510,7 +651,7 @@ async function saveFeedback(event) {
     const rating = Number(button?.dataset?.rating || 0);
     if (!state.lastQuestion || !rating) return;
     if (isCmsAvailable()) {
-        await safeInsert("ai_conversations", {
+        const result = await safeInsert("ai_conversations", {
             session_id: state.sessionId,
             question: state.lastQuestion,
             answer: state.lastAnswer?.answer || "",
@@ -518,6 +659,7 @@ async function saveFeedback(event) {
             status: "feedback",
             metadata: { feedback: rating >= 4 ? "positive" : "negative" },
         });
+        if (!result.ok) return;
     }
     addBubble("Thank you. Your feedback helps improve the institute assistant.", "bot", null, false);
 }

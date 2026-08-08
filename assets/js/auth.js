@@ -3,6 +3,9 @@
     hasAdminSession,
     purgeSupabaseAuthStorage,
 } from "./supabase.js";
+import { installGlobalErrorHandlers } from "./errors.js";
+
+installGlobalErrorHandlers();
 
 const loginBtn = document.getElementById("loginBtn");
 const msg = document.getElementById("msg");

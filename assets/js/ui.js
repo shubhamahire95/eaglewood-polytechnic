@@ -342,6 +342,7 @@ function initNavigation() {
         const open = navLinks.classList.toggle("open");
         navToggle.classList.toggle("open", open);
         navToggle.setAttribute("aria-expanded", String(open));
+        document.body.classList.toggle("no-scroll", open && window.matchMedia("(max-width: 1080px)").matches);
     });
 
     navLinks?.querySelectorAll("a").forEach((link) =>
@@ -349,6 +350,7 @@ function initNavigation() {
             navLinks.classList.remove("open");
             navToggle?.classList.remove("open");
             navToggle?.setAttribute("aria-expanded", "false");
+            document.body.classList.remove("no-scroll");
         })
     );
 
@@ -357,6 +359,7 @@ function initNavigation() {
             navLinks.classList.remove("open");
             navToggle?.classList.remove("open");
             navToggle?.setAttribute("aria-expanded", "false");
+            document.body.classList.remove("no-scroll");
         }
     });
 

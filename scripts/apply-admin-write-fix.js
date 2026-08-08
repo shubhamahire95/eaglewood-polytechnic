@@ -18,11 +18,13 @@ import {
     DEFAULT_ADMIN_EMAIL,
     DEFAULT_ADMIN_PASSWORD,
     buildAdminAuthHeaders,
+    buildAdminJsonHeaders,
+    stripBodyHeaders,
     checkAdminWritePermission,
 } from "./lib/admin-rest.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const rlsSqlPath = join(root, "supabase", "migrations", "010_admin_auth_storage_fix.sql");
+const rlsSqlPath = join(root, "supabase", "GENERATED_FIX_ADMIN_WRITES.sql");
 
 function loadEnvValue(name) {
     const candidates = [process.env[name]].filter(Boolean);
@@ -64,7 +66,7 @@ async function promptDbUrl() {
 async function verifyAdminInsert() {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/home_slides`, {
         method: "POST",
-        headers: buildAdminAuthHeaders(DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD, {
+        headers: buildAdminJsonHeaders(DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD, {
             Prefer: "return=representation",
         }),
         body: JSON.stringify({
@@ -87,7 +89,7 @@ async function verifyAdminInsert() {
     if (row?.id) {
         await fetch(`${SUPABASE_URL}/rest/v1/home_slides?id=eq.${row.id}`, {
             method: "DELETE",
-            headers: buildAdminAuthHeaders(DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD),
+            headers: stripBodyHeaders(buildAdminAuthHeaders(DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD)),
         });
     }
     return { ok: true };
@@ -157,7 +159,7 @@ async function main() {
     }
 
     if (!permission.admin) {
-        console.log(`Admin writes blocked (is_admin=${permission.admin}) — applying 010_admin_auth_storage_fix.sql`);
+        console.log(`Admin writes blocked (is_admin=${permission.admin}) — applying GENERATED_FIX_ADMIN_WRITES.sql`);
 
         let dbUrl = loadEnvValue("SUPABASE_DB_URL") || loadEnvValue("DATABASE_URL");
         const accessToken = loadEnvValue("SUPABASE_ACCESS_TOKEN");

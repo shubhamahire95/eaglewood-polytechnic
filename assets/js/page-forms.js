@@ -2,6 +2,7 @@ import { safeFetch, isCmsAvailable } from "./supabase.js";
 import { renderFacultyPage, renderPlacementsPage, renderAboutPrincipal } from "./pages-cms.js";
 import { submitPublicForm } from "./form-store.js";
 import { fetchCmsRows } from "./cms-store.js";
+import { parseContactPhones, parseInstituteEmails, parseSettingValue, telHref } from "./site-settings.js";
 
 export async function initDynamicPages() {
     const page = location.pathname.split("/").pop() || "index.html";
@@ -18,19 +19,24 @@ async function enhanceContactPage() {
     const main = document.getElementById("main");
     if (!main || document.getElementById("contact-message-form")) return;
 
+    const phones = parseContactPhones(settings);
+    const primaryPhone = phones[0] || parseSettingValue(settings.phone) || "+91 94237 16230";
+    const emails = parseInstituteEmails(settings);
+    const primaryEmail = emails[0]?.value || parseSettingValue(settings.email) || "eaglewoodpoly@gmail.com";
+
     main.insertAdjacentHTML("beforeend", `
         <section class="section contact-form-section" id="contact-form">
             <div class="container contact-form-grid">
                 <div class="contact-form-cards">
                     <article class="contact-mini-card glass-card">
                         <span>Admission Office</span>
-                        <strong>${escapeHtml(settings.phone || "+91 94237 16230")}</strong>
-                        <a href="tel:+919423716230">Call Now</a>
+                        <strong>${escapeHtml(primaryPhone)}</strong>
+                        <a href="${telHref(primaryPhone)}">Call Now</a>
                     </article>
                     <article class="contact-mini-card glass-card">
                         <span>Email</span>
-                        <strong>${escapeHtml(settings.email || "eaglewoodpoly@gmail.com")}</strong>
-                        <a href="mailto:eaglewoodpoly@gmail.com">Send Email</a>
+                        <strong>${escapeHtml(primaryEmail)}</strong>
+                        <a href="mailto:${escapeHtml(primaryEmail)}">Send Email</a>
                     </article>
                     <article class="contact-mini-card glass-card">
                         <span>Office Hours</span>
@@ -284,7 +290,38 @@ async function loadCourses() {
 
 function updateContactText(settings) {
     const map = document.querySelector(".map-embed iframe");
-    if (map && settings.google_map) map.src = settings.google_map;
+    if (map && settings.google_map) map.src = parseSettingValue(settings.google_map);
+
+    const phonesHost = document.querySelector("[data-contact-phones]");
+    const emailsHost = document.querySelector("[data-contact-emails]");
+    const phones = parseContactPhones(settings);
+    const emails = parseInstituteEmails(settings);
+
+    if (phonesHost) {
+        phonesHost.innerHTML = phones.map((phone) =>
+            `<a href="${telHref(phone)}">${escapeHtml(phone)}</a>`
+        ).join("");
+    }
+
+    if (emailsHost) {
+        emailsHost.innerHTML = emails.map((row) =>
+            `<div><span class="contact-email-label">${escapeHtml(row.label)}</span><a href="mailto:${escapeHtml(row.value)}">${escapeHtml(row.value)}</a></div>`
+        ).join("");
+    }
+
+    const callBtn = document.querySelector("[data-contact-call]");
+    const primaryPhone = phones[0] || parseSettingValue(settings.phone);
+    if (callBtn && primaryPhone) {
+        callBtn.href = telHref(primaryPhone);
+        callBtn.textContent = "Call Now";
+    }
+
+    const emailBtn = document.querySelector("[data-contact-email]");
+    const primaryEmail = emails[0]?.value || parseSettingValue(settings.email);
+    if (emailBtn && primaryEmail) {
+        emailBtn.href = `mailto:${primaryEmail}`;
+        emailBtn.textContent = "Email Us";
+    }
 }
 
 export function bindHomeInquiryForm(courses = []) {

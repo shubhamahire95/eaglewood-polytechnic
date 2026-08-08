@@ -17,6 +17,7 @@ This document maps **every Supabase resource** used by the JavaScript app to the
 | Facilities | `facilities` | home, admin |
 | Placements | `placements` | home, admin |
 | Gallery | `gallery` | home, admin |
+| Downloads | `downloads` | home student resources, admin |
 | Media library | `media_library` | admin uploads |
 | Footer blocks | `footer_blocks` | footer CMS, admin |
 | Contact messages | `contacts` | contact form, admin |
@@ -37,7 +38,7 @@ This document maps **every Supabase resource** used by the JavaScript app to the
 
 These exist in legacy `schema.sql` but **must not be called** until a feature is implemented:
 
-`visitors`, `home_sections`, `events`, `downloads`, `ai_analytics`, `testimonials`, `faq`, `menus`, `seo_pages`, `popups`, `newsletters`, `feedback`, `analytics_events`, `activity_logs`, `notifications`, `backups`, `hero_content`, `principal`, `ai_faqs`, `ai_settings`, `chat_logs`, `ai_categories`, `ai_questions`, `ai_training`, `ai_logs`, `ai_feedback`
+`visitors`, `home_sections`, `events`, `ai_analytics`, `testimonials`, `faq`, `menus`, `seo_pages`, `popups`, `newsletters`, `feedback`, `analytics_events`, `activity_logs`, `notifications`, `backups`, `hero_content`, `principal`, `ai_faqs`, `ai_settings`, `chat_logs`, `ai_categories`, `ai_questions`, `ai_training`, `ai_logs`, `ai_feedback`
 
 ## Setup
 

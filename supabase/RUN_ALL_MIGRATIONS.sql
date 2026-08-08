@@ -1,6 +1,6 @@
 -- Eaglewood Polytechnic — run ALL migrations in one paste
 -- Supabase Dashboard → SQL Editor → New query → Run
--- Order: 003_upgrade_legacy_admins.sql → 001_eaglewood_cms.sql → 002_admin_auth_fixes.sql → 004_indexes.sql → 005_mission_vision_settings.sql → 006_legacy_admin_sessions.sql → 007_admin_auth_bootstrap.sql → 008_bootstrap_cms_content.sql → 009_production_stabilize.sql → 010_admin_auth_storage_fix.sql
+-- Order: 003_upgrade_legacy_admins.sql → 001_eaglewood_cms.sql → 002_admin_auth_fixes.sql → 004_indexes.sql → 005_mission_vision_settings.sql → 006_legacy_admin_sessions.sql → 007_admin_auth_bootstrap.sql → 008_bootstrap_cms_content.sql → 009_production_stabilize.sql → 010_admin_auth_storage_fix.sql → 011_client_content_fields.sql → 012_create_downloads.sql
 -- After success: hard-refresh admin + public site, click "Retry connection" in dashboard.
 
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -1461,5 +1461,85 @@ $$;
 
 revoke all on function public.verify_legacy_admin(text, text) from public;
 grant execute on function public.verify_legacy_admin(text, text) to anon, authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 011_client_content_fields.sql
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- Client content fields: program types, dual principals, downloads, institute stats
+
+alter table public.departments
+  add column if not exists program_type text default 'diploma';
+
+alter table public.courses
+  add column if not exists program_type text default 'diploma';
+
+alter table public.principal_message
+  add column if not exists institute text default 'polytechnic',
+  add column if not exists qualification text;
+
+insert into public.settings (key, value, published, display_order) values
+  ('stat_departments', '"6"', true, 100),
+  ('stat_placements', '"85%"', true, 101),
+  ('stat_faculty', '"75"', true, 102),
+  ('stat_institute_code', '"2634"', true, 103),
+  ('contact_phones', '["+91 94237 16230","+91 97655 43454","+91 90281 85454","+91 90493 44003"]', true, 50),
+  ('email_polytechnic', '"eaglewoodpoly@gmail.com"', true, 51),
+  ('email_engineering', '"eaglewoodcoe@gmail.com"', true, 52)
+on conflict (key) do nothing;
+
+notify pgrst, 'reload schema';
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 012_create_downloads.sql
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- Downloads CMS table (student resources: admission forms, circulars, prospectus)
+-- Idempotent — safe to run on production after migrations 001–010.
+
+create table if not exists public.downloads (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  description text,
+  file_url text not null,
+  file_type text default 'pdf',
+  category text default 'circulars',
+  published boolean default true,
+  status text default 'published',
+  display_order int default 0,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- Repair columns if table existed without full schema (no data loss).
+alter table public.downloads add column if not exists title text;
+alter table public.downloads add column if not exists description text;
+alter table public.downloads add column if not exists file_url text;
+alter table public.downloads add column if not exists file_type text default 'pdf';
+alter table public.downloads add column if not exists category text default 'circulars';
+alter table public.downloads add column if not exists published boolean default true;
+alter table public.downloads add column if not exists status text default 'published';
+alter table public.downloads add column if not exists display_order int default 0;
+alter table public.downloads add column if not exists created_at timestamptz default now();
+alter table public.downloads add column if not exists updated_at timestamptz default now();
+
+alter table public.downloads enable row level security;
+
+drop policy if exists public_read_published on public.downloads;
+create policy public_read_published on public.downloads
+  for select using (published = true);
+
+drop policy if exists verified_admin_manage on public.downloads;
+create policy verified_admin_manage on public.downloads
+  for all using (public.is_admin()) with check (public.is_admin());
+
+drop trigger if exists set_downloads_updated_at on public.downloads;
+create trigger set_downloads_updated_at
+  before update on public.downloads
+  for each row execute function public.set_updated_at();
+
+create index if not exists idx_downloads_published_order on public.downloads (published, display_order);
 
 notify pgrst, 'reload schema';

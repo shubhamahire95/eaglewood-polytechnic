@@ -4,7 +4,11 @@
   "type": "module",
   "scripts": {
     "audit:supabase": "node scripts/audit-supabase.js",
+    "audit:backend": "node scripts/audit-backend.js",
+    "audit:database": "node scripts/full-database-audit.js",
+    "verify:all-crud": "node scripts/verify-all-crud.js",
     "db:migrate": "node scripts/run-migrations.js",
+    "db:migrate:pending": "node scripts/apply-pending-migrations.js",
     "db:seed": "node scripts/import-default-content.js",
     "cms:bootstrap": "node scripts/bootstrap-cms-content.js",
     "cms:deploy": "node scripts/apply-cms-sync.js",

@@ -115,6 +115,12 @@ async function verifyPage(browser, path) {
     });
 
     const response = await page.goto(`http://127.0.0.1:${PORT}/${path}`, { waitUntil: "networkidle", timeout: 45000 });
+    if (path === "index.html") {
+        await page.waitForFunction(
+            () => document.body?.dataset?.cmsReady === "true" && document.querySelector("#hero .premium-slide"),
+            { timeout: 20000 },
+        ).catch(() => {});
+    }
     await page.evaluate(async () => {
         window.scrollTo(0, document.body.scrollHeight);
         await new Promise((r) => setTimeout(r, 600));

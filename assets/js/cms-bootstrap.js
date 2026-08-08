@@ -2,18 +2,13 @@
  * CMS content bootstrap — seeds Eaglewood defaults into Supabase when empty.
  */
 import { cmsEnabled, safeCount } from "./supabase.js";
-import { importCmsContent } from "./cms-import.js";
-
-const CONTENT_TABLES = [
-    "home_slides", "principal_message", "updates", "notices", "courses",
-    "departments", "faculty", "facilities", "placements", "gallery", "footer_blocks",
-];
+import { bootstrapAllContentTables, bootstrapTableIfEmpty, BOOTSTRAP_TABLES } from "./cms-store.js";
 
 const BOOTSTRAP_LOCK_KEY = "ew_cms_bootstrap_lock";
 
 export async function getCmsContentCounts() {
     if (!cmsEnabled()) return {};
-    const entries = await Promise.all(CONTENT_TABLES.map(async (table) => {
+    const entries = await Promise.all(BOOTSTRAP_TABLES.map(async (table) => {
         const result = await safeCount(table, `audit:count:${table}`);
         return [table, result.ok ? (result.count || 0) : 0];
     }));
@@ -22,7 +17,7 @@ export async function getCmsContentCounts() {
 
 export async function isCmsContentEmpty() {
     const counts = await getCmsContentCounts();
-    return CONTENT_TABLES.every((table) => (counts[table] || 0) === 0);
+    return BOOTSTRAP_TABLES.every((table) => (counts[table] || 0) === 0);
 }
 
 /** Seed Supabase when CMS tables are empty (admin REST inserts). */
@@ -47,28 +42,27 @@ export async function bootstrapCmsContentIfNeeded({ force = false } = {}) {
         sessionStorage.setItem(BOOTSTRAP_LOCK_KEY, "pending");
     }
 
-    const result = await importCmsContent({ force });
+    const results = await bootstrapAllContentTables();
+    const inserted = Object.values(results).reduce((sum, r) => sum + (r.bootstrapped ? (r.inserted || 0) : 0), 0);
+    const failed = Object.entries(results).find(([, r]) => r.ok === false);
 
-    if (result.seeded) {
+    if (failed) {
+        sessionStorage.removeItem(BOOTSTRAP_LOCK_KEY);
+        return { ok: false, skipped: true, reason: failed[1].reason || "error", table: failed[0] };
+    }
+
+    if (inserted > 0) {
         sessionStorage.setItem(BOOTSTRAP_LOCK_KEY, "done");
         try {
             localStorage.setItem("ew_cms_updated_at", String(Date.now()));
         } catch {
             /* ignore */
         }
-        return { ok: true, seeded: true, via: result.via, data: result };
+        return { ok: true, seeded: true, inserted, via: "direct_insert", data: results };
     }
 
-    if (result.skipped) {
-        sessionStorage.setItem(BOOTSTRAP_LOCK_KEY, "done");
-        return { ok: true, skipped: true, reason: result.reason || "already_seeded", via: result.via };
-    }
-
-    if (result.reason === "permission") {
-        sessionStorage.removeItem(BOOTSTRAP_LOCK_KEY);
-        return { ok: false, skipped: true, reason: "permission", via: result.via };
-    }
-
-    sessionStorage.removeItem(BOOTSTRAP_LOCK_KEY);
-    return { ok: false, skipped: true, reason: result.reason || "error", via: result.via };
+    sessionStorage.setItem(BOOTSTRAP_LOCK_KEY, "done");
+    return { ok: true, skipped: true, reason: "already_seeded", via: "direct_insert" };
 }
+
+export { bootstrapTableIfEmpty };

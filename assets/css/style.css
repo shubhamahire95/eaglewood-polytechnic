@@ -5117,3 +5117,5 @@ body:not([data-home]) .section:nth-of-type(even) {
     bottom: max(16px, env(safe-area-inset-bottom)) !important;
   }
 }
+
+@import url("responsive.css");

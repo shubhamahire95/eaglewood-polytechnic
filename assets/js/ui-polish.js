@@ -2,6 +2,8 @@
  * UI polish utilities — lazy load, resize debounce, mobile gallery (no CRUD).
  */
 
+import { bootResponsiveSwiper } from "./swiper-utils.js";
+
 let resizeTimer = null;
 
 export function debounceResize(fn, wait = 120) {
@@ -37,29 +39,19 @@ export function initLazyImages() {
 
 export function initGalleryMobileSwiper() {
     const el = document.querySelector(".gallery-mobile-swiper");
-    if (!el || el.dataset.bound === "1") return;
-    el.dataset.bound = "1";
-    const boot = () => {
-        if (!window.Swiper) return false;
-        new window.Swiper(el, {
-            slidesPerView: 1.12,
-            spaceBetween: 14,
-            loop: true,
-            speed: 650,
-            grabCursor: true,
-            autoplay: { delay: 4000, disableOnInteraction: false, pauseOnMouseEnter: true },
-            pagination: { el: ".gallery-mobile-pagination", clickable: true },
-            navigation: { nextEl: ".gallery-mobile-next", prevEl: ".gallery-mobile-prev" },
-            breakpoints: {
-                480: { slidesPerView: 1.25, spaceBetween: 16 },
-            },
-        });
-        return true;
-    };
-    if (!boot()) {
-        const wait = setInterval(() => { if (boot()) clearInterval(wait); }, 60);
-        setTimeout(() => clearInterval(wait), 8000);
-    }
+    if (!el) return;
+    bootResponsiveSwiper(el, () => ({
+        slidesPerView: 1.12,
+        spaceBetween: 14,
+        speed: 650,
+        grabCursor: true,
+        autoplay: { delay: 4000, disableOnInteraction: false, pauseOnMouseEnter: true },
+        pagination: { el: ".gallery-mobile-pagination", clickable: true },
+        navigation: { nextEl: ".gallery-mobile-next", prevEl: ".gallery-mobile-prev" },
+        breakpoints: {
+            480: { slidesPerView: 1.25, spaceBetween: 16 },
+        },
+    }));
 }
 
 function initPrincipalPhotoFit() {

@@ -1,10 +1,12 @@
 ﻿import { safeDelete, safeFetch, safeInsert, safeUpdate, supabase, connectCms, safeAdminSelect, safeCount, getCmsStatusLabel, resetCmsStatus, isCmsAvailable, getMissingTables, getCmsTableStats, getLastConnectionDiagnostics, hasAdminSession, ensureAdminWriteSession, ensureAdminWriteSessionOnLoad, getAdminWriteCapability, mapCrudReason, setCmsAdminMode, getTableStatus, clearCmsQueryCache, signOutAdmin, loadLegacyCredentials, tableHasDisplayOrder, adminStorageUpload, adminStorageRemove, getCmsStoragePublicUrl, notifyCmsDataChanged } from "../assets/js/supabase.js";
 import { bootstrapCmsContentIfNeeded, isCmsContentEmpty } from "../assets/js/cms-bootstrap.js";
-import { fetchCmsRows, cmsTableCount, cmsInsert, cmsUpdate, cmsDelete, isContentTable } from "../assets/js/cms-store.js";
-import { fetchFormRows, formTableCount, isPublicFormTable } from "../assets/js/form-store.js";
+import { fetchCmsRows, cmsTableCount, cmsInsert, cmsUpdate, cmsDelete, cmsUpsert, bootstrapTableIfEmpty, bootstrapAllContentTables, clearCmsLocalCache, isContentTable, isUuid } from "../assets/js/cms-store.js";
+import { fetchFormRows, formTableCount, isPublicFormTable, flushFormQueue } from "../assets/js/form-store.js";
 import { initAdminUiPolish } from "../assets/js/ui-polish.js";
+import { installGlobalErrorHandlers, mapApiError } from "../assets/js/errors.js";
 import { openModal, closeModal, closeAllModals, isModalOpen } from "./modal-manager.js";
 import { ensureMediaMap, getMediaMap, resolveAdminPreviewUrl, isRenderableImageUrl } from "../assets/js/media-url.js";
+import { principalInstituteKey, principalProgramLabel } from "../assets/js/principal-content.js";
 
 const localAdmin = await bootstrapAdminAccess();
 if (!localAdmin) {
@@ -29,12 +31,13 @@ async function bootstrapAdminAccess() {
 const MODULES = [
     { key: "dashboard", label: "Dashboard", group: "Overview" },
 
-    { key: "principal_message", label: "Principal Message", table: "principal_message", folder: "principal", group: "Website", fields: ["photo_url:image", "name", "qualification", "designation", "message:rich", "signature", "published:boolean", "status:select", "display_order:number"] },
+    { key: "principal_message", label: "Principal Message", table: "principal_message", folder: "principal", group: "Website", fields: ["photo_url:image", "name", "qualification", "designation", "institute:instituteType", "message:rich", "published:boolean", "display_order:number", "status:select"] },
     { key: "updates", label: "Updates", table: "updates", folder: "updates", group: "Website", fields: ["icon", "title", "description:rich", "image_url:image", "date:date", "category", "pinned:boolean", "button_label", "button_url", "color:color", "published:boolean", "status:select", "display_order:number"] },
     { key: "notices", label: "Important Notices", table: "notices", folder: "notices", group: "Website", fields: ["title", "description:rich", "pdf_url:file", "attachment_url:file", "image_url:image", "date:date", "expiry_date:date", "priority:priority", "important:boolean", "is_new:boolean", "published:boolean", "status:select", "display_order:number"] },
+    { key: "downloads", label: "Downloads", table: "downloads", folder: "downloads", group: "Website", fields: ["title", "description:rich", "file_url:file", "file_type:downloadType", "category:downloadCategory", "published:boolean", "status:select", "display_order:number"] },
 
-    { key: "courses", label: "Courses", table: "courses", folder: "courses", group: "Website", fields: ["department", "image_url:image", "title", "duration", "fees", "seats:number", "code", "description:rich", "eligibility:rich", "syllabus_pdf_url:file", "button_label", "button_url", "published:boolean", "status:select", "display_order:number"] },
-    { key: "departments", label: "Departments", table: "departments", folder: "departments", group: "Website", fields: ["title", "hod_name", "hod_photo_url:image", "department_image_url:image", "description:rich", "labs:rich", "faculty_count:number", "students_count:number", "button_label", "button_url", "published:boolean", "status:select", "display_order:number"] },
+    { key: "courses", label: "Courses", table: "courses", folder: "courses", group: "Website", fields: ["department", "image_url:image", "title", "program_type:programType", "duration", "fees", "seats:number", "code", "description:rich", "eligibility:rich", "syllabus_pdf_url:file", "button_label", "button_url", "published:boolean", "status:select", "display_order:number"] },
+    { key: "departments", label: "Departments", table: "departments", folder: "departments", group: "Website", fields: ["title", "program_type:programType", "hod_name", "hod_photo_url:image", "department_image_url:image", "description:rich", "labs:rich", "faculty_count:number", "students_count:number", "button_label", "button_url", "published:boolean", "status:select", "display_order:number"] },
     { key: "faculty", label: "Faculty", table: "faculty", folder: "faculty", group: "Website", fields: ["photo_url:image", "name", "qualification", "experience", "department", "subjects:rich", "email", "social_links:json", "published:boolean", "status:select", "display_order:number"] },
     { key: "facilities", label: "Facilities", table: "facilities", folder: "facilities", group: "Website", fields: ["title", "icon", "image_url:image", "description:rich", "category", "published:boolean", "status:select", "display_order:number"] },
     { key: "placements", label: "Placements", table: "placements", folder: "placements", group: "Website", fields: ["title", "recruiter", "company_logo_url:image", "image_url:image", "package", "highest_package", "average_package", "placed_students:number", "training_activities:rich", "testimonial:rich", "student_name", "course", "published:boolean", "status:select", "display_order:number"] },
@@ -58,7 +61,7 @@ const MODULES = [
 /** Modules shown on the dashboard home grid (real CMS modules only). */
 const DASHBOARD_MODULE_KEYS = [
     "principal_message", "courses", "departments", "faculty", "facilities", "gallery", "placements", "home_slides", "footer_blocks",
-    "admissions", "notices", "updates", "ai_prompts", "media_library", "contacts",
+    "admissions", "notices", "downloads", "updates", "ai_prompts", "media_library", "contacts",
     "settings", "admins",
 ];
 
@@ -72,6 +75,7 @@ let page = 1;
 const pageSize = 10;
 let editingRow = null;
 let editorDirty = false;
+let saveInFlight = false;
 let selectedRowIds = new Set();
 let searchDebounceTimer = null;
 let activeActionMenuId = null;
@@ -103,7 +107,7 @@ const NAV_ICONS = {
 const NAV_SECTIONS = [
     { id: "overview", label: "Overview", icon: "dashboard", keys: ["dashboard"] },
     { id: "website", label: "Website", icon: "cms", keys: [
-        "principal_message", "updates", "notices",
+        "principal_message", "updates", "notices", "downloads",
         "courses", "departments", "faculty",
         "facilities", "placements", "gallery",
     ] },
@@ -116,6 +120,7 @@ let cmsConnection = { connected: false };
 let chromeInitialized = false;
 let dashboardLoadPromise = null;
 let dashboardVisibilityTimer = null;
+let contentBootstrapDone = false;
 
 function settled(result, fallback) {
     return result.status === "fulfilled" ? result.value : fallback;
@@ -139,19 +144,25 @@ function createDashboardRequestCache() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+    installGlobalErrorHandlers();
     setCmsAdminMode(true);
+    clearCmsLocalCache();
     await ensureAdminWriteSessionOnLoad();
     cmsConnection = await connectCms();
     initChrome();
 
-    // Auto-bootstrap disabled — never insert seed data without explicit operator action.
-    // Run `npm run cms:fix` manually after applying 009_production_stabilize.sql if needed.
-
-    // Do not flush the public form queue on dashboard load — avoids repeated 401/RLS noise.
+    const writeCap = await getAdminWriteCapability();
+    if (writeCap.canWrite) {
+        await bootstrapAllContentTables();
+    } else if (writeCap.message) {
+        console.error("[CMS] Admin writes unavailable:", writeCap.message);
+    }
+    contentBootstrapDone = true;
+    void flushFormQueue().catch(() => {});
 
     await refreshPendingBar();
     renderNav();
-    void loadDashboard();
+    void loadDashboard().catch(handleModuleLoadError);
     updateSystemStatus();
     setInterval(updateLiveClock, 1000);
     updateLiveClock();
@@ -199,7 +210,7 @@ function initChrome() {
     $("addRecordBtn")?.addEventListener("click", () => openEditor());
     $("cancelEditBtn")?.addEventListener("click", closeEditor);
     document.querySelector(".dialog-close")?.addEventListener("click", closeEditor);
-    $("editorForm").addEventListener("submit", saveRecord);
+    $("editorForm").addEventListener("submit", saveRecord, { capture: true });
     $("editorDialog")?.addEventListener("click", handleEditorUploadAction);
     $("globalSearch")?.addEventListener("input", debouncedRenderTable);
     $("statusFilter")?.addEventListener("change", (e) => { window.__statusFilter = e.target.value; page = 1; renderTable(); });
@@ -296,6 +307,13 @@ function updateLiveClock() {
 async function updatePendingBar() {
     const bar = $("pendingBar");
     if (!bar) return;
+
+    const capability = await getAdminWriteCapability();
+    if (!capability.canWrite) {
+        await renderWriteCapabilityBanner();
+        return;
+    }
+
     if (!isCmsAvailable()) return;
     const [inqResult, contactResult] = await Promise.allSettled([
         adminTableCount("inquiries"),
@@ -365,6 +383,22 @@ function navItemHtml(m) {
     </button>`;
 }
 
+function handleModuleLoadError(err) {
+    const message = mapApiError(err, "Could not load this module. Please try again.");
+    toast(message, true);
+}
+
+function bindModuleSetupRetry() {
+    $("moduleSetupRetry")?.addEventListener("click", async () => {
+        resetCmsStatus();
+        cmsConnection = await connectCms({ force: true });
+        updateConnectionBanner();
+        updateSystemStatus();
+        if (isCmsAvailable()) void loadModule().catch(handleModuleLoadError);
+        else switchModule("dashboard");
+    });
+}
+
 function switchModule(key) {
     closeAllModals();
     currentModule = MODULES.find((m) => m.key === key) || MODULES[0];
@@ -380,8 +414,8 @@ function switchModule(key) {
     const isDashboard = key === "dashboard";
     $("dashboardView").classList.toggle("active", isDashboard);
     $("moduleView").classList.toggle("active", !isDashboard);
-    if (isDashboard) loadDashboard();
-    else loadModule();
+    if (isDashboard) void loadDashboard().catch(handleModuleLoadError);
+    else void loadModule().catch(handleModuleLoadError);
 }
 
 async function loadDashboard() {
@@ -481,7 +515,7 @@ async function loadDashboardInner() {
     renderLatestAdmissions(admissions, cmsReady);
     renderPendingInquiries(pendingInquiries, inquiriesProbe, cmsReady);
     renderContentImportBanner(statuses);
-    await renderWriteCapabilityBanner();
+    await updatePendingBar();
 
     bindDashboardLinks();
 }
@@ -941,12 +975,35 @@ async function adminTableCount(table) {
     return { count: null, ok: false, reason: result.reason || "error" };
 }
 
+/** Route save to INSERT or UPDATE using real database UUIDs only. */
+async function writeSave(table, payload, existingRow = null) {
+    if (isContentTable(table)) {
+        return cmsUpsert(table, payload, existingRow);
+    }
+    const rowId = existingRow?.id;
+    if (isUuid(rowId)) {
+        return safeUpdate(table, payload, { id: rowId });
+    }
+    return safeInsert(table, payload);
+}
+
 async function writeInsert(table, payload) {
     return isContentTable(table) ? cmsInsert(table, payload) : safeInsert(table, payload);
 }
 
 async function writeUpdate(table, payload, match) {
-    return isContentTable(table) ? cmsUpdate(table, payload, match) : safeUpdate(table, payload, match);
+    if (isContentTable(table)) {
+        return cmsUpdate(table, payload, match);
+    }
+    const rowId = match?.id;
+    if (!isUuid(rowId)) {
+        return safeInsert(table, payload);
+    }
+    return safeUpdate(table, payload, match);
+}
+
+function crudErrorMessage(result) {
+    return result?.message || mapApiError(result?.error, mapCrudReason(result?.reason, result?.error));
 }
 
 async function writeDelete(table, match) {
@@ -1010,21 +1067,18 @@ async function loadModule() {
     if (!isCmsAvailable()) {
         const missing = getTableStatus(currentModule.table) === "missing" || getMissingTables().includes(currentModule.table);
         $("moduleTable").innerHTML = `<div class="empty-state setup-state"><strong>${missing ? "Module unavailable" : "CMS unavailable"}</strong><p>${missing ? `The <code>${esc(currentModule.table)}</code> table is not available.` : "Check your connection and try again."}</p><button class="btn-primary" type="button" id="moduleSetupRetry">Retry</button></div>`;
-        $("moduleSetupRetry")?.addEventListener("click", async () => {
-            resetCmsStatus();
-            cmsConnection = await connectCms({ force: true });
-            updateConnectionBanner();
-            updateSystemStatus();
-            if (isCmsAvailable()) loadModule();
-            else switchModule("dashboard");
-        });
+        bindModuleSetupRetry();
         return;
     }
 
     const probe = await adminTableCount(currentModule.table);
     if (!probe.ok && (probe.reason === "missing_table" || probe.reason === "not_configured")) {
         $("moduleTable").innerHTML = `<div class="empty-state setup-state"><strong>Module unavailable</strong><p>The <code>${esc(currentModule.table)}</code> table could not be reached. Check your connection and try again.</p><button class="btn-primary" type="button" id="moduleSetupRetry">Retry</button></div>`;
+        bindModuleSetupRetry();
         return;
+    }
+    if (isContentTable(currentModule.table) && !contentBootstrapDone) {
+        await bootstrapTableIfEmpty(currentModule.table);
     }
     rows = await selectRows(currentModule.table, 250, false);
     syncModuleFilters();
@@ -1048,6 +1102,13 @@ function renderModuleContext() {
                 <button type="button" class="btn-ghost" data-settings-key="vision">Vision</button>
                 <button type="button" class="btn-ghost" data-settings-key="objectives">Objectives</button>
                 <button type="button" class="btn-ghost" data-settings-key="core_values">Core Values</button>
+                <button type="button" class="btn-ghost" data-settings-key="stat_departments">Stat: Departments</button>
+                <button type="button" class="btn-ghost" data-settings-key="stat_placements">Stat: Placements</button>
+                <button type="button" class="btn-ghost" data-settings-key="stat_faculty">Stat: Faculty</button>
+                <button type="button" class="btn-ghost" data-settings-key="stat_institute_code">Stat: Institute Code</button>
+                <button type="button" class="btn-ghost" data-settings-key="contact_phones">Contact Phones</button>
+                <button type="button" class="btn-ghost" data-settings-key="email_polytechnic">Polytechnic Email</button>
+                <button type="button" class="btn-ghost" data-settings-key="email_engineering">Engineering Email</button>
                 <button type="button" class="btn-ghost" data-appearance="home_slides">Hero Slides</button>
                 <button type="button" class="btn-ghost" data-appearance="footer_blocks">Footer Blocks</button>
             </div>
@@ -1065,6 +1126,29 @@ function renderModuleContext() {
         return;
     }
 
+    if (currentModule.key === "principal_message") {
+        target.innerHTML = `<div class="context-card appearance-card">
+            <div>
+                <p class="eyebrow">Dual Principals</p>
+                <h3>Diploma &amp; Degree</h3>
+                <p>Maintain one published record for Eaglewood Polytechnic (Diploma) and one for Eaglewood College of Engineering (Degree). Edit by UUID — new records are inserted only when you explicitly create them.</p>
+            </div>
+            <div class="appearance-actions">
+                <button type="button" class="btn-ghost" data-principal-preset="polytechnic">Diploma Principal</button>
+                <button type="button" class="btn-ghost" data-principal-preset="engineering">Degree Principal</button>
+                <button type="button" class="btn-ghost" data-preview-site="../index.html#principal">Preview Homepage</button>
+                <button type="button" class="btn-ghost" data-preview-site="../about.html#principal-diploma">Preview About</button>
+            </div>
+        </div>`;
+        target.querySelectorAll("[data-principal-preset]").forEach((btn) => {
+            btn.addEventListener("click", () => openPrincipalEditor(btn.dataset.principalPreset));
+        });
+        target.querySelectorAll("[data-preview-site]").forEach((btn) => {
+            btn.addEventListener("click", () => window.open(btn.dataset.previewSite, "_blank", "noopener"));
+        });
+        return;
+    }
+
     const templates = {
         ai_knowledge_base: ["Knowledge Base", "Categories", "Publish", "Search"],
         ai_prompts: ["Greeting", "Fallback", "Quick Replies", "Response Delay"],
@@ -1072,6 +1156,7 @@ function renderModuleContext() {
         media_library: ["Upload", "Folders", "Preview", "Replace"],
         gallery: ["Albums", "Featured", "Categories", "Publish"],
         notices: ["Pinned", "Priority", "Expiry", "Attachments"],
+        downloads: ["Admission Forms", "Circulars", "Prospectus", "PDF/DOC"],
         updates: ["Timeline", "Categories", "Featured", "Publish"],
         admissions: ["Review", "Status", "Export", "Contact"],
         settings: ["Institute Info", "Contact", "Social", "Map"],
@@ -1079,6 +1164,33 @@ function renderModuleContext() {
     const items = templates[currentModule.key] || ["Draft / Publish", "Search", "Export"];
     target.innerHTML = `<div class="context-card"><div><p class="eyebrow">${esc(currentModule.group || "Module")}</p><h3>${esc(currentModule.label)}</h3><p>Manage records, publishing state, and metadata from Supabase.</p></div><div>${items.map((item) => `<span>${item}</span>`).join("")}</div></div>`;
 }
+function buildAdminListQuery(table, limit, publishedOnly) {
+    return (q) => {
+        let query = q.select("*").limit(limit);
+        if (publishedOnly) query = query.eq("published", true);
+        if (hasDisplayOrder(table)) query = query.order("display_order", { ascending: true, nullsFirst: false });
+        return query.order("created_at", { ascending: false });
+    };
+}
+
+async function selectRowsWithFallback(table, limit = 250, publishedOnly = false) {
+    const builder = buildAdminListQuery(table, limit, publishedOnly);
+    const result = await safeAdminSelect(table, builder, []);
+    if (result.ok && Array.isArray(result.data) && result.data.length) {
+        return result.data;
+    }
+    if (!result.ok || !result.data?.length) {
+        const fallback = await safeFetch(table, builder, [], `admin:fallback:${table}`);
+        if (fallback.ok && Array.isArray(fallback.data) && fallback.data.length) {
+            return fallback.data;
+        }
+    }
+    if (!result.ok) {
+        console.error(`[CMS] Admin read failed for ${table}:`, result.reason || "unknown");
+    }
+    return Array.isArray(result.data) ? result.data : [];
+}
+
 async function selectRows(table, limit = 250, publishedOnly = false) {
     if (isPublicFormTable(table)) {
         const result = await fetchFormRows(table, { admin: true, limit });
@@ -1086,30 +1198,10 @@ async function selectRows(table, limit = 250, publishedOnly = false) {
     }
     if (isContentTable(table)) {
         const result = await fetchCmsRows(table, { admin: true, publishedOnly, limit });
-        return result.data || [];
+        if (result.data?.length) return result.data;
+        return selectRowsWithFallback(table, limit, publishedOnly);
     }
-    const result = await safeAdminSelect(table, (q) => {
-        let query = q.select("*").limit(limit);
-        if (publishedOnly) query = query.eq("published", true);
-        if (hasDisplayOrder(table)) query = query.order("display_order", { ascending: true, nullsFirst: false });
-        return query.order("created_at", { ascending: false });
-    }, []);
-    if (result.ok && Array.isArray(result.data)) {
-        return result.data;
-    }
-    if (result.reason === "permission") {
-        const fallback = await safeFetch(table, (q) => {
-            let query = q.select("*").limit(limit);
-            if (publishedOnly) query = query.eq("published", true);
-            if (hasDisplayOrder(table)) query = query.order("display_order", { ascending: true, nullsFirst: false });
-            return query.order("created_at", { ascending: false });
-        }, [], `admin:fallback:${table}`);
-        if (fallback.ok && Array.isArray(fallback.data)) return fallback.data;
-    }
-    if (!result.ok) {
-        console.error(`[CMS] Admin read failed for ${table}:`, result.reason || "unknown");
-    }
-    return [];
+    return selectRowsWithFallback(table, limit, publishedOnly);
 }
 
 function debouncedRenderTable() {
@@ -1298,7 +1390,11 @@ function highlightMatch(text) {
 }
 
 function getRowTitle(row) {
-    return row.title || row.name || row.student_name || row.question || row.key || row.block_key || `Record #${row.id}`;
+    const base = row.title || row.name || row.student_name || row.question || row.key || row.block_key || `Record #${row.id}`;
+    if (currentModule?.key === "principal_message" && row.institute) {
+        return `${base} (${principalProgramLabel(row)})`;
+    }
+    return base;
 }
 
 function getRowImage(row) {
@@ -1539,6 +1635,23 @@ function cell(row, key) {
     return `<td class="${key.includes("title") || key.includes("name") ? "row-title" : ""}">${esc(String(value ?? "")).slice(0, 140)}</td>`;
 }
 
+function openPrincipalEditor(instituteKey = "polytechnic") {
+    const normalized = instituteKey === "engineering" ? "engineering" : "polytechnic";
+    const existing = rows.find((row) => principalInstituteKey(row) === normalized);
+    if (existing) {
+        openEditor(existing);
+        return;
+    }
+    const program = normalized === "engineering" ? "Degree" : "Diploma";
+    openEditor({
+        institute: normalized,
+        designation: `Principal - ${program}`,
+        display_order: normalized === "engineering" ? 2 : 1,
+        published: true,
+        status: "published",
+    });
+}
+
 function openEditor(row = null) {
     if (!currentModule.fields?.length) return toast("This module is read-only.", true);
     closeActionMenus();
@@ -1616,15 +1729,26 @@ function renderField(def, row) {
             <small class="field-hint">Drag and drop or browse. Preview updates immediately.</small>
         </label>`;
     }
-    if (["select", "selectCategory", "reply", "lead", "role", "userStatus", "priority", "applicationStatus", "paymentStatus", "mediaType"].includes(type)) return selectField(name, type, value, labelHtml, pairClass);
+    if (["select", "selectCategory", "reply", "lead", "role", "userStatus", "priority", "applicationStatus", "paymentStatus", "mediaType", "programType", "instituteType", "downloadCategory", "downloadType"].includes(type)) return selectField(name, type, value, labelHtml, pairClass);
     if (type === "boolean") return `<label class="field pair"><span class="editor-section">Publishing</span>${labelHtml}<select name="${name}"><option value="true" ${value !== false ? "selected" : ""}>Publish / Yes</option><option value="false" ${value === false ? "selected" : ""}>Hide / No</option></select></label>`;
     return `<label class="field${pairClass}">${labelHtml}<input name="${name}" type="${type === "number" ? "number" : type === "date" ? "date" : "text"}" value="${esc(value)}"></label>`;
 }
 
 function selectField(name, type, value, labelHtml = null, pairClass = " pair") {
-    const sets = { select: ["published", "draft", "scheduled", "archived", "hidden"], selectCategory: ["Campus", "Labs", "Sports", "Events", "Workshops", "Industrial Visits", "Functions"], reply: ["pending", "replied", "follow-up", "archived"], lead: ["new", "assigned", "read", "approved", "rejected", "closed"], role: ["super_admin", "admin", "editor", "staff"], userStatus: ["active", "inactive", "suspended"], priority: ["low", "normal", "high", "urgent"], applicationStatus: ["new", "under_review", "approved", "rejected", "waitlisted"], paymentStatus: ["pending", "paid", "failed", "refunded"], mediaType: ["image", "video", "pdf", "document", "other"] };
+    const instituteLabels = {
+        polytechnic: "Diploma (Polytechnic)",
+        engineering: "Degree (Engineering)",
+    };
+    const sets = { select: ["published", "draft", "scheduled", "archived", "hidden"], selectCategory: ["Campus", "Labs", "Sports", "Events", "Workshops", "Industrial Visits", "Functions"], reply: ["pending", "replied", "follow-up", "archived"], lead: ["new", "assigned", "read", "approved", "rejected", "closed"], role: ["super_admin", "admin", "editor", "staff"], userStatus: ["active", "inactive", "suspended"], priority: ["low", "normal", "high", "urgent"], applicationStatus: ["new", "under_review", "approved", "rejected", "waitlisted"], paymentStatus: ["pending", "paid", "failed", "refunded"], mediaType: ["image", "video", "pdf", "document", "other"], programType: ["diploma", "degree"], instituteType: ["polytechnic", "engineering"], downloadCategory: ["admission_forms", "circulars", "prospectus"], downloadType: ["pdf", "doc", "image"] };
     const lbl = labelHtml || `<span class="field-label">${label(name)}</span>`;
-    return `<label class="field${pairClass}">${lbl}<select name="${name}">${sets[type].map((o) => `<option value="${o}" ${String(value) === o ? "selected" : ""}>${o}</option>`).join("")}</select></label>`;
+    const options = sets[type] || [];
+    const optionHtml = options.map((o) => {
+        const labelText = (type === "instituteType" && currentModule?.key === "principal_message")
+            ? (instituteLabels[o] || o)
+            : o;
+        return `<option value="${o}" ${String(value) === o ? "selected" : ""}>${labelText}</option>`;
+    }).join("");
+    return `<label class="field${pairClass}">${lbl}<select name="${name}">${optionHtml}</select></label>`;
 }
 
 function bindRichTextTools() {
@@ -1728,8 +1852,15 @@ async function previewUpload(event) {
 
 async function saveRecord(event) {
     event.preventDefault();
+    event.stopImmediatePropagation();
+    if (saveInFlight) return;
     if (!(await requireWriteSession())) return;
+
     const form = event.target;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    saveInFlight = true;
+    if (submitBtn) submitBtn.disabled = true;
+
     const allowed = new Set(currentModule.fields.map((f) => f.split(":")[0]));
     const payload = {};
 
@@ -1756,11 +1887,16 @@ async function saveRecord(event) {
             } else if (type === "boolean") {
                 payload[name] = control.value === "true";
             } else if (type === "number") {
-                payload[name] = Number(control.value || 0);
+                const num = Number(control.value);
+                payload[name] = Number.isFinite(num) ? num : null;
+            } else if (type === "date") {
+                const raw = String(control.value || "").trim();
+                payload[name] = raw || null;
             } else if (type === "json") {
                 try { payload[name] = JSON.parse(control.value); } catch { payload[name] = control.value || ""; }
             } else if (type === "image" || type === "file") {
-                payload[name] = hidden?.value ?? "";
+                const val = hidden?.value ?? control?.value ?? "";
+                payload[name] = String(val).trim() || null;
             } else {
                 payload[name] = control.value ?? "";
             }
@@ -1770,7 +1906,18 @@ async function saveRecord(event) {
             if (!allowed.has(key)) delete payload[key];
         });
 
-        if (!editingRow?.id) {
+        if (currentModule.key === "principal_message" && payload.institute) {
+            const nextKey = principalInstituteKey({ institute: payload.institute });
+            const duplicate = rows.find((row) => {
+                if (editingRow?.id && String(row.id) === String(editingRow.id)) return false;
+                return principalInstituteKey(row) === nextKey;
+            });
+            if (duplicate) {
+                throw new Error(`A ${principalProgramLabel({ institute: payload.institute })} principal already exists. Edit that record instead of creating a duplicate.`);
+            }
+        }
+
+        if (!editingRow?.id || !isUuid(editingRow?.id)) {
             if (allowed.has("status") && (!payload.status || payload.status === "draft")) payload.status = "published";
             if (allowed.has("published") && payload.published !== false) payload.published = true;
             if (allowed.has("display_order") && !Number(payload.display_order)) {
@@ -1779,13 +1926,8 @@ async function saveRecord(event) {
             }
         }
 
-        let result;
-        if (editingRow?.id) {
-            result = await writeUpdate(currentModule.table, payload, { id: editingRow.id });
-        } else {
-            result = await writeInsert(currentModule.table, payload);
-        }
-        if (!result.ok) throw new Error(mapCrudReason(result.reason));
+        const result = await writeSave(currentModule.table, payload, editingRow);
+        if (!result.ok) throw new Error(crudErrorMessage(result));
 
         editorDirty = false;
         $("autosaveStatus").textContent = "Saved";
@@ -1800,6 +1942,9 @@ async function saveRecord(event) {
         const message = err?.message || `Could not save ${currentModule.label}.`;
         toast(message, true);
         $("autosaveStatus").textContent = "Save failed";
+    } finally {
+        saveInFlight = false;
+        if (submitBtn) submitBtn.disabled = false;
     }
 }
 
@@ -1831,7 +1976,7 @@ async function uploadFile(field, file, oldUrl) {
     const path = `${folder}/${crypto.randomUUID()}.${ext}`;
     const result = await adminStorageUpload(path, file, { upsert: false });
     if (!result.ok) {
-        throw new Error(result.error?.message || mapCrudReason(result.reason));
+        throw new Error(result.error?.message || crudErrorMessage(result));
     }
     const oldPath = storagePathFromPublicUrl(oldUrl);
     if (oldPath) {
@@ -1861,8 +2006,12 @@ async function togglePublished(id) {
     if (!(await requireWriteSession())) return;
     const row = rows.find((r) => String(r.id) === String(id));
     if (!row) return;
-    const result = await writeUpdate(currentModule.table, { published: !row.published, status: !row.published ? "published" : "hidden" }, { id });
-    if (!result.ok) return toast(mapCrudReason(result.reason), true);
+    const result = await writeSave(currentModule.table, {
+        ...row,
+        published: !row.published,
+        status: !row.published ? "published" : "hidden",
+    }, row);
+    if (!result.ok) return toast(crudErrorMessage(result), true);
     clearCmsQueryCache();
     toast(!row.published ? "Published." : "Unpublished.", false, "success");
     await loadModule();
@@ -1875,7 +2024,7 @@ async function deleteRecord(id) {
     try {
         for (const key of Object.keys(row || {})) if (key.endsWith("_url")) await deleteOldStorageObject(row[key]);
         const result = await writeDelete(currentModule.table, { id });
-        if (!result.ok) throw new Error(mapCrudReason(result.reason));
+        if (!result.ok) throw new Error(crudErrorMessage(result));
         clearCmsQueryCache();
         toast("Deleted successfully.", false, "success");
         rows = rows.filter((r) => String(r.id) !== String(id));
@@ -1911,7 +2060,23 @@ function showSkeleton(id, count) { $(id).innerHTML = Array.from({ length: count 
 function skeletonTable() { return `<div class="skeleton table-skeleton"></div><div class="skeleton table-skeleton"></div><div class="skeleton table-skeleton"></div>`; }
 function defaultValue(name, type) { if (type === "select") return "published"; if (type === "boolean") return true; if (type === "number") return 0; if (type === "date") return new Date().toISOString().slice(0, 10); if (type === "color") return "#005b5b"; return ""; }
 function formatDate(value) { return value ? new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "-"; }
-function label(key) { return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()); }
+function label(key) {
+    if (currentModule?.key === "principal_message") {
+        const map = {
+            photo_url: "Principal Photo",
+            name: "Principal Name",
+            qualification: "Qualification",
+            designation: "Designation",
+            institute: "Program / Institute",
+            message: "Principal Message",
+            published: "Published",
+            display_order: "Display Order",
+            status: "Status",
+        };
+        if (map[key]) return map[key];
+    }
+    return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 function esc(value) { const div = document.createElement("div"); div.textContent = value ?? ""; return div.innerHTML; }
 function toast(message, error = false, tone = "") {
     const region = $("toastRegion") || document.body;
@@ -1945,6 +2110,7 @@ function previewRecord(id) {
         facilities: "../index.html#facilities",
         placements: "../index.html#placements",
         gallery: "../index.html#gallery",
+        downloads: "../index.html#student-resources",
         settings: "../index.html",
         footer_blocks: "../index.html",
         ai_knowledge_base: "../index.html",
@@ -1962,12 +2128,18 @@ async function reorderRecord(id, direction) {
     if (index < 0 || target < 0 || target >= sorted.length) return;
     const current = sorted[index];
     const swap = sorted[target];
+    const currentId = current.id;
+    const swapId = swap.id;
+    if (!isUuid(currentId) || !isUuid(swapId)) {
+        toast("Records must exist in the database before reordering.", true);
+        return;
+    }
     const currentOrder = Number(current.display_order ?? index);
     const swapOrder = Number(swap.display_order ?? target);
     try {
         await Promise.all([
-            writeUpdate(currentModule.table, { display_order: swapOrder }, { id: current.id }),
-            writeUpdate(currentModule.table, { display_order: currentOrder }, { id: swap.id }),
+            writeUpdate(currentModule.table, { display_order: swapOrder }, { id: currentId }),
+            writeUpdate(currentModule.table, { display_order: currentOrder }, { id: swapId }),
         ]);
         toast("Order updated.");
         await loadModule();
@@ -1990,7 +2162,7 @@ async function duplicateRecord(id) {
     copy.status = "draft";
     try {
         const result = await writeInsert(currentModule.table, copy);
-        if (!result.ok) throw new Error(mapCrudReason(result.reason));
+        if (!result.ok) throw new Error(crudErrorMessage(result));
         toast("Record duplicated.");
         await loadModule();
     } catch (err) {
@@ -2005,7 +2177,7 @@ async function bulkPublish() {
     if (!targets.length) return toast("No draft records in selection.", true);
     if (!(await confirmAction("Publish selected?", `Publish ${targets.length} record(s)?`))) return;
     try {
-        await Promise.all(targets.map((r) => writeUpdate(currentModule.table, { published: true, status: "published" }, { id: r.id })));
+        await Promise.all(targets.map((r) => writeSave(currentModule.table, { ...r, published: true, status: "published" }, r)));
         clearCmsQueryCache();
         toast(`${targets.length} record(s) published.`, false, "success");
         clearSelection();
@@ -2023,7 +2195,7 @@ async function bulkUnpublish() {
     if (!targets.length) return toast("No published records in selection.", true);
     if (!(await confirmAction("Unpublish selected?", `Unpublish ${targets.length} record(s)?`))) return;
     try {
-        await Promise.all(targets.map((r) => writeUpdate(currentModule.table, { published: false, status: "hidden" }, { id: r.id })));
+        await Promise.all(targets.map((r) => writeSave(currentModule.table, { ...r, published: false, status: "hidden" }, r)));
         clearCmsQueryCache();
         toast(`${targets.length} record(s) unpublished.`, false, "success");
         clearSelection();
