@@ -39,6 +39,12 @@ export function parseInstituteEmails(settings = {}) {
     return rows;
 }
 
+export function formatLocaleStatValue(value) {
+    const num = Number(String(value ?? "").replace(/,/g, ""));
+    if (!Number.isFinite(num)) return String(value ?? "");
+    return num.toLocaleString("en-US");
+}
+
 export function getInstituteStats(settings = {}, fallbacks = {}) {
     return {
         departments: parseSettingValue(settings.stat_departments) || fallbacks.departments || "",
@@ -48,6 +54,7 @@ export function getInstituteStats(settings = {}, fallbacks = {}) {
             || parseSettingValue(settings.dte_code)
             || fallbacks.instituteCode
             || "",
+        students: parseSettingValue(settings.stat_students) || fallbacks.students || "1200",
     };
 }
 

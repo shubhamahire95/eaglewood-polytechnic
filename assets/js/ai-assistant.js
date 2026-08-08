@@ -158,6 +158,7 @@ async function loadKnowledgeBase() {
 }
 
 function renderHeaderButton() {
+    if (window.matchMedia("(max-width: 1080px)").matches) return;
     const nav = document.querySelector(".nav-links, nav ul, header nav");
     if (!nav || document.querySelector(".ask-ai-nav")) return;
     const button = document.createElement("button");

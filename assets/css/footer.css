@@ -345,6 +345,7 @@ a.mobile-apply {
 
   .epi-ft__inner {
     --epi-ft-max: min(1180px, calc(100% - 28px));
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
   }
 
   .epi-ft__main {
@@ -375,8 +376,10 @@ a.mobile-apply {
   }
 
   .epi-ft-wa {
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
+    left: max(14px, env(safe-area-inset-left));
+    bottom: max(16px, env(safe-area-inset-bottom));
   }
 
   .epi-ft-wa svg {

@@ -1106,6 +1106,7 @@ function renderModuleContext() {
                 <button type="button" class="btn-ghost" data-settings-key="stat_placements">Stat: Placements</button>
                 <button type="button" class="btn-ghost" data-settings-key="stat_faculty">Stat: Faculty</button>
                 <button type="button" class="btn-ghost" data-settings-key="stat_institute_code">Stat: Institute Code</button>
+                <button type="button" class="btn-ghost" data-settings-key="stat_students">Stat: Enrolled Students</button>
                 <button type="button" class="btn-ghost" data-settings-key="contact_phones">Contact Phones</button>
                 <button type="button" class="btn-ghost" data-settings-key="email_polytechnic">Polytechnic Email</button>
                 <button type="button" class="btn-ghost" data-settings-key="email_engineering">Engineering Email</button>

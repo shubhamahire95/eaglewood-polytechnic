@@ -48,6 +48,30 @@ body[data-home] .topbar {
     gap: 18px
 }
 
+.top-mobile-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    width: 100%;
+}
+
+.top-mobile-meta,
+.top-mobile-contact {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 16px;
+}
+
+.top-mobile-contact a {
+    white-space: nowrap;
+}
+
+.top-mobile-cta {
+    font-weight: 800;
+}
+
 .premium-topbar .top-left,
 .premium-topbar .top-right {
     display: flex;
@@ -69,31 +93,56 @@ body[data-home] .topbar {
     left: 0;
     right: 0;
     z-index: 115;
-    background: rgba(255, 255, 255, .08);
-    border-bottom: 1px solid rgba(255, 255, 255, .16);
-    backdrop-filter: blur(18px);
-    box-shadow: none
+    background: rgba(255, 255, 255, .96);
+    border-bottom: 1px solid rgba(15, 118, 110, .12);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 10px 34px rgba(15, 45, 55, .06)
+}
+
+@media (max-width: 1080px) {
+    .home-page .site-header {
+        position: sticky;
+        top: 0;
+    }
+
+    .premium-topbar {
+        position: relative;
+        inset: auto;
+    }
 }
 
 .home-page.header-scrolled .site-header {
     top: 0;
-    background: rgba(255, 255, 255, .92);
+    background: rgba(255, 255, 255, .98);
     border-color: rgba(15, 118, 110, .12);
     box-shadow: 0 16px 48px rgba(15, 45, 55, .08)
 }
 
-.home-page:not(.header-scrolled) .brand strong,
-.home-page:not(.header-scrolled) .brand small,
-.home-page:not(.header-scrolled) .nav-links:not(.open) a {
-    color: #fff
+.home-page:not(.header-scrolled) .brand strong {
+    color: var(--teal-3, #063f43)
+}
+
+.home-page:not(.header-scrolled) .brand small {
+    color: var(--muted, #607376)
 }
 
 .home-page:not(.header-scrolled) .brand em {
-    color: #ffe3a1
+    color: var(--orange-2, #c45c00)
+}
+
+.home-page:not(.header-scrolled) .nav-links:not(.open) a {
+    color: #1e293b
 }
 
 .home-page:not(.header-scrolled) .nav-toggle span {
-    background: #fff
+    background: var(--ink, #102426)
+}
+
+.home-page:not(.header-scrolled) .ask-ai-nav {
+    color: #fff !important;
+    border-color: rgba(15, 118, 110, .2) !important;
+    background: linear-gradient(135deg, #0f766e, #14b8a6) !important;
+    backdrop-filter: none
 }
 
 .home-page .navbar {
@@ -294,6 +343,7 @@ body[data-home] .topbar {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    object-position: center center;
     filter: saturate(1.08) contrast(1.04);
     transform: scale(1.06);
     transition: transform 7s ease
@@ -1213,17 +1263,19 @@ body[data-home] .topbar {
 }
 
 @media(max-width:760px) {
+    #top-bar,
     .premium-topbar {
-        display: none
+        display: none !important
     }
 
     .home-page .site-header {
+        position: sticky;
         top: 0
     }
 
     .premium-topbar .container,
     .eaglewood-home .container {
-        width: min(100% - 36px, 1400px)
+        width: min(100% - 28px, 1400px)
     }
 
     .premium-section,
@@ -1232,12 +1284,12 @@ body[data-home] .topbar {
     }
 
     .hero-copy {
-        width: calc(100% - 36px);
-        padding-top: 21vh
+        width: calc(100% - 32px);
+        padding-top: clamp(88px, 14vh, 112px)
     }
 
     .premium-slide h1 {
-        font-size: 46px
+        font-size: clamp(1.75rem, 7.5vw, 2.5rem)
     }
 
     .animated-subtitle {
@@ -1319,10 +1371,6 @@ body[data-home] .topbar {
         min-width: 0
     }
 
-    .brand span {
-        max-width: 210px
-    }
-
     .nav-apply {
         display: none
     }
@@ -1330,18 +1378,18 @@ body[data-home] .topbar {
 
 @media(max-width:520px) {
     .hero-float-grid {
-        position: relative;
+        position: static;
         left: auto;
         right: auto;
         bottom: auto;
         z-index: 5;
-        width: calc(100% - 36px);
-        margin: -180px auto 0
+        width: calc(100% - 32px);
+        margin: 16px auto 0
     }
 
     .premium-hero,
     .hero-slider-shell {
-        min-height: 880px
+        min-height: clamp(560px, 92svh, 720px)
     }
 
     .hero-actions .btn {
@@ -1823,11 +1871,32 @@ body[data-home] .socials {
 
     .premium-hero,
     .hero-slider-shell {
-        min-height: 820px !important;
+        min-height: clamp(560px, 90svh, 720px) !important;
+    }
+
+    .premium-slide {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+    }
+
+    .premium-slide img {
+        object-position: center 32%;
+        transform: none !important;
+    }
+
+    .premium-slide.active img {
+        transform: none !important;
+    }
+
+    .premium-slide:after {
+        background: linear-gradient(180deg, rgba(5, 22, 24, 0.55) 0%, rgba(5, 22, 24, 0.42) 38%, rgba(5, 22, 24, 0.72) 100%);
     }
 
     .hero-copy {
-        padding-top: 132px !important;
+        width: calc(100% - 32px) !important;
+        margin: 0 auto !important;
+        padding: clamp(20px, 5vh, 36px) 0 clamp(24px, 6vh, 40px) !important;
     }
 
     .premium-slide h1 {
@@ -1851,7 +1920,12 @@ body[data-home] .socials {
     }
 
     .hero-float-grid {
-        bottom: 86px !important;
+        position: static !important;
+        left: auto !important;
+        right: auto !important;
+        bottom: auto !important;
+        width: calc(100% - 32px) !important;
+        margin: 16px auto 8px !important;
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
         gap: 10px !important;
     }
@@ -1995,13 +2069,13 @@ body[data-home] .socials {
 
     .premium-hero,
     .hero-slider-shell {
-        min-height: 800px !important;
+        min-height: clamp(540px, 90svh, 700px) !important;
     }
 
     .hero-copy {
         width: calc(100% - 32px) !important;
         margin: 0 auto !important;
-        padding-top: 118px !important;
+        padding-top: clamp(80px, 12vh, 100px) !important;
     }
 
     .hero-badge {
@@ -2014,15 +2088,15 @@ body[data-home] .socials {
     }
 
     .hero-float-grid {
-        left: 16px !important;
-        right: 16px !important;
-        width: auto !important;
-        margin: 0 !important;
-        position: absolute !important;
+        position: static !important;
+        left: auto !important;
+        right: auto !important;
+        width: calc(100% - 32px) !important;
+        margin: 14px auto 8px !important;
     }
 
     .stats-premium-grid strong {
-        font-size: 34px !important;
+        font-size: clamp(1.5rem, 7vw, 2rem) !important;
     }
 
     .premium-course-grid,
@@ -2578,20 +2652,35 @@ body[data-home] .socials {
     position: relative;
     z-index: 3;
     overflow: hidden;
-    padding: 10px 58px 58px;
-    margin-inline: -10px
+    padding: 10px 48px 58px;
+    margin-inline: 0;
+    width: 100%;
+    max-width: 100%;
 }
 
 .gov-slider-track {
-    display: flex;
-    gap: 24px;
-    transition: transform .72s cubic-bezier(.22, 1, .36, 1);
-    will-change: transform
+    align-items: stretch;
+    box-sizing: border-box;
 }
 
 .gov-swiper .swiper-slide {
-    flex: 0 0 calc((100% - 48px)/3);
-    min-width: 0
+    height: auto;
+    min-width: 0;
+    box-sizing: border-box;
+    flex-shrink: 0;
+}
+
+.gov-swiper:not(.swiper-initialized) .swiper-wrapper {
+    display: block;
+}
+
+.gov-swiper:not(.swiper-initialized) .swiper-slide {
+    display: none;
+    width: 100%;
+}
+
+.gov-swiper:not(.swiper-initialized) .swiper-slide:first-child {
+    display: block;
 }
 
 .gov-slider-arrow {
@@ -2987,10 +3076,6 @@ body[data-home] .socials {
 }
 
 @media(max-width:1024px) {
-    .gov-swiper .swiper-slide {
-        flex-basis: calc((100% - 24px)/2)
-    }
-
     .gov-principal-grid {
         grid-template-columns: 1fr
     }
@@ -3004,10 +3089,6 @@ body[data-home] .socials {
     .gov-swiper {
         padding: 6px 0 54px;
         margin: 0
-    }
-
-    .gov-swiper .swiper-slide {
-        flex-basis: 100%
     }
 
     .gov-slider-arrow {
@@ -4519,7 +4600,14 @@ body[data-home] .socials {
 .gov-home .gov-dept-card,
 .gov-home .gov-course-card,
 .gov-home .facility-slide-card {
-    height: 100%
+    height: 100%;
+}
+
+.gov-swiper .gov-update-card,
+.gov-swiper .gov-notice-card {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
 }
 
 .gov-home .gov-course-body ul {
@@ -4660,7 +4748,7 @@ body[data-home] .socials {
 }
 
 .stats-premium-grid--four {
-    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
 }
 
 .gov-program-badge {

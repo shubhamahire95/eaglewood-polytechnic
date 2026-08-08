@@ -607,6 +607,64 @@
 .sitemap-grid ul { margin: 0; padding-left: 18px; }
 
 @media (max-width: 760px) {
-  .placement-story { grid-template-columns: 1fr; }
+  .principal-about-block {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .principal-about-block img {
+    max-width: min(260px, 72vw);
+    margin-inline: auto;
+  }
+
+  .contact-grid,
+  .contact-form-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .contact-item,
+  .contact-form-section .card {
+    min-width: 0;
+  }
+
+  .admission-heading {
+    display: grid;
+    gap: 14px;
+  }
+
+  .admission-heading-action .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .faculty-grid .card,
+  .gallery-grid .gallery-item {
+    min-width: 0;
+  }
+
+  .placement-story,
+  .fact-grid {
+    gap: 16px;
+  }
 }
 
+@media (max-width: 480px) {
+  .dept-support-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .highlight-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .field-block input,
+  .field-block select,
+  .field-block textarea,
+  .contact-form input,
+  .contact-form select,
+  .contact-form textarea {
+    width: 100%;
+    max-width: 100%;
+  }
+}

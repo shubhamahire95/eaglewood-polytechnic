@@ -345,21 +345,26 @@ function initNavigation() {
         document.body.classList.toggle("no-scroll", open && window.matchMedia("(max-width: 1080px)").matches);
     });
 
+    const closeMobileNav = () => {
+        navLinks?.classList.remove("open");
+        navToggle?.classList.remove("open");
+        navToggle?.setAttribute("aria-expanded", "false");
+        document.body.classList.remove("no-scroll");
+    };
+
     navLinks?.querySelectorAll("a").forEach((link) =>
-        link.addEventListener("click", () => {
-            navLinks.classList.remove("open");
-            navToggle?.classList.remove("open");
-            navToggle?.setAttribute("aria-expanded", "false");
-            document.body.classList.remove("no-scroll");
-        })
+        link.addEventListener("click", closeMobileNav)
     );
+
+    window.addEventListener("resize", () => {
+        if (window.innerWidth > 1080 && navLinks?.classList.contains("open")) {
+            closeMobileNav();
+        }
+    }, { passive: true });
 
     document.addEventListener("click", (event) => {
         if (navLinks?.classList.contains("open") && !event.target.closest(".navbar")) {
-            navLinks.classList.remove("open");
-            navToggle?.classList.remove("open");
-            navToggle?.setAttribute("aria-expanded", "false");
-            document.body.classList.remove("no-scroll");
+            closeMobileNav();
         }
     });
 
@@ -441,6 +446,11 @@ function initCounterAnimation() {
     const counters = document.querySelectorAll("[data-count]");
     if (!counters.length) return;
 
+    const formatCount = (value, el) => (
+        el.dataset.locale === "true"
+            ? Number(value).toLocaleString("en-US")
+            : String(value)
+    );
     const animateCounter = (el) => {
         const target = parseInt(el.dataset.count, 10);
         const suffix = el.dataset.suffix || "";
@@ -450,9 +460,10 @@ function initCounterAnimation() {
         const step = (now) => {
             const progress = Math.min((now - start) / duration, 1);
             const eased = 1 - Math.pow(1 - progress, 3);
-            el.textContent = Math.floor(target * eased) + suffix;
+            const value = Math.floor(target * eased);
+            el.textContent = formatCount(value, el) + suffix;
             if (progress < 1) requestAnimationFrame(step);
-            else el.textContent = target + suffix;
+            else el.textContent = formatCount(target, el) + suffix;
         };
 
         requestAnimationFrame(step);

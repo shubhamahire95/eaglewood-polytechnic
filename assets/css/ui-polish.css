@@ -122,16 +122,7 @@ img, video, iframe {
   }
 }
 
-/* Notices scrollable on small screens */
-@media (max-width: 640px) {
-  .gov-notices-carousel .gov-slider-track {
-    scroll-snap-type: x mandatory;
-  }
-
-  .gov-notice-card {
-    scroll-snap-align: start;
-  }
-}
+/* Notices — Swiper handles horizontal scroll on mobile */
 
 /* Contact / map */
 .contact-form-grid,

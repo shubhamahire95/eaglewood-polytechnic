@@ -16,6 +16,7 @@ import {
     parseSettingValue,
     parseSettingList,
     getInstituteStats,
+    formatLocaleStatValue,
     programTypeLabel,
     noticeFileMeta,
     instituteLabel,
@@ -277,23 +278,32 @@ function renderTopUtility(settings, cmsOnly = false) {
     const top = document.getElementById("top-bar");
     if (!top) return;
     const phones = parseContactPhones(settings);
-    const phone = phones[0] || parseSettingValue(settings.phone) || "";
     const emails = parseInstituteEmails(settings);
-    const email = emails[0]?.value || parseSettingValue(settings.email) || "";
     const approval = parseSettingValue(settings.approval) || "Approved by AICTE, DTE & Govt. of Maharashtra";
     const affiliation = parseSettingValue(settings.affiliation) || "Affiliated to MSBTE & DBATU";
     const dte = parseSettingValue(settings.dte_code) || "2634";
     const msbte = parseSettingValue(settings.msbte_code) || "51307";
-    if (cmsOnly && !phone && !email && !approval) {
+    if (cmsOnly && !phones.length && !emails.length && !approval) {
         top.remove();
         return;
     }
+    const phoneLinks = phones.map((p) => `<a href="${esc(telHref(p))}">${esc(p)}</a>`).join("");
+    const emailLinks = emails.map((e) => `<a href="mailto:${esc(e.value)}">${esc(e.value)}</a>`).join("");
     top.className = "top-bar premium-topbar";
-    top.innerHTML = `<div class="container top-inner"><div class="top-left"><span>${esc(approval)}</span><span>${esc(affiliation)}</span><span>DTE ${esc(dte)} | MSBTE ${esc(msbte)}</span></div><div class="top-right">${phone ? `<a href="tel:${esc(phone)}">${esc(phone)}</a>` : ""}${email ? `<a href="mailto:${esc(email)}">${esc(email)}</a>` : ""}<a href="contact.html">Contact Office</a></div></div>`;
+    top.innerHTML = `<div class="container top-inner"><div class="top-mobile-info"><div class="top-mobile-meta"><span>${esc(approval)}</span><span>${esc(affiliation)}</span><span>DTE ${esc(dte)} | MSBTE ${esc(msbte)}</span></div><div class="top-mobile-contact">${phoneLinks}${emailLinks}<a class="top-mobile-cta" href="contact.html">Contact Office</a></div></div></div>`;
 }
 
 function sectionHead(kicker, title, lead = "") {
     return `<div class="section-head-pro premium-reveal"><span>${kicker}</span><h2>${title}</h2>${lead ? `<p>${lead}</p>` : ""}</div>`;
+}
+
+function statDisplayMeta(value, { locale = false } = {}) {
+    const raw = String(value ?? "");
+    const count = raw.replace(/[^0-9]/g, "") || "0";
+    const suffix = raw.replace(/[0-9]/g, "") || "";
+    const display = locale ? formatLocaleStatValue(raw) : raw;
+    const localeAttr = locale ? ' data-locale="true"' : "";
+    return { count, suffix, display, localeAttr };
 }
 
 function hero(data) {
@@ -346,13 +356,17 @@ function statsBand(data) {
         instituteCode: parseSettingValue(data.settings?.dte_code) || "—",
     });
     const rows = [
-        [statsConfig.departments, "", "Departments"],
-        [statsConfig.placements, "", "Placements"],
-        [statsConfig.faculty, "", "Faculty Members"],
-        [statsConfig.instituteCode, "", "Institute Code"],
+        [statsConfig.departments, "", "Departments", false],
+        [statsConfig.placements, "", "Placements", false],
+        [statsConfig.faculty, "", "Faculty Members", false],
+        [statsConfig.instituteCode, "", "Institute Code", false],
+        [statsConfig.students, "", "Enrolled Students", true],
     ];
     if (data.cmsOnly && rows.every(([value]) => !value || value === "—")) return "";
-    return `<section class="stats-band" id="stats-band" aria-label="Institute statistics"><div class="container"><div class="stats-premium-grid stats-premium-grid--four premium-reveal">${rows.map(([value, suffix, label]) => `<div><strong data-count="${String(value).replace(/[^0-9]/g, "") || 0}" data-suffix="${String(value).replace(/[0-9]/g, "") || suffix}">${esc(String(value))}${esc(suffix)}</strong><span>${esc(label)}</span></div>`).join("")}</div></div></section>`;
+    return `<section class="stats-band" id="stats-band" aria-label="Institute statistics"><div class="container"><div class="stats-premium-grid stats-premium-grid--four premium-reveal">${rows.map(([value, suffix, label, locale]) => {
+        const meta = statDisplayMeta(value, { locale });
+        return `<div><strong data-count="${meta.count}" data-suffix="${esc(meta.suffix || suffix)}"${meta.localeAttr}>${esc(meta.display)}${esc(meta.suffix || suffix)}</strong><span>${esc(label)}</span></div>`;
+    }).join("")}</div></div></section>`;
 }
 
 function initHeroAiButton() {
@@ -372,20 +386,24 @@ function quickHighlights(data) {
         instituteCode: parseSettingValue(data.settings?.dte_code) || "",
     });
     const cards = [
-        ["departments", statsConfig.departments, "Departments"],
-        ["placement", statsConfig.placements, "Placements"],
-        ["faculty", statsConfig.faculty, "Faculty Members"],
-        ["code", statsConfig.instituteCode, "Institute Code"],
+        ["departments", statsConfig.departments, "Departments", false],
+        ["placement", statsConfig.placements, "Placements", false],
+        ["faculty", statsConfig.faculty, "Faculty Members", false],
+        ["code", statsConfig.instituteCode, "Institute Code", false],
+        ["students", statsConfig.students, "Enrolled Students", true],
     ].filter(([, value]) => value !== "" && value !== 0);
     if (data.cmsOnly && !cards.length) return "";
     return `<section class="gov-highlights premium-section white" id="highlights" aria-labelledby="highlights-title">
         <div class="container">
             ${sectionHead("Institute at a Glance", "Quick Highlights", "Key academic strengths, student support and campus infrastructure at Eaglewood Polytechnic Institute.")}
-            <div class="gov-highlight-grid premium-reveal">${cards.map(([icon, value, label]) => `<article class="gov-highlight-card glass-card">
+            <div class="gov-highlight-grid premium-reveal">${cards.map(([icon, value, label, locale]) => {
+                const meta = statDisplayMeta(value, { locale });
+                return `<article class="gov-highlight-card glass-card">
                 <span class="gov-highlight-icon">${HIGHLIGHT_ICONS[icon] || HIGHLIGHT_ICONS.lab}</span>
-                <strong class="gov-highlight-value" data-count="${String(value).replace(/[^0-9]/g, "") || 0}" data-suffix="${String(value).replace(/[0-9]/g, "")}">${esc(value)}</strong>
+                <strong class="gov-highlight-value" data-count="${meta.count}" data-suffix="${esc(meta.suffix)}"${meta.localeAttr}>${esc(meta.display)}${esc(meta.suffix)}</strong>
                 <span class="gov-highlight-label">${esc(label)}</span>
-            </article>`).join("")}</div>
+            </article>`;
+            }).join("")}</div>
         </div></section>`;
 }
 
@@ -500,17 +518,17 @@ function departments(items) {
 function updates(items) {
     if (!items?.length) return "";
     const images = ["assets/images/induction-programme.jpg", "assets/images/drone-workshop.jpg", "assets/images/industrial-visit-plant.jpg", "assets/images/annual-gathering.jpg", "assets/images/placement-guidance.jpg"];
-    return `<section class="premium-section blue updates-section gov-updates-section" id="latest-updates"><div class="container"><div class="section-split-head">${sectionHead("Latest Updates", "Recent campus events and academic highlights", "Official institute updates presented as a live academic news desk.")}<a class="section-view-all" href="index.html#latest-updates">View All</a></div><div class="swiper gov-swiper gov-updates-carousel premium-reveal" data-gov-slider data-autoplay="5000" data-loop="true"><button class="gov-slider-arrow prev" type="button" data-slider-prev aria-label="Previous update">&lt;</button><div class="swiper-wrapper gov-slider-track">${items.slice(0, 9).map((u, index) => `<article class="swiper-slide gov-update-card"><a class="gov-update-media" href="${esc(u.button_url || "index.html#latest-updates")}"><img loading="lazy" decoding="async" src="${esc(img(u.image_url || images[index % images.length]))}" alt="${esc(u.title)}"><span>${esc(u.category || u.icon || "Campus Update")}</span></a><div class="gov-update-body"><div class="gov-update-meta"><time>${date(u.date || u.created_at)}</time><span>${esc(u.category || "Update")}</span></div><h3>${esc(u.title)}</h3><p>${plain(u.description)}</p><div class="gov-update-actions"><a href="${esc(u.button_url || "index.html#latest-updates")}">${esc(u.button_label || "Read More")}</a></div></div></article>`).join("")}</div><button class="gov-slider-arrow next" type="button" data-slider-next aria-label="Next update">&gt;</button><div class="swiper-pagination gov-slider-dots" data-slider-dots></div></div></div></section>`;
+    return `<section class="premium-section blue updates-section gov-updates-section" id="latest-updates"><div class="container"><div class="section-split-head">${sectionHead("Latest Updates", "Recent campus events and academic highlights", "Official institute updates presented as a live academic news desk.")}<a class="section-view-all" href="index.html#latest-updates">View All</a></div><div class="swiper gov-swiper gov-updates-carousel premium-reveal" data-autoplay="5000"><div class="swiper-wrapper gov-slider-track">${items.slice(0, 9).map((u, index) => `<article class="swiper-slide gov-update-card"><a class="gov-update-media" href="${esc(u.button_url || "index.html#latest-updates")}"><img loading="lazy" decoding="async" src="${esc(img(u.image_url || images[index % images.length]))}" alt="${esc(u.title)}"><span>${esc(u.category || u.icon || "Campus Update")}</span></a><div class="gov-update-body"><div class="gov-update-meta"><time>${date(u.date || u.created_at)}</time><span>${esc(u.category || "Update")}</span></div><h3>${esc(u.title)}</h3><p>${plain(u.description)}</p><div class="gov-update-actions"><a href="${esc(u.button_url || "index.html#latest-updates")}">${esc(u.button_label || "Read More")}</a></div></div></article>`).join("")}</div><button class="gov-slider-arrow prev" type="button" data-slider-prev aria-label="Previous update">&lt;</button><button class="gov-slider-arrow next" type="button" data-slider-next aria-label="Next update">&gt;</button><div class="swiper-pagination gov-slider-dots" data-slider-dots></div></div></div></section>`;
 }
 function notices(items) {
     if (!items?.length) return "";
     const sorted = [...items].sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0));
-    return `<section class="premium-section white notices-section gov-notices-section" id="notice-board"><div class="container"><div class="section-split-head">${sectionHead("Important Notices", "Official notice board and downloads", "Pinned notices, deadlines and attachments remain easy to scan for students and parents.")}<a class="section-view-all" href="admission.html">Admission Info</a></div><div class="swiper gov-swiper gov-notices-carousel premium-reveal" data-gov-slider data-autoplay="5000" data-loop="true"><button class="gov-slider-arrow prev" type="button" data-slider-prev aria-label="Previous notice">&lt;</button><div class="swiper-wrapper gov-slider-track">${sorted.slice(0, 10).map((n, i) => {
+    return `<section class="premium-section white notices-section gov-notices-section" id="notice-board"><div class="container"><div class="section-split-head">${sectionHead("Important Notices", "Official notice board and downloads", "Pinned notices, deadlines and attachments remain easy to scan for students and parents.")}<a class="section-view-all" href="admission.html">Admission Info</a></div><div class="swiper gov-swiper gov-notices-carousel premium-reveal" data-autoplay="5000"><div class="swiper-wrapper gov-slider-track">${sorted.slice(0, 10).map((n, i) => {
         const file = n.attachment_url || n.pdf_url || n.file_url || "";
         const priority = n.priority || (n.important ? "Important" : "General");
         const fileMeta = noticeFileMeta(file, n.file_type);
         return `<article class="swiper-slide gov-notice-card ${i === 0 || n.important ? "is-pinned" : ""}"><div class="gov-notice-strip"></div><div class="gov-notice-head"><div class="gov-notice-badges">${i === 0 || n.important ? `<span class="pin">Pinned</span>` : ""}<span class="priority">${esc(priority)}</span>${n.is_new ? `<span class="new">New</span>` : ""}<span class="status">${esc(n.status || (n.published === false ? "Draft" : "Published"))}</span></div><time>${date(n.date || n.created_at)}</time></div><h3>${esc(n.title)}</h3><p>${plain(n.description)}</p><div class="gov-notice-foot"><span>${n.expiry_date ? `Valid till ${date(n.expiry_date)}` : "Official notice"}</span><span>Latest first</span></div><div class="gov-notice-actions">${file ? `<a class="download gov-download--${fileMeta.className}" href="${esc(file)}" target="_blank" rel="noopener noreferrer" download><b>${fileMeta.badge}</b> Download</a>` : ""}<a href="${esc(file ? file : "index.html#notice-board")}"${file ? ' target="_blank" rel="noopener noreferrer"' : ""}>${file ? `Open ${fileMeta.label}` : "View Notice"}</a></div></article>`;
-    }).join("")}</div><button class="gov-slider-arrow next" type="button" data-slider-next aria-label="Next notice">&gt;</button><div class="swiper-pagination gov-slider-dots" data-slider-dots></div></div>        </div></section>`;
+    }).join("")}</div><button class="gov-slider-arrow prev" type="button" data-slider-prev aria-label="Previous notice">&lt;</button><button class="gov-slider-arrow next" type="button" data-slider-next aria-label="Next notice">&gt;</button><div class="swiper-pagination gov-slider-dots" data-slider-dots></div></div></div></section>`;
 }
 
 function courses(items) {
@@ -818,6 +836,11 @@ function initLightbox() {
 function initHighlightCounters() {
     const counters = document.querySelectorAll("[data-count]");
     if (!counters.length) return;
+    const formatCount = (value, el) => (
+        el.dataset.locale === "true"
+            ? Number(value).toLocaleString("en-US")
+            : String(value)
+    );
     const animate = (el) => {
         const target = Number(el.dataset.count || 0);
         const suffix = el.dataset.suffix || "";
@@ -827,8 +850,9 @@ function initHighlightCounters() {
         const tick = (now) => {
             const progress = Math.min((now - start) / duration, 1);
             const value = Math.round(target * (1 - Math.pow(1 - progress, 3)));
-            el.textContent = `${value}${suffix}`;
+            el.textContent = `${formatCount(value, el)}${suffix}`;
             if (progress < 1) requestAnimationFrame(tick);
+            else el.textContent = `${formatCount(target, el)}${suffix}`;
         };
         requestAnimationFrame(tick);
     };
@@ -876,6 +900,7 @@ function bindPremiumInteractionsOnce() {
     const bindHeroParallax = () => {
         const hero = document.querySelector(".premium-hero");
         if (!hero || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        if (window.matchMedia("(max-width: 768px)").matches) return;
         if (hero.dataset.parallaxBound === "1") return;
         hero.dataset.parallaxBound = "1";
         window.addEventListener("scroll", () => {
@@ -937,46 +962,44 @@ function initDepartmentsSwiper() {
     }));
 }
 
-function initHomeCarousels() {
-    document.querySelectorAll("[data-gov-slider]").forEach((slider) => {
-        const track = slider.querySelector(".gov-slider-track");
-        const slides = [...slider.querySelectorAll(".swiper-slide")];
-        const prev = slider.querySelector("[data-slider-prev]");
-        const next = slider.querySelector("[data-slider-next]");
-        const dots = slider.querySelector("[data-slider-dots]");
-        if (!track || !slides.length) return;
-        slider.classList.toggle("is-single", slides.length === 1);
-        let index = 0;
-        let timer;
-        let startX = 0;
-        const perView = () => window.matchMedia("(max-width: 640px)").matches ? 1 : window.matchMedia("(max-width: 1024px)").matches ? 2 : 3;
-        const maxIndex = () => Math.max(0, slides.length - perView());
-        const renderDots = () => { if (!dots) return; dots.innerHTML = Array.from({ length: maxIndex() + 1 }, (_, i) => `<button type="button" class="${i === index ? "active" : ""}" data-slide-dot="${i}" aria-label="Go to slide ${i + 1}"></button>`).join(""); };
-        const update = (nextIndex = index) => {
-            index = maxIndex() ? (nextIndex < 0 ? maxIndex() : nextIndex > maxIndex() ? 0 : nextIndex) : 0;
-            const gap = parseFloat(getComputedStyle(track).gap || "24") || 24;
-            const width = slides[0].getBoundingClientRect().width + gap;
-            track.style.transform = `translate3d(${-index * width}px,0,0)`;
-            renderDots();
-        };
-        const stop = () => { if (timer) clearInterval(timer); };
-        const play = () => { stop(); const ms = Number(slider.dataset.autoplay || 0); if (ms && slides.length > perView()) timer = setInterval(() => update(index + 1), ms); };
-        prev?.addEventListener("click", () => { update(index - 1); play(); });
-        next?.addEventListener("click", () => { update(index + 1); play(); });
-        dots?.addEventListener("click", (event) => { const dot = event.target.closest("[data-slide-dot]"); if (!dot) return; update(Number(dot.dataset.slideDot)); play(); });
-        slider.addEventListener("pointerdown", (event) => { startX = event.clientX; stop(); }, { passive: true });
-        slider.addEventListener("pointerup", (event) => { const dx = event.clientX - startX; if (Math.abs(dx) > 45) update(index + (dx < 0 ? 1 : -1)); play(); }, { passive: true });
-        slider.addEventListener("keydown", (event) => {
-            if (event.key === "ArrowLeft") { event.preventDefault(); update(index - 1); play(); }
-            if (event.key === "ArrowRight") { event.preventDefault(); update(index + 1); play(); }
-        });
-        slider.setAttribute("tabindex", "0");
-        slider.addEventListener("mouseenter", stop);
-        slider.addEventListener("mouseleave", play);
-        window.addEventListener("resize", () => update(index), { passive: true });
-        update(0);
-        play();
+function initGovCarousel(selector) {
+    const govBreakpoints = {
+        0: { slidesPerView: 1, slidesPerGroup: 1, spaceBetween: 18 },
+        768: { slidesPerView: 2, slidesPerGroup: 1, spaceBetween: 20 },
+        1200: { slidesPerView: 3, slidesPerGroup: 1, spaceBetween: 24 },
+    };
+    document.querySelectorAll(selector).forEach((el) => {
+        const slides = el.querySelectorAll(".swiper-slide");
+        el.classList.toggle("is-single", slides.length <= 1);
+        if (!slides.length) return;
+        destroySwiper(el);
+        const autoplayMs = Number(el.dataset.autoplay || 5000);
+        bootResponsiveSwiper(el, () => ({
+            slidesPerView: 1,
+            slidesPerGroup: 1,
+            spaceBetween: 18,
+            speed: 650,
+            grabCursor: true,
+            watchOverflow: true,
+            loop: false,
+            centeredSlides: false,
+            autoHeight: false,
+            autoplay: slides.length > 1 ? { delay: autoplayMs, disableOnInteraction: false, pauseOnMouseEnter: true } : false,
+            keyboard: { enabled: true, onlyInViewport: true },
+            a11y: { enabled: true },
+            pagination: { el: el.querySelector(".gov-slider-dots"), clickable: true },
+            navigation: {
+                nextEl: el.querySelector("[data-slider-next]"),
+                prevEl: el.querySelector("[data-slider-prev]"),
+            },
+            breakpoints: govBreakpoints,
+        }));
     });
+}
+
+function initHomeCarousels() {
+    initGovCarousel(".gov-updates-carousel");
+    initGovCarousel(".gov-notices-carousel");
 }
 
 function initFacilitiesSwiper() {
