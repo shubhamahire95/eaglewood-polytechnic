@@ -3,6 +3,7 @@
  * Home renders from the production Supabase CMS; other pages keep shared chrome behavior.
  */
 
+import "./ga4.js";
 import { dismissPageLoader, preloadSiteLogo } from "./page-loader.js";
 import { applyStorageImageMapToDom } from "./media-url.js";
 import { installGlobalErrorHandlers } from "./errors.js";
