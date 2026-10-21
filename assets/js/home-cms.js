@@ -104,7 +104,6 @@ async function renderCmsHomeInner() {
     initLightbox();
     initPremiumReveal();
     bindPremiumInteractionsOnce();
-    initHighlightCounters();
     initHomeGalleryFilters();
     initHomeCarousels();
     initFacilitiesSwiper();
@@ -299,11 +298,13 @@ function sectionHead(kicker, title, lead = "") {
 
 function statDisplayMeta(value, { locale = false } = {}) {
     const raw = String(value ?? "");
-    const count = raw.replace(/[^0-9]/g, "") || "0";
-    const suffix = raw.replace(/[0-9]/g, "") || "";
+    const match = raw.match(/[+-]?\d[\d,]*(?:\.\d+)?/);
+    const count = match ? match[0].replace(/,/g, "") : "0";
+    const prefix = match ? raw.slice(0, match.index) : "";
+    const suffix = match ? raw.slice(match.index + match[0].length) : "";
     const display = locale ? formatLocaleStatValue(raw) : raw;
     const localeAttr = locale ? ' data-locale="true"' : "";
-    return { count, suffix, display, localeAttr };
+    return { count, prefix, suffix, display, localeAttr };
 }
 
 function hero(data) {
@@ -339,7 +340,10 @@ function hero(data) {
                 </div>
             </div>
         </article>`).join("")}
-        <div class="hero-float-grid hero-float-grid--duo premium-reveal" aria-hidden="true">${stats.length ? stats.map(([value, suffix, label]) => `<div class="hero-float-card hero-float-card--duo"><strong data-count="${String(value).replace(/[^0-9]/g, "") || 0}" data-suffix="${String(value).replace(/[0-9]/g, "") || suffix}">${esc(String(value))}${esc(suffix)}</strong><span>${esc(label)}</span></div>`).join("") : ""}</div>
+        <div class="hero-float-grid hero-float-grid--duo premium-reveal">${stats.length ? stats.map(([value, suffix, label]) => {
+            const meta = statDisplayMeta(value);
+            return `<div class="hero-float-card hero-float-card--duo"><strong data-count="${meta.count}" data-prefix="${esc(meta.prefix)}" data-suffix="${esc(meta.suffix || suffix)}">${esc(meta.display)}</strong><span>${esc(label)}</span></div>`;
+        }).join("") : ""}</div>
         <button class="slide-nav prev" data-prev type="button" aria-label="Previous slide">‹</button>
         <button class="slide-nav next" data-next type="button" aria-label="Next slide">›</button>
         <div class="slide-dots">${items.map((_, i) => `<button class="${i === 0 ? "active" : ""}" data-dot="${i}" type="button" aria-label="Show slide ${i + 1}"></button>`).join("")}</div>
@@ -365,7 +369,7 @@ function statsBand(data) {
     if (data.cmsOnly && rows.every(([value]) => !value || value === "—")) return "";
     return `<section class="stats-band" id="stats-band" aria-label="Institute statistics"><div class="container"><div class="stats-premium-grid stats-premium-grid--four premium-reveal">${rows.map(([value, suffix, label, locale]) => {
         const meta = statDisplayMeta(value, { locale });
-        return `<div><strong data-count="${meta.count}" data-suffix="${esc(meta.suffix || suffix)}"${meta.localeAttr}>${esc(meta.display)}${esc(meta.suffix || suffix)}</strong><span>${esc(label)}</span></div>`;
+        return `<div><strong data-count="${meta.count}" data-prefix="${esc(meta.prefix)}" data-suffix="${esc(meta.suffix || suffix)}"${meta.localeAttr}>${esc(meta.display)}</strong><span>${esc(label)}</span></div>`;
     }).join("")}</div></div></section>`;
 }
 
@@ -400,7 +404,7 @@ function quickHighlights(data) {
                 const meta = statDisplayMeta(value, { locale });
                 return `<article class="gov-highlight-card glass-card">
                 <span class="gov-highlight-icon">${HIGHLIGHT_ICONS[icon] || HIGHLIGHT_ICONS.lab}</span>
-                <strong class="gov-highlight-value" data-count="${meta.count}" data-suffix="${esc(meta.suffix)}"${meta.localeAttr}>${esc(meta.display)}${esc(meta.suffix)}</strong>
+                <strong class="gov-highlight-value" data-count="${meta.count}" data-prefix="${esc(meta.prefix)}" data-suffix="${esc(meta.suffix)}"${meta.localeAttr}>${esc(meta.display)}</strong>
                 <span class="gov-highlight-label">${esc(label)}</span>
             </article>`;
             }).join("")}</div>
@@ -607,6 +611,9 @@ function placements(items) {
     const highest = top.highest_package || "₹6 LPA";
     const average = top.average_package || "₹3.2 LPA";
     const placed = top.placed_students || 120;
+    const highestMeta = statDisplayMeta(highest);
+    const averageMeta = statDisplayMeta(average);
+    const placedMeta = statDisplayMeta(placed);
     const recruiters = [top.recruiter, top.company_logo_url, top.student_name].filter(Boolean);
     const recruiterLabels = recruiters.length ? recruiters : [];
     const testimonials = items.filter((p) => p.testimonial).slice(0, 2);
@@ -618,9 +625,9 @@ function placements(items) {
             ${sectionHead("Training & Placement", "Placement Highlights", "Career readiness through aptitude training, technical skills and industry interaction.")}
             <div class="gov-placement-grid premium-reveal">
                 <div class="gov-placement-stats">
-                    <article class="glass-card"><span>Highest Package</span><strong data-count="${String(highest).replace(/[^0-9.]/g, "") || 6}" data-suffix=" LPA">${esc(highest)}</strong></article>
-                    <article class="glass-card"><span>Average Package</span><strong data-count="${String(average).replace(/[^0-9.]/g, "") || 3}" data-suffix=" LPA">${esc(average)}</strong></article>
-                    <article class="glass-card"><span>Students Trained</span><strong data-count="${placed}">${placed}+</strong></article>
+                    <article class="glass-card"><span>Highest Package</span><strong data-count="${highestMeta.count}" data-prefix="${esc(highestMeta.prefix)}" data-suffix="${esc(highestMeta.suffix)}">${esc(highestMeta.display)}</strong></article>
+                    <article class="glass-card"><span>Average Package</span><strong data-count="${averageMeta.count}" data-prefix="${esc(averageMeta.prefix)}" data-suffix="${esc(averageMeta.suffix)}">${esc(averageMeta.display)}</strong></article>
+                    <article class="glass-card"><span>Students Trained</span><strong data-count="${placedMeta.count}" data-prefix="${esc(placedMeta.prefix)}" data-suffix="${esc(placedMeta.suffix || "+")}">${esc(placedMeta.display)}</strong></article>
                     <article class="glass-card"><span>Placement Guidance</span><strong data-count="100" data-suffix="%">100%</strong></article>
                 </div>
                 <div class="gov-placement-visual"><img loading="lazy" decoding="async" src="${esc(placementImage)}" alt="Placement activity at Eaglewood Polytechnic"></div>
@@ -709,24 +716,25 @@ function achievements(data, cmsOnly = false) {
 function campusHighlights(data, cmsOnly = false) {
     const galleryItems = data.gallery || [];
     const images = galleryItems.slice(0, 3).map((g) => g.image_url).filter(Boolean);
-    if (cmsOnly && !images.length && !data.campusFacts?.length && !parseSettingValue(data.settings?.about_summary)) return "";
+    const facts = data.campusFacts || [];
+    const summary = plain(parseSettingValue(data.settings?.about_summary) || "");
+    const hasCampusDetails = facts.length > 0 || Boolean(summary);
+    if (cmsOnly && !images.length && !hasCampusDetails) return "";
     const displayImages = images.length
         ? images
         : (cmsOnly ? [] : ["assets/images/campus.jpg", "assets/images/annual-gathering.jpg", "assets/images/workshop.jpg"]);
     const videoUrl = parseSettingValue(data.settings?.campus_video_url) || "";
-    const facts = data.campusFacts || [];
     return `<section class="premium-section gray gov-campus-section" id="campus-highlights">
         <div class="container">
             ${sectionHead("Campus", "Campus Highlights", "Explore our disciplined campus environment, modern infrastructure and vibrant student life.")}
-            <div class="gov-campus-grid premium-reveal">
+            <div class="gov-campus-grid ${hasCampusDetails ? "" : "gov-campus-grid--media-led"} premium-reveal">
                 <div class="gov-campus-media">
                     <div class="gov-campus-images">${displayImages.map((src, i) => `<img loading="lazy" decoding="async" src="${esc(img(src))}" alt="Campus view ${i + 1}" class="${i === 0 ? "primary" : ""}">`).join("")}</div>
                     ${videoUrl ? `<a class="gov-campus-video glass-card" href="${esc(videoUrl)}" target="_blank" rel="noopener noreferrer"><span>▶</span><strong>Campus Video Tour</strong><small>Watch on YouTube</small></a>` : `<div class="gov-campus-video glass-card is-static"><span>🏫</span><strong>Visit Our Campus</strong><small>Majalgaon, District Beed</small></div>`}
                 </div>
-                <div class="gov-campus-facts glass-card">
-                    <h3>Quick Facts</h3>
-                    <ul>${facts.map((f) => `<li><span>${esc(f.label)}</span><strong>${esc(f.value)}</strong></li>`).join("")}</ul>
-                    <p>${plain(parseSettingValue(data.settings?.about_summary) || "")}</p>
+                <div class="gov-campus-facts glass-card ${hasCampusDetails ? "" : "gov-campus-facts--link-only"}">
+                    ${facts.length ? `<h3>Quick Facts</h3><ul>${facts.map((f) => `<li><span>${esc(f.label)}</span><strong>${esc(f.value)}</strong></li>`).join("")}</ul>` : ""}
+                    ${summary ? `<p>${summary}</p>` : ""}
                     <a class="btn btn-primary btn-ripple" href="infrastructure.html">Explore Infrastructure</a>
                 </div>
             </div>
@@ -779,7 +787,7 @@ function inquirySection(data) {
                 <form id="home-inquiry-form" class="premium-form form-glass glass-card" novalidate>
                     <h3>Quick Inquiry Form</h3>
                     <label><span class="sr-only">Name</span><input name="name" type="text" placeholder="Your Name" autocomplete="name" required></label>
-                    <label><span class="sr-only">Phone</span><input name="phone" type="tel" placeholder="Phone Number" autocomplete="tel" required></label>
+                    <label><span class="sr-only">Phone</span><input name="phone" type="tel" inputmode="tel" placeholder="Phone Number" autocomplete="tel" required></label>
                     <label><span class="sr-only">Email</span><input name="email" type="email" placeholder="Email (optional)" autocomplete="email"></label>
                     <label><span class="sr-only">Course</span><select name="course"><option value="">Select Course</option>${courseOptions.map((c) => `<option value="${esc(c.title)}">${esc(c.title)}</option>`).join("")}</select></label>
                     <label class="full"><span class="sr-only">Message</span><textarea name="message" placeholder="Your question about admission, courses or campus" required></textarea></label>
@@ -831,39 +839,6 @@ function initLightbox() {
         overlay.addEventListener("click", () => overlay.remove());
         document.body.appendChild(overlay);
     }));
-}
-
-function initHighlightCounters() {
-    const counters = document.querySelectorAll("[data-count]");
-    if (!counters.length) return;
-    const formatCount = (value, el) => (
-        el.dataset.locale === "true"
-            ? Number(value).toLocaleString("en-US")
-            : String(value)
-    );
-    const animate = (el) => {
-        const target = Number(el.dataset.count || 0);
-        const suffix = el.dataset.suffix || "";
-        if (!target) return;
-        const duration = 1200;
-        const start = performance.now();
-        const tick = (now) => {
-            const progress = Math.min((now - start) / duration, 1);
-            const value = Math.round(target * (1 - Math.pow(1 - progress, 3)));
-            el.textContent = `${formatCount(value, el)}${suffix}`;
-            if (progress < 1) requestAnimationFrame(tick);
-            else el.textContent = `${formatCount(target, el)}${suffix}`;
-        };
-        requestAnimationFrame(tick);
-    };
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach((entry) => {
-            if (!entry.isIntersecting) return;
-            animate(entry.target);
-            observer.unobserve(entry.target);
-        });
-    }, { threshold: 0.35 });
-    counters.forEach((el) => observer.observe(el));
 }
 
 function initPremiumReveal() {

@@ -8,6 +8,8 @@ import { debounce, throttle } from "./utils.js";
 import { safeFetch, ensureCmsReady, isCmsAvailable, isCmsStrictMode } from "./supabase.js";
 import { getSiteLogoUrl } from "./page-loader.js";
 
+const NAV_COLLAPSE_WIDTH = 1400;
+
 const FOOTER_DEFAULTS = {
     institute_name: "Eaglewood Polytechnic Institute",
     footer_tagline: "AICTE Approved • MSBTE Affiliated",
@@ -344,7 +346,7 @@ function initNavigation() {
         const open = navLinks.classList.toggle("open");
         navToggle.classList.toggle("open", open);
         navToggle.setAttribute("aria-expanded", String(open));
-        document.body.classList.toggle("no-scroll", open && window.matchMedia("(max-width: 1080px)").matches);
+        document.body.classList.toggle("no-scroll", open && window.matchMedia(`(max-width: ${NAV_COLLAPSE_WIDTH}px)`).matches);
     });
 
     const closeMobileNav = () => {
@@ -359,7 +361,7 @@ function initNavigation() {
     );
 
     window.addEventListener("resize", () => {
-        if (window.innerWidth > 1080 && navLinks?.classList.contains("open")) {
+        if (window.innerWidth > NAV_COLLAPSE_WIDTH && navLinks?.classList.contains("open")) {
             closeMobileNav();
         }
     }, { passive: true });
@@ -448,24 +450,32 @@ function initCounterAnimation() {
     const counters = document.querySelectorAll("[data-count]");
     if (!counters.length) return;
 
-    const formatCount = (value, el) => (
-        el.dataset.locale === "true"
-            ? Number(value).toLocaleString("en-US")
-            : String(value)
-    );
+    const formatCount = (value, el) => {
+        const precision = (String(el.dataset.count || "0").split(".")[1] || "").length;
+        const normalized = Number(Number(value).toFixed(precision));
+        const formatted = el.dataset.locale === "true"
+            ? normalized.toLocaleString("en-US", {
+                minimumFractionDigits: precision,
+                maximumFractionDigits: precision,
+            })
+            : precision
+                ? normalized.toFixed(precision)
+                : String(Math.floor(normalized));
+        return `${el.dataset.prefix || ""}${formatted}${el.dataset.suffix || ""}`;
+    };
     const animateCounter = (el) => {
-        const target = parseInt(el.dataset.count, 10);
-        const suffix = el.dataset.suffix || "";
+        const target = Number(el.dataset.count);
+        if (!Number.isFinite(target)) return;
         const duration = CONFIG.animation.counterDuration;
         const start = performance.now();
 
         const step = (now) => {
             const progress = Math.min((now - start) / duration, 1);
             const eased = 1 - Math.pow(1 - progress, 3);
-            const value = Math.floor(target * eased);
-            el.textContent = formatCount(value, el) + suffix;
+            const value = target * eased;
+            el.textContent = formatCount(value, el);
             if (progress < 1) requestAnimationFrame(step);
-            else el.textContent = formatCount(target, el) + suffix;
+            else el.textContent = formatCount(target, el);
         };
 
         requestAnimationFrame(step);

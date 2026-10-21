@@ -4931,3 +4931,96 @@ body[data-home] .socials {
     font-weight: 700;
     letter-spacing: .03em;
 }
+.gov-campus-grid--media-led {
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 0.46fr);
+    align-items: center;
+}
+
+.gov-campus-facts--link-only {
+    align-content: center;
+    min-height: 0;
+    padding: 24px;
+}
+
+.gov-campus-images:has(img:only-child) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(260px, 1fr);
+}
+
+.gov-campus-images:has(img:only-child) img {
+    grid-row: auto;
+}
+
+.gov-campus-images:has(img:nth-child(2):last-child) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: minmax(260px, 1fr);
+}
+
+.gov-campus-images:has(img:nth-child(2):last-child) img.primary {
+    grid-row: auto;
+}
+
+.stats-premium-grid strong,
+.gov-highlight-value,
+.hero-float-card strong,
+.gov-placement-stats strong {
+    font-variant-numeric: tabular-nums;
+}
+
+.premium-form input:focus-visible,
+.premium-form select:focus-visible,
+.premium-form textarea:focus-visible,
+.premium-form button:focus-visible {
+    outline: 3px solid rgba(15, 118, 110, 0.28);
+    outline-offset: 2px;
+}
+
+.premium-form button[data-loading="true"] {
+    position: relative;
+    cursor: progress;
+}
+
+.premium-form button[data-loading="true"]::before {
+    content: "";
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    margin-right: 9px;
+    vertical-align: -2px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: inquiry-spin 0.7s linear infinite;
+}
+
+.premium-form button:disabled {
+    opacity: 0.78;
+    cursor: not-allowed;
+}
+
+@keyframes inquiry-spin {
+    to { transform: rotate(360deg); }
+}
+
+@media (max-width: 1024px) {
+    .gov-campus-grid--media-led {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .gov-campus-facts--link-only {
+        padding: 20px;
+    }
+
+    .gov-campus-images:has(img:nth-child(2):last-child) {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: repeat(2, minmax(180px, 1fr));
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .premium-form button[data-loading="true"]::before {
+        animation-duration: 1.5s;
+    }
+}

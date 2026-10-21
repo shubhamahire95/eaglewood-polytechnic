@@ -341,6 +341,7 @@ function bindForm(id, table) {
     const form = document.getElementById(id);
     form?.addEventListener("submit", async (event) => {
         event.preventDefault();
+        if (form.dataset.submitting === "true") return;
 
         if (form.id === "admission-multistep-form") {
             const check = validateAdmissionForm(form, { focus: true });
@@ -359,9 +360,15 @@ function bindForm(id, table) {
 
         const status = form.querySelector(".form-status");
         const button = form.querySelector("button[type=\"submit\"]");
+        form.dataset.submitting = "true";
+        form.setAttribute("aria-busy", "true");
         status.textContent = "Submitting...";
         status.classList.remove("error", "success");
-        if (button) button.disabled = true;
+        if (button) {
+            button.disabled = true;
+            button.dataset.loading = "true";
+            button.setAttribute("aria-busy", "true");
+        }
 
         const payload = Object.fromEntries(new FormData(form).entries());
         if (table === "admissions") {
@@ -416,7 +423,13 @@ function bindForm(id, table) {
             status.classList.add("error");
             showFormToast(message, "error");
         } finally {
-            if (button) button.disabled = false;
+            form.dataset.submitting = "false";
+            form.removeAttribute("aria-busy");
+            if (button) {
+                button.disabled = false;
+                delete button.dataset.loading;
+                button.removeAttribute("aria-busy");
+            }
         }
     });
 }
