@@ -668,3 +668,650 @@
     max-width: 100%;
   }
 }
+
+/* Committee and alumni */
+.people-page {
+  background: linear-gradient(180deg, #fff 0, #f8fafc 52%, #fff 100%);
+}
+
+.people-title {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(70px, 8vw, 110px) 0 clamp(42px, 5vw, 62px);
+  background:
+    radial-gradient(circle at 12% 0, rgba(15, 118, 110, .10), transparent 26rem),
+    radial-gradient(circle at 88% 15%, rgba(212, 160, 23, .10), transparent 22rem),
+    linear-gradient(180deg, #ffffff 0%, #f4faf9 100%);
+  border-bottom: 1px solid rgba(226, 232, 240, .9);
+}
+
+.people-title .container {
+  max-width: 920px;
+}
+
+.people-title .breadcrumb {
+  width: fit-content;
+  margin: 0 0 18px;
+  padding: 8px 12px;
+  border: 1px solid rgba(15, 118, 110, .12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .82);
+  box-shadow: 0 10px 26px rgba(15, 23, 42, .05);
+}
+
+.people-title h1 {
+  max-width: 780px;
+  margin: 8px 0 0;
+  color: #0f172a;
+  font-size: clamp(34px, 5vw, 58px);
+  line-height: 1.04;
+  letter-spacing: 0;
+}
+
+.page-title-lead {
+  max-width: 720px;
+  margin: 18px 0 0;
+  color: #475569;
+  font-size: clamp(15px, 1.45vw, 18px);
+  line-height: 1.75;
+}
+
+.people-section {
+  padding-top: clamp(44px, 6vw, 76px);
+}
+
+.people-section-head {
+  max-width: 760px;
+  margin-bottom: clamp(24px, 4vw, 38px);
+}
+
+.people-section-head .section-title {
+  margin-top: 6px;
+}
+
+.committee-grid,
+.alumni-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr));
+  gap: clamp(18px, 2.4vw, 28px);
+  align-items: stretch;
+}
+
+.committee-card,
+.alumni-card {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 100%;
+  overflow: hidden;
+  background: rgba(255, 255, 255, .96);
+  border: 1px solid rgba(226, 232, 240, .95);
+  border-radius: 18px;
+  box-shadow: 0 16px 42px rgba(15, 23, 42, .07);
+  transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+}
+
+.committee-card:before,
+.alumni-card:before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, #0f766e, rgba(212, 160, 23, .76));
+  opacity: .88;
+}
+
+.committee-card:hover,
+.alumni-card:hover {
+  transform: translateY(-5px);
+  border-color: rgba(15, 118, 110, .24);
+  box-shadow: 0 24px 64px rgba(15, 45, 55, .13);
+}
+
+.committee-card--senior {
+  border-color: rgba(212, 160, 23, .36);
+  box-shadow: 0 18px 50px rgba(126, 91, 8, .10);
+}
+
+.committee-card--senior:after {
+  content: "Office Bearer";
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 2;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .92);
+  color: #8a6108;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, .10);
+}
+
+.committee-portrait,
+.alumni-portrait {
+  aspect-ratio: 4 / 3.25;
+  min-height: 210px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background:
+    linear-gradient(135deg, rgba(15, 118, 110, .92), rgba(7, 59, 59, .96)),
+    #0f766e;
+  color: #fff;
+  font-size: clamp(2.4rem, 5vw, 3.6rem);
+  font-weight: 900;
+}
+
+.committee-portrait img,
+.alumni-portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  filter: saturate(1.03) contrast(1.02);
+  transition: transform .45s ease, filter .45s ease;
+}
+
+.committee-card:hover img,
+.alumni-card:hover img {
+  transform: scale(1.045);
+  filter: saturate(1.08) contrast(1.04);
+}
+
+.committee-card__body,
+.alumni-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 22px 22px 24px;
+}
+
+.committee-role,
+.alumni-meta {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0;
+  color: #0f766e;
+  font-size: .74rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+  line-height: 1.45;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.alumni-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #ecfdf5;
+}
+
+.alumni-meta span {
+  color: #d4a017;
+}
+
+.committee-card h2,
+.alumni-card h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: clamp(1.12rem, 1.6vw, 1.3rem);
+  line-height: 1.25;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.committee-qualification,
+.alumni-title {
+  margin: 0;
+  color: #334155;
+  font-size: .94rem;
+  font-weight: 750;
+  line-height: 1.55;
+}
+
+.committee-card__body > p:last-child,
+.alumni-card__body > p:last-child {
+  margin: 0;
+  color: #64748b;
+  line-height: 1.68;
+  font-size: .93rem;
+}
+
+.alumni-card__body > p:last-child {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.alumni-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: end;
+  margin: 0 0 clamp(22px, 3vw, 34px);
+  padding: 16px;
+  border: 1px solid rgba(226, 232, 240, .95);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .9);
+  box-shadow: 0 14px 38px rgba(15, 23, 42, .06);
+}
+
+.alumni-toolbar label {
+  display: grid;
+  gap: 7px;
+  min-width: min(100%, 220px);
+  flex: 1 1 220px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.alumni-toolbar select {
+  width: 100%;
+  min-height: 46px;
+  padding: 11px 42px 11px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  background:
+    linear-gradient(45deg, transparent 50%, #0f766e 50%) calc(100% - 20px) 50% / 7px 7px no-repeat,
+    linear-gradient(135deg, #fff, #f8fafc);
+  color: #1e293b;
+  font: inherit;
+  font-weight: 750;
+  appearance: none;
+  outline: none;
+  transition: border-color .22s ease, box-shadow .22s ease, transform .22s ease;
+}
+
+.alumni-toolbar select:hover {
+  border-color: rgba(15, 118, 110, .42);
+}
+
+.alumni-toolbar select:focus-visible,
+.people-title .breadcrumb a:focus-visible {
+  outline: 3px solid rgba(15, 118, 110, .18);
+  outline-offset: 3px;
+}
+
+.alumni-toolbar select:focus-visible {
+  border-color: #0f766e;
+  box-shadow: 0 0 0 4px rgba(15, 118, 110, .10);
+  transform: translateY(-1px);
+}
+
+.people-page .empty-state {
+  grid-column: 1 / -1;
+  padding: clamp(28px, 5vw, 46px);
+  border: 1px dashed rgba(15, 118, 110, .24);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .82);
+  color: #64748b;
+  text-align: center;
+}
+
+@media (min-width: 980px) {
+  .committee-card--senior {
+    grid-template-columns: minmax(240px, .9fr) minmax(0, 1.1fr);
+    grid-template-rows: 1fr;
+  }
+
+  .committee-card--senior .committee-portrait {
+    aspect-ratio: auto;
+    min-height: 100%;
+  }
+}
+
+@media (max-width: 720px) {
+  .people-title {
+    padding-top: 54px;
+  }
+
+  .people-title .breadcrumb {
+    margin-bottom: 14px;
+  }
+
+  .committee-grid,
+  .alumni-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .committee-portrait,
+  .alumni-portrait {
+    min-height: 230px;
+  }
+
+  .alumni-toolbar {
+    padding: 14px;
+  }
+}
+
+@media (max-width: 420px) {
+  .people-title h1 {
+    font-size: 31px;
+  }
+
+  .committee-card__body,
+  .alumni-card__body {
+    padding: 19px 18px 21px;
+  }
+
+  .committee-portrait,
+  .alumni-portrait {
+    min-height: 205px;
+  }
+}
+
+/* Committee and alumni directory refinements. Keep these styles page-scoped
+   so shared navigation, footer, and other inner pages retain their design. */
+.people-page {
+  color: #23333a;
+  background: #fff;
+}
+
+.people-title {
+  padding: clamp(42px, 6vw, 76px) 0 clamp(36px, 4.5vw, 58px);
+  background: linear-gradient(180deg, #f3f8f7 0%, #fbfcfb 100%);
+  border-bottom-color: #e2eae8;
+}
+
+.people-title .container {
+  max-width: 1200px;
+}
+
+.people-title .breadcrumb {
+  box-shadow: none;
+  color: #64727a;
+}
+
+.people-title .breadcrumb a {
+  color: var(--teal, #005b5b);
+}
+
+.people-title .eyebrow,
+.people-section-head .eyebrow {
+  color: var(--teal, #005b5b);
+  letter-spacing: .12em;
+}
+
+.people-title h1 {
+  max-width: 900px;
+  color: #17333b;
+  font-size: clamp(2rem, 4.4vw, 3.45rem);
+  line-height: 1.12;
+  letter-spacing: -.025em;
+  overflow-wrap: anywhere;
+}
+
+.page-title-lead {
+  max-width: 68ch;
+  color: #53636a;
+  font-size: clamp(.98rem, 1.35vw, 1.08rem);
+  line-height: 1.75;
+}
+
+.people-section {
+  padding-block: clamp(38px, 5vw, 64px);
+}
+
+.people-section-head {
+  margin-bottom: clamp(22px, 3vw, 32px);
+}
+
+.people-section-head .section-title {
+  color: #17333b;
+  letter-spacing: -.015em;
+}
+
+.people-section-head .section-lead {
+  max-width: 65ch;
+}
+
+.committee-grid,
+.alumni-grid {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: clamp(16px, 2vw, 24px);
+}
+
+.committee-card,
+.alumni-card {
+  min-width: 0;
+  grid-column: span 4;
+  border-color: #dfe8e6;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(18, 48, 55, .055);
+}
+
+.committee-card::before,
+.alumni-card::before {
+  height: 3px;
+  background: var(--teal, #005b5b);
+}
+
+.committee-card:hover,
+.alumni-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(0, 91, 91, .28);
+  box-shadow: 0 15px 32px rgba(18, 48, 55, .11);
+}
+
+.committee-card--senior {
+  grid-column: span 6;
+  border-color: #d7e4e1;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(18, 48, 55, .075);
+}
+
+.committee-card--senior::after {
+  top: 12px;
+  left: 12px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, .72);
+  background: rgba(255, 255, 255, .95);
+  color: #805b19;
+  letter-spacing: .07em;
+}
+
+.committee-portrait,
+.alumni-portrait {
+  min-height: 0;
+  aspect-ratio: 4 / 3;
+  background: #e9f0ef;
+  color: var(--teal, #005b5b);
+}
+
+.committee-portrait img,
+.alumni-portrait img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 28%;
+  filter: none;
+}
+
+.committee-card:hover img,
+.alumni-card:hover img {
+  transform: scale(1.025);
+  filter: none;
+}
+
+.committee-card__body,
+.alumni-card__body {
+  min-width: 0;
+  gap: 9px;
+  padding: 20px 21px 22px;
+}
+
+.committee-role,
+.alumni-meta {
+  color: var(--teal, #005b5b);
+  letter-spacing: .055em;
+}
+
+.alumni-meta {
+  width: fit-content;
+  border: 1px solid #e0ece9;
+  border-radius: 6px;
+  background: #f3f8f7;
+}
+
+.alumni-meta span {
+  color: #b17a22;
+}
+
+.committee-card h2,
+.alumni-card h2 {
+  color: #18333a;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+.committee-qualification,
+.alumni-title {
+  color: #43545c;
+  overflow-wrap: anywhere;
+}
+
+.alumni-card__body > p:last-child {
+  -webkit-line-clamp: 3;
+}
+
+.alumni-toolbar {
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 16px;
+  border-color: #dfe8e6;
+  border-radius: 12px;
+  background: #f8faf9;
+  box-shadow: none;
+}
+
+.alumni-toolbar label {
+  min-width: min(100%, 220px);
+  color: #53636a;
+  letter-spacing: .045em;
+}
+
+.alumni-toolbar select {
+  min-height: 48px;
+  border-color: #cbd9d6;
+  border-radius: 8px;
+  background-color: #fff;
+  color: #263a40;
+  font-weight: 600;
+}
+
+.alumni-toolbar select:focus-visible {
+  border-color: var(--teal, #005b5b);
+  box-shadow: 0 0 0 3px rgba(0, 91, 91, .12);
+  transform: none;
+}
+
+.people-page .empty-state {
+  padding: clamp(28px, 5vw, 44px);
+  border: 1px solid #dfe8e6;
+  border-radius: 14px;
+  background: #f8faf9;
+  color: #56666d;
+  line-height: 1.65;
+}
+
+.people-page .empty-state strong {
+  display: block;
+  margin-bottom: 5px;
+  color: #18333a;
+  font-size: 1.05rem;
+}
+
+.people-page .empty-state p {
+  margin: 0;
+}
+
+@media (min-width: 980px) {
+  .committee-card--senior .committee-portrait {
+    min-height: 100%;
+    aspect-ratio: auto;
+  }
+}
+
+@media (max-width: 900px) {
+  .committee-card,
+  .alumni-card {
+    grid-column: span 6;
+  }
+
+  .committee-card--senior {
+    grid-column: span 6;
+  }
+}
+
+@media (max-width: 720px) {
+  .committee-grid,
+  .alumni-grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .people-title {
+    padding-top: 38px;
+  }
+
+  .people-title h1 {
+    font-size: clamp(1.85rem, 8vw, 2.25rem);
+    line-height: 1.12;
+  }
+
+  .committee-grid,
+  .alumni-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .committee-card,
+  .alumni-card,
+  .committee-card--senior {
+    grid-column: 1;
+  }
+
+  .committee-card--senior {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+  }
+
+  .committee-portrait,
+  .alumni-portrait,
+  .committee-card--senior .committee-portrait {
+    min-height: 0;
+    aspect-ratio: 4 / 3;
+  }
+
+  .alumni-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 14px;
+  }
+
+  .alumni-toolbar label {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .committee-card,
+  .alumni-card,
+  .committee-portrait img,
+  .alumni-portrait img {
+    transition-duration: .01ms;
+  }
+}

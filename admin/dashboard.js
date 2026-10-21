@@ -1,4 +1,4 @@
-﻿import { safeDelete, safeFetch, safeInsert, safeUpdate, supabase, connectCms, safeAdminSelect, safeCount, getCmsStatusLabel, resetCmsStatus, isCmsAvailable, getMissingTables, getCmsTableStats, getLastConnectionDiagnostics, hasAdminSession, ensureAdminWriteSession, ensureAdminWriteSessionOnLoad, getAdminWriteCapability, mapCrudReason, setCmsAdminMode, getTableStatus, clearCmsQueryCache, signOutAdmin, loadLegacyCredentials, tableHasDisplayOrder, adminStorageUpload, adminStorageRemove, getCmsStoragePublicUrl, notifyCmsDataChanged } from "../assets/js/supabase.js";
+import { safeDelete, safeFetch, safeInsert, safeUpdate, supabase, connectCms, safeAdminSelect, safeCount, getCmsStatusLabel, resetCmsStatus, isCmsAvailable, getMissingTables, getCmsTableStats, getLastConnectionDiagnostics, hasAdminSession, ensureAdminWriteSession, ensureAdminWriteSessionOnLoad, getAdminWriteCapability, mapCrudReason, setCmsAdminMode, getTableStatus, clearCmsQueryCache, signOutAdmin, loadLegacyCredentials, tableHasDisplayOrder, adminStorageUpload, adminStorageRemove, getCmsStoragePublicUrl, notifyCmsDataChanged } from "../assets/js/supabase.js";
 import { bootstrapCmsContentIfNeeded, isCmsContentEmpty } from "../assets/js/cms-bootstrap.js";
 import { fetchCmsRows, cmsTableCount, cmsInsert, cmsUpdate, cmsDelete, cmsUpsert, bootstrapTableIfEmpty, bootstrapAllContentTables, clearCmsLocalCache, isContentTable, isUuid } from "../assets/js/cms-store.js";
 import { fetchFormRows, formTableCount, isPublicFormTable, flushFormQueue } from "../assets/js/form-store.js";
@@ -39,6 +39,8 @@ const MODULES = [
     { key: "courses", label: "Courses", table: "courses", folder: "courses", group: "Website", fields: ["department", "image_url:image", "title", "program_type:programType", "duration", "fees", "seats:number", "code", "description:rich", "eligibility:rich", "syllabus_pdf_url:file", "button_label", "button_url", "published:boolean", "status:select", "display_order:number"] },
     { key: "departments", label: "Departments", table: "departments", folder: "departments", group: "Website", fields: ["title", "program_type:programType", "hod_name", "hod_photo_url:image", "department_image_url:image", "description:rich", "labs:rich", "faculty_count:number", "students_count:number", "button_label", "button_url", "published:boolean", "status:select", "display_order:number"] },
     { key: "faculty", label: "Faculty", table: "faculty", folder: "faculty", group: "Website", fields: ["photo_url:image", "name", "qualification", "experience", "department", "subjects:rich", "email", "social_links:json", "published:boolean", "status:select", "display_order:number"] },
+    { key: "committee_members", label: "Committee Management", table: "committee_members", folder: "committee", group: "Website", fields: ["photo_url:image", "full_name", "designation", "qualification", "description:rich", "published:boolean", "status:select", "display_order:number"] },
+    { key: "alumni", label: "Alumni Management", table: "alumni", folder: "alumni", group: "Website", fields: ["photo_url:image", "full_name", "department", "passing_year:number", "current_designation", "company", "biography:rich", "published:boolean", "status:select", "display_order:number"] },
     { key: "facilities", label: "Facilities", table: "facilities", folder: "facilities", group: "Website", fields: ["title", "icon", "image_url:image", "description:rich", "category", "published:boolean", "status:select", "display_order:number"] },
     { key: "placements", label: "Placements", table: "placements", folder: "placements", group: "Website", fields: ["title", "recruiter", "company_logo_url:image", "image_url:image", "package", "highest_package", "average_package", "placed_students:number", "training_activities:rich", "testimonial:rich", "student_name", "course", "published:boolean", "status:select", "display_order:number"] },
     { key: "gallery", label: "Gallery", table: "gallery", folder: "gallery", group: "Website", fields: ["title", "album", "category:selectCategory", "image_url:image", "alt", "description:rich", "featured:boolean", "published:boolean", "status:select", "display_order:number"] },
@@ -60,7 +62,7 @@ const MODULES = [
 
 /** Modules shown on the dashboard home grid (real CMS modules only). */
 const DASHBOARD_MODULE_KEYS = [
-    "principal_message", "courses", "departments", "faculty", "facilities", "gallery", "placements", "home_slides", "footer_blocks",
+    "principal_message", "courses", "departments", "faculty", "committee_members", "alumni", "facilities", "gallery", "placements", "home_slides", "footer_blocks",
     "admissions", "notices", "downloads", "updates", "ai_prompts", "media_library", "contacts",
     "settings", "admins",
 ];
@@ -90,6 +92,19 @@ const ACTION_ICONS = {
     delete: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
 };
 
+const NUMBER_FIELD_ATTRIBUTES = {
+    passing_year: { min: 1950, max: 2100, step: 1, inputmode: "numeric" },
+    display_order: { min: 0, step: 1 },
+    seats: { min: 0, step: 1 },
+    faculty_count: { min: 0, step: 1 },
+    students_count: { min: 0, step: 1 },
+    placed_students: { min: 0, step: 1 },
+    version: { min: 0, step: 1 },
+    token_limit: { min: 0, step: 1 },
+    response_delay: { min: 0, step: 1 },
+    rating: { min: 0, step: 1 },
+};
+
 const EMPTY_ILLUSTRATION = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 7h16M4 12h10M4 17h7"/><rect x="3" y="3" width="18" height="18" rx="3"/></svg>';
 
 const NAV_ICONS = {
@@ -109,6 +124,7 @@ const NAV_SECTIONS = [
     { id: "website", label: "Website", icon: "cms", keys: [
         "principal_message", "updates", "notices", "downloads",
         "courses", "departments", "faculty",
+        "committee_members", "alumni",
         "facilities", "placements", "gallery",
     ] },
     { id: "forms", label: "Admissions", icon: "admissions", keys: ["admissions", "contacts", "inquiries"] },
@@ -1683,7 +1699,7 @@ function renderField(def, row) {
     const value = row?.[name] ?? defaultValue(name, type);
     const fullWidth = ["rich", "json", "image", "file"].includes(type) || name === "value" || name === "description" || name === "message" || name.includes("description");
     const pairClass = fullWidth ? " full" : " pair";
-    const required = ["name", "title", "student_name", "question", "key", "message"].includes(name);
+    const required = ["name", "full_name", "title", "student_name", "question", "key", "message", "designation", "department"].includes(name);
     const req = required ? '<span class="req" aria-label="required">*</span>' : "";
     const labelHtml = `<span class="field-label">${label(name)}${req}</span>`;
     if (type === "rich") {
@@ -1732,7 +1748,16 @@ function renderField(def, row) {
     }
     if (["select", "selectCategory", "reply", "lead", "role", "userStatus", "priority", "applicationStatus", "paymentStatus", "mediaType", "programType", "instituteType", "downloadCategory", "downloadType"].includes(type)) return selectField(name, type, value, labelHtml, pairClass);
     if (type === "boolean") return `<label class="field pair"><span class="editor-section">Publishing</span>${labelHtml}<select name="${name}"><option value="true" ${value !== false ? "selected" : ""}>Publish / Yes</option><option value="false" ${value === false ? "selected" : ""}>Hide / No</option></select></label>`;
-    return `<label class="field${pairClass}">${labelHtml}<input name="${name}" type="${type === "number" ? "number" : type === "date" ? "date" : "text"}" value="${esc(value)}"></label>`;
+    const inputType = type === "number" ? "number" : type === "date" ? "date" : "text";
+    const attrs = type === "number" ? numberInputAttributes(name) : "";
+    return `<label class="field${pairClass}">${labelHtml}<input name="${name}" type="${inputType}" value="${esc(value)}"${attrs}${required ? " required" : ""}></label>`;
+}
+
+function numberInputAttributes(name) {
+    const attrs = NUMBER_FIELD_ATTRIBUTES[name] || { step: 1 };
+    return Object.entries(attrs)
+        .map(([key, value]) => ` ${key}="${esc(value)}"`)
+        .join("");
 }
 
 function selectField(name, type, value, labelHtml = null, pairClass = " pair") {
@@ -1888,8 +1913,9 @@ async function saveRecord(event) {
             } else if (type === "boolean") {
                 payload[name] = control.value === "true";
             } else if (type === "number") {
-                const num = Number(control.value);
-                payload[name] = Number.isFinite(num) ? num : null;
+                const raw = String(control.value ?? "").trim();
+                const num = raw === "" ? null : Number(raw);
+                payload[name] = Number.isFinite(num) ? Math.trunc(num) : null;
             } else if (type === "date") {
                 const raw = String(control.value || "").trim();
                 payload[name] = raw || null;
@@ -2059,7 +2085,7 @@ function hasDisplayOrder(table) { return tableHasDisplayOrder(table); }
 function csvCell(value) { return `"${String(value ?? "").replace(/"/g, '""')}"`; }
 function showSkeleton(id, count) { $(id).innerHTML = Array.from({ length: count }, () => `<div class="skeleton"></div>`).join(""); }
 function skeletonTable() { return `<div class="skeleton table-skeleton"></div><div class="skeleton table-skeleton"></div><div class="skeleton table-skeleton"></div>`; }
-function defaultValue(name, type) { if (type === "select") return "published"; if (type === "boolean") return true; if (type === "number") return 0; if (type === "date") return new Date().toISOString().slice(0, 10); if (type === "color") return "#005b5b"; return ""; }
+function defaultValue(name, type) { if (type === "select") return "published"; if (type === "boolean") return true; if (type === "number") return name === "display_order" ? 0 : ""; if (type === "date") return new Date().toISOString().slice(0, 10); if (type === "color") return "#005b5b"; return ""; }
 function formatDate(value) { return value ? new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "-"; }
 function label(key) {
     if (currentModule?.key === "principal_message") {

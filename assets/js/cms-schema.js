@@ -49,6 +49,14 @@ export const TABLE_COLUMNS = {
         subjects: "text", email: "text", social_links: "jsonb", published: "boolean", status: "text",
         display_order: "int",
     },
+    committee_members: {
+        full_name: "text", designation: "text", photo_url: "text", qualification: "text", description: "text",
+        published: "boolean", status: "text", display_order: "int",
+    },
+    alumni: {
+        full_name: "text", department: "text", passing_year: "int", photo_url: "text", current_designation: "text",
+        company: "text", biography: "text", published: "boolean", status: "text", display_order: "int",
+    },
     facilities: {
         title: "text", icon: "text", image_url: "text", description: "text", category: "text",
         published: "boolean", status: "text", display_order: "int",

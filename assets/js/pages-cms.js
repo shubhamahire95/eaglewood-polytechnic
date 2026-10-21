@@ -159,3 +159,43 @@ function esc(value) {
     div.textContent = value ?? "";
     return div.innerHTML;
 }
+
+export async function renderCommitteePage() {
+    const host = document.getElementById("committee-grid");
+    if (!host) return;
+    try {
+        const rows = await loadPublished("committee_members");
+        host.innerHTML = rows.length ? rows.map((member, index) => {
+            const photo = resolveAdminPreviewUrl(member.photo_url || "");
+            const senior = index < 2 ? " committee-card--senior" : "";
+            return `<article class="committee-card${senior} reveal">
+                <div class="committee-portrait">${photo ? `<img loading="lazy" decoding="async" src="${esc(photo)}" alt="${esc(member.full_name)}">` : `<span aria-hidden="true">${esc((member.full_name || "M").charAt(0))}</span>`}</div>
+                <div class="committee-card__body"><p class="committee-role">${esc(member.designation || "Committee Member")}</p><h2>${esc(member.full_name)}</h2>${member.qualification ? `<p class="committee-qualification">${esc(member.qualification)}</p>` : ""}${member.description ? `<p>${esc(stripHtml(member.description))}</p>` : ""}</div>
+            </article>`;
+        }).join("") : emptyState("committee members");
+    } catch { host.innerHTML = `<div class="empty-state"><strong>Committee information is temporarily unavailable</strong><p>Please try again shortly.</p></div>`; }
+}
+
+export async function renderAlumniPage() {
+    const host = document.getElementById("alumni-grid");
+    const departmentFilter = document.getElementById("alumni-department");
+    const yearFilter = document.getElementById("alumni-year");
+    if (!host) return;
+    try {
+        const rows = await loadPublished("alumni");
+        const render = () => {
+            const department = departmentFilter?.value || "";
+            const year = yearFilter?.value || "";
+            const visible = rows.filter((alumnus) => (!department || alumnus.department === department) && (!year || String(alumnus.passing_year || "") === year));
+            host.innerHTML = visible.length ? visible.map((alumnus) => {
+                const photo = resolveAdminPreviewUrl(alumnus.photo_url || "");
+                return `<article class="alumni-card reveal"><div class="alumni-portrait">${photo ? `<img loading="lazy" decoding="async" src="${esc(photo)}" alt="${esc(alumnus.full_name)}">` : `<span aria-hidden="true">${esc((alumnus.full_name || "A").charAt(0))}</span>`}</div><div class="alumni-card__body"><p class="alumni-meta">${esc(alumnus.department || "Eaglewood Alumni")}${alumnus.passing_year ? ` <span>&middot;</span> ${esc(alumnus.passing_year)}` : ""}</p><h2>${esc(alumnus.full_name)}</h2>${alumnus.current_designation ? `<p class="alumni-title">${esc(alumnus.current_designation)}${alumnus.company ? `, ${esc(alumnus.company)}` : ""}</p>` : alumnus.company ? `<p class="alumni-title">${esc(alumnus.company)}</p>` : ""}${alumnus.biography ? `<p>${esc(stripHtml(alumnus.biography))}</p>` : ""}</div></article>`;
+            }).join("") : `<div class="empty-state"><strong>No alumni match these filters</strong><p>Try selecting a different department or passing year.</p></div>`;
+        };
+        const departments = [...new Set(rows.map((row) => row.department).filter(Boolean))].sort();
+        const years = [...new Set(rows.map((row) => row.passing_year).filter(Boolean))].sort((a, b) => b - a);
+        if (departmentFilter) departmentFilter.innerHTML = `<option value="">All departments</option>${departments.map((value) => `<option value="${esc(value)}">${esc(value)}</option>`).join("")}`;
+        if (yearFilter) yearFilter.innerHTML = `<option value="">All passing years</option>${years.map((value) => `<option value="${esc(value)}">${esc(value)}</option>`).join("")}`;
+        departmentFilter?.addEventListener("change", render); yearFilter?.addEventListener("change", render); render();
+    } catch { host.innerHTML = `<div class="empty-state"><strong>Alumni stories are temporarily unavailable</strong><p>Please try again shortly.</p></div>`; }
+}

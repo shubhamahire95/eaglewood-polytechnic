@@ -27,6 +27,8 @@ export const CONTENT_TABLES = new Set([
     "courses",
     "departments",
     "faculty",
+    "committee_members",
+    "alumni",
     "facilities",
     "placements",
     "gallery",

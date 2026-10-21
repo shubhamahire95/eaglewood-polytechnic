@@ -26,6 +26,8 @@ const FOOTER_QUICK_LINKS = [
     { label: "Courses", href: "courses.html" },
     { label: "Departments", href: "departments.html" },
     { label: "Faculty", href: "faculty.html" },
+    { label: "Committee", href: "committee.html" },
+    { label: "Alumni", href: "alumni.html" },
     { label: "Placements", href: "placements.html" },
     { label: "Gallery", href: "gallery.html" },
     { label: "Admissions", href: "admission.html" },
@@ -72,7 +74,7 @@ const siteHeader = `
       </a>
       <button class="nav-toggle" type="button" aria-label="Toggle navigation" aria-expanded="false"><span></span><span></span><span></span></button>
       <ul class="nav-links">
-        <li><a href="index.html">Home</a></li><li><a href="about.html">About</a></li><li><a href="courses.html">Courses</a></li><li><a href="departments.html">Departments</a></li><li><a href="faculty.html">Faculty</a></li><li><a href="placements.html">Placements</a></li><li><a href="infrastructure.html">Infrastructure</a></li><li><a href="gallery.html">Gallery</a></li><li><a href="admission.html">Admission</a></li><li><a href="contact.html">Contact</a></li>
+        <li><a href="index.html">Home</a></li><li><a href="about.html">About</a></li><li><a href="courses.html">Courses</a></li><li><a href="departments.html">Departments</a></li><li><a href="faculty.html">Faculty</a></li><li><a href="committee.html">Committee</a></li><li><a href="alumni.html">Alumni</a></li><li><a href="placements.html">Placements</a></li><li><a href="infrastructure.html">Infrastructure</a></li><li><a href="gallery.html">Gallery</a></li><li><a href="admission.html">Admission</a></li><li><a href="contact.html">Contact</a></li>
       </ul>
       <a class="btn btn-sm nav-apply" href="admission.html">Admission <span>-&gt;</span></a>
     </nav>
