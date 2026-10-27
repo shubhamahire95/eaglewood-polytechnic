@@ -8,7 +8,7 @@ import { debounce, throttle } from "./utils.js";
 import { safeFetch, ensureCmsReady, isCmsAvailable, isCmsStrictMode } from "./supabase.js";
 import { getSiteLogoUrl } from "./page-loader.js";
 
-const NAV_COLLAPSE_WIDTH = 1400;
+const NAV_COLLAPSE_WIDTH = 1700;
 
 const FOOTER_DEFAULTS = {
     institute_name: "Eaglewood Polytechnic Institute",
@@ -78,7 +78,7 @@ const siteHeader = `
       <ul class="nav-links">
         <li><a href="index.html">Home</a></li><li><a href="about.html">About</a></li><li><a href="courses.html">Courses</a></li><li><a href="departments.html">Departments</a></li><li><a href="faculty.html">Faculty</a></li><li><a href="committee.html">Committee</a></li><li><a href="alumni.html">Alumni</a></li><li><a href="placements.html">Placements</a></li><li><a href="infrastructure.html">Infrastructure</a></li><li><a href="gallery.html">Gallery</a></li><li><a href="admission.html">Admission</a></li><li><a href="contact.html">Contact</a></li>
       </ul>
-      <a class="btn btn-sm nav-apply" href="admission.html">Admission <span>-&gt;</span></a>
+      <a class="btn btn-sm nav-apply" href="admission.html">Admission <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10h12m-5-5 5 5-5 5"/></svg></a>
     </nav>
   </header>`;
 

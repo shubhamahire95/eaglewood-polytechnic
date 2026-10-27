@@ -1032,3 +1032,116 @@
 .ai-panel {
   display: none !important;
 }
+
+/* Eaglewood identity for the existing assistant launcher and chat header. */
+.ew-ai__fab {
+  width: auto;
+  min-width: 172px;
+  height: 58px;
+  min-height: 58px;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 7px 18px 7px 7px;
+  overflow: hidden;
+  border: 1px solid rgba(15, 45, 55, .16);
+  border-radius: 8px;
+  color: #fff;
+  background: #123b3d;
+  box-shadow: 0 8px 24px rgba(15, 45, 55, .2);
+  backdrop-filter: none;
+}
+
+.ew-ai__fab::before,
+.ew-ai__fab::after {
+  display: none;
+}
+
+.ew-ai__fab:hover {
+  transform: translateY(-2px);
+  border-color: rgba(212, 160, 23, .7);
+  background: #0d3032;
+  box-shadow: 0 12px 28px rgba(15, 45, 55, .24);
+}
+
+.ew-ai__fab-icon {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  overflow: hidden;
+  border: 1px solid rgba(15, 45, 55, .12);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.ew-ai__logo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.ew-ai__fab-label {
+  position: relative;
+  z-index: 1;
+  color: inherit;
+  font: 700 13px/1.2 Inter, system-ui, sans-serif;
+  white-space: nowrap;
+}
+
+.ew-ai__avatar {
+  overflow: hidden;
+  padding: 4px;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.ew-ai__avatar .ew-ai__logo {
+  border-radius: 4px;
+}
+
+.ew-ai__head {
+  background: #123b3d;
+}
+
+.ew-ai__head .ew-ai__meta strong {
+  color: #fff;
+  font-size: 16px;
+  line-height: 1.25;
+}
+
+.ew-ai__head .ew-ai__meta small {
+  letter-spacing: .04em;
+}
+
+.ew-ai__fab:focus-visible {
+  outline-color: #d4a017;
+  outline-offset: 3px;
+}
+
+@media (max-width: 560px) {
+  .ew-ai__fab {
+    width: var(--ew-ai-fab-size-mobile);
+    min-width: var(--ew-ai-fab-size-mobile);
+    height: var(--ew-ai-fab-size-mobile);
+    min-height: var(--ew-ai-fab-size-mobile);
+    justify-content: center;
+    padding: 5px;
+    border-radius: 50%;
+  }
+
+  .ew-ai__fab-icon {
+    width: 42px;
+    height: 42px;
+    flex-basis: 42px;
+    border-radius: 50%;
+  }
+
+  .ew-ai__fab-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+}

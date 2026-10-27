@@ -5024,3 +5024,214 @@ body[data-home] .socials {
         animation-duration: 1.5s;
     }
 }
+
+.slide-nav {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    transform: translateY(-50%);
+    border: 1px solid rgba(255, 255, 255, .55);
+    border-radius: 50%;
+    background: rgba(9, 34, 37, .48);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .16);
+    transition: background .18s ease, border-color .18s ease, transform .18s ease;
+}
+
+.slide-nav:hover {
+    transform: translateY(-50%) scale(1.04);
+    border-color: #fff;
+    background: rgba(9, 34, 37, .74);
+}
+
+.slide-nav:focus-visible,
+.slide-dots button:focus-visible {
+    outline: 3px solid #f4d27a;
+    outline-offset: 3px;
+}
+
+.slide-nav svg {
+    display: block;
+    width: 21px;
+    height: 21px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.slide-dots {
+    align-items: center;
+    gap: 4px;
+}
+
+.slide-dots button {
+    width: 40px;
+    height: 28px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    background: transparent;
+}
+
+.slide-dots button::before {
+    content: "";
+    display: block;
+    width: 18px;
+    height: 4px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, .65);
+    transition: width .18s ease, background .18s ease;
+}
+
+.slide-dots button.active::before {
+    width: 30px;
+    background: #f0c85c;
+}
+
+.slide-dots button.active {
+    background: transparent;
+}
+
+body[data-home] .premium-topbar {
+    position: relative;
+    inset: auto;
+    z-index: 120;
+    padding: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, .12);
+    background: #123b3d;
+    color: #f1f5f3;
+    backdrop-filter: none;
+}
+
+body[data-home] .premium-topbar .top-inner {
+    min-height: 0;
+    padding-block: 6px;
+}
+
+body[data-home] .top-mobile-info {
+    display: grid;
+    gap: 4px;
+}
+
+body[data-home] .top-mobile-meta {
+    display: flex;
+    align-items: center;
+    gap: 4px 16px;
+}
+
+body[data-home] .top-mobile-meta span {
+    color: rgba(255, 255, 255, .88);
+    font-size: 11px;
+    line-height: 1.35;
+}
+
+body[data-home] .top-mobile-contact {
+    display: flex;
+    justify-content: flex-start;
+    gap: 4px 16px;
+}
+
+body[data-home] .top-mobile-contact a {
+    color: rgba(255, 255, 255, .9);
+    font-size: 11px;
+    line-height: 1.35;
+}
+
+body[data-home] .site-header {
+    position: sticky;
+    top: 0;
+}
+
+/* Keep CMS notices readable without duplicating messages in a marquee. */
+body[data-home] .breaking-news {
+    position: relative;
+    z-index: 2;
+    background: #123b3d;
+    border-bottom: 1px solid rgba(255, 255, 255, .16);
+}
+
+body[data-home] .breaking-news-inner {
+    min-height: 40px;
+    padding-block: 7px;
+    overflow: visible;
+}
+
+body[data-home] .breaking-news-label {
+    padding: 4px 9px;
+    background: rgba(255, 255, 255, .12);
+    color: #f3d77a;
+    font-size: 10px;
+    letter-spacing: .06em;
+}
+
+body[data-home] .breaking-news-track {
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    gap: 5px 12px;
+    white-space: normal;
+    animation: none;
+}
+
+body[data-home] .breaking-news-track a {
+    color: #fff;
+    font-size: 12px;
+    line-height: 1.45;
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    text-underline-offset: 3px;
+    transition: color .18s ease, text-decoration-color .18s ease;
+}
+
+body[data-home] .breaking-news-track a:hover,
+body[data-home] .breaking-news-track a:focus-visible {
+    color: #f3d77a;
+    text-decoration-color: currentColor;
+}
+
+body[data-home] .breaking-news-sep {
+    color: rgba(255, 255, 255, .48);
+}
+
+@media (max-width: 640px) {
+    body[data-home] .breaking-news-inner {
+        align-items: flex-start;
+        min-height: 0;
+        padding-block: 8px;
+    }
+
+    body[data-home] .breaking-news-label {
+        display: inline-flex;
+        margin-top: 1px;
+    }
+
+    body[data-home] .breaking-news-track {
+        align-items: flex-start;
+        gap: 4px 8px;
+    }
+
+    body[data-home] .breaking-news-track a {
+        max-width: 100%;
+        overflow-wrap: anywhere;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body[data-home] .breaking-news-track {
+        animation: none !important;
+    }
+}
+
+@media (max-width: 760px) {
+    body[data-home] .top-mobile-meta {
+        justify-content: center;
+    }
+
+    body[data-home] .top-mobile-contact {
+        justify-content: center;
+    }
+}

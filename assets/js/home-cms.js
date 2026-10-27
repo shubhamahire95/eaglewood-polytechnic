@@ -265,12 +265,17 @@ function listBits(value) {
 function renderBreakingNews(notices = []) {
     const host = document.getElementById("breaking-news");
     if (!host) return;
-    const items = notices.slice(0, 6);
+    const seenTitles = new Set();
+    const items = notices.filter((notice) => {
+        const title = String(notice?.title || "").trim();
+        const key = title.replace(/\s+/g, " ").toLocaleLowerCase();
+        if (!key || seenTitles.has(key)) return false;
+        seenTitles.add(key);
+        return true;
+    }).slice(0, 6);
     if (!items.length) { host.remove(); return; }
     host.className = "breaking-news";
-    host.innerHTML = `<div class="container breaking-news-inner"><span class="breaking-news-label">Latest</span><div class="breaking-news-track" id="breakingNewsTrack">${items.map((n) => `<a href="${esc(n.attachment_url || n.pdf_url || n.file_url || "index.html#notice-board")}">${esc(n.title)}</a>`).join('<span class="breaking-news-sep">|</span>')}</div></div>`;
-    const track = document.getElementById("breakingNewsTrack");
-    if (track) track.innerHTML = `${track.innerHTML} <span class="breaking-news-sep">|</span> ${track.innerHTML}`;
+    host.innerHTML = `<div class="container breaking-news-inner"><span class="breaking-news-label">Latest</span><div class="breaking-news-track" id="breakingNewsTrack">${items.map((n) => `<a href="${esc(n.attachment_url || n.pdf_url || n.file_url || "index.html#notice-board")}">${esc(n.title)}</a>`).join('<span class="breaking-news-sep" aria-hidden="true">|</span>')}</div></div>`;
 }
 
 function renderTopUtility(settings, cmsOnly = false) {
@@ -344,9 +349,9 @@ function hero(data) {
             const meta = statDisplayMeta(value);
             return `<div class="hero-float-card hero-float-card--duo"><strong data-count="${meta.count}" data-prefix="${esc(meta.prefix)}" data-suffix="${esc(meta.suffix || suffix)}">${esc(meta.display)}</strong><span>${esc(label)}</span></div>`;
         }).join("") : ""}</div>
-        <button class="slide-nav prev" data-prev type="button" aria-label="Previous slide">‹</button>
-        <button class="slide-nav next" data-next type="button" aria-label="Next slide">›</button>
-        <div class="slide-dots">${items.map((_, i) => `<button class="${i === 0 ? "active" : ""}" data-dot="${i}" type="button" aria-label="Show slide ${i + 1}"></button>`).join("")}</div>
+        <button class="slide-nav prev" data-prev type="button" aria-label="Previous slide"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+        <button class="slide-nav next" data-next type="button" aria-label="Next slide"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+        <div class="slide-dots" role="group" aria-label="Choose a slide">${items.map((_, i) => `<button class="${i === 0 ? "active" : ""}" data-dot="${i}" type="button" aria-current="${i === 0 ? "true" : "false"}" aria-label="Show slide ${i + 1}"></button>`).join("")}</div>
         <a class="scroll-indicator" href="#highlights" aria-label="Scroll to highlights"></a>
         <div class="wave-divider"></div>
         </div></section>`;
@@ -824,7 +829,19 @@ function initSlider() {
     if (!slides.length) return;
     const dots = [...document.querySelectorAll("[data-dot]")];
     let index = 0;
-    const show = (next) => { index = (next + slides.length) % slides.length; slides.forEach((s, i) => s.classList.toggle("active", i === index)); dots.forEach((d, i) => d.classList.toggle("active", i === index)); };
+    const show = (next) => {
+        index = (next + slides.length) % slides.length;
+        slides.forEach((slide, i) => {
+            const active = i === index;
+            slide.classList.toggle("active", active);
+            slide.setAttribute("aria-hidden", String(!active));
+        });
+        dots.forEach((dot, i) => {
+            const active = i === index;
+            dot.classList.toggle("active", active);
+            dot.setAttribute("aria-current", String(active));
+        });
+    };
     document.querySelector("[data-prev]")?.addEventListener("click", () => show(index - 1));
     document.querySelector("[data-next]")?.addEventListener("click", () => show(index + 1));
     dots.forEach((dot) => dot.addEventListener("click", () => show(Number(dot.dataset.dot))));

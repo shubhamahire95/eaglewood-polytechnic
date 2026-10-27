@@ -1,4 +1,5 @@
 import { safeFetch, safeInsert, isCmsAvailable } from "./supabase.js";
+import { getSiteLogoUrl } from "./page-loader.js";
 
 const DEFAULT_SETTINGS = {
     assistant_name: "Institute Assistant",
@@ -63,17 +64,7 @@ try {
 } catch { /* ignore quota/private mode */ }
 restoreHistory();
 
-const AI_ICON_SVG = `<svg class="ew-ai__fab-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <rect x="5" y="9" width="14" height="11" rx="4" fill="currentColor" opacity="0.95"/>
-  <path d="M9 5.5h6a2.5 2.5 0 0 1 2.5 2.5V9H6.5V8A2.5 2.5 0 0 1 9 5.5Z" fill="currentColor" opacity="0.88"/>
-  <circle cx="9.5" cy="13" r="1.35" fill="#0f766e"/>
-  <circle cx="14.5" cy="13" r="1.35" fill="#0f766e"/>
-  <path d="M10 16.2c.7.55 1.4.8 2 .8s1.3-.25 2-.8" stroke="#0f766e" stroke-width="1.2" stroke-linecap="round"/>
-  <path d="M12 3.2v2.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-  <circle cx="12" cy="2.4" r="1" fill="currentColor"/>
-  <path d="M4.5 12.5 3 13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-  <path d="M19.5 12.5 21 13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-</svg>`;
+const AI_ICON = `<img class="ew-ai__logo" src="${getSiteLogoUrl()}" alt="" aria-hidden="true" loading="eager" decoding="async">`;
 
 export async function initAiAssistant() {
     if (initPromise) return initPromise;
@@ -158,14 +149,14 @@ async function loadKnowledgeBase() {
 }
 
 function renderHeaderButton() {
-    if (window.matchMedia("(max-width: 1080px)").matches) return;
-    const nav = document.querySelector(".nav-links, nav ul, header nav");
+    const nav = document.querySelector(".nav-links") || document.querySelector("nav ul") || document.querySelector("header nav");
     if (!nav || document.querySelector(".ask-ai-nav")) return;
     const button = document.createElement("button");
     button.className = "ask-ai-nav";
     button.type = "button";
-    button.innerHTML = '<span class="ask-ai-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" aria-hidden="true"><rect x="5" y="9" width="14" height="11" rx="4" fill="currentColor"/><circle cx="9.5" cy="13" r="1" fill="#0f766e"/><circle cx="14.5" cy="13" r="1" fill="#0f766e"/></svg></span><span>Ask AI</span>';
-    button.setAttribute("aria-label", "Ask Eaglewood AI");
+    button.innerHTML = `<span class="ask-ai-mark" aria-hidden="true"><img src="${getSiteLogoUrl()}" alt="" loading="eager" decoding="async"></span><span>Ask Eaglewood</span>`;
+    button.setAttribute("aria-label", "Open Eaglewood Smart Assistant");
+    button.title = "Eaglewood Smart Assistant";
     if (nav.tagName === "UL") {
         const item = document.createElement("li");
         item.className = "ask-ai-item";
@@ -176,24 +167,23 @@ function renderHeaderButton() {
     }
 }
 
-const FAB_ICON = AI_ICON_SVG;
-
 function renderAssistant() {
     const s = state.settings;
-    const displayName = "AI Assistant";
+    const displayName = "Eaglewood Smart Assistant";
     document.documentElement.style.setProperty("--ai-primary", s.primary_color || DEFAULT_SETTINGS.primary_color);
     document.body.insertAdjacentHTML("beforeend", `
         <div class="ew-ai__backdrop" id="ewAiBackdrop" hidden></div>
         <aside class="ew-ai" id="ewAi" data-ai-assistant aria-live="polite">
             <div class="ew-ai__fab-wrap">
-                <button class="ew-ai__fab" id="ewAiFab" type="button" aria-label="Open ${esc(displayName)}" aria-expanded="false" aria-controls="ewAiPanel">
-                    <span class="ew-ai__fab-icon">${FAB_ICON}</span>
+                <button class="ew-ai__fab" id="ewAiFab" type="button" aria-label="Open ${esc(displayName)}" title="${esc(displayName)}" aria-expanded="false" aria-controls="ewAiPanel">
+                    <span class="ew-ai__fab-icon">${AI_ICON}</span>
+                    <span class="ew-ai__fab-label">Ask Eaglewood</span>
                     <span class="ew-ai__badge" id="ewAiBadge" aria-hidden="true"></span>
                 </button>
             </div>
             <section class="ew-ai__panel ew-ai__panel--mobile-full" id="ewAiPanel" aria-label="${esc(displayName)}" role="dialog" aria-modal="true" hidden>
                 <header class="ew-ai__head">
-                    <div class="ew-ai__avatar" aria-hidden="true">${FAB_ICON}</div>
+                    <div class="ew-ai__avatar" aria-hidden="true">${AI_ICON}</div>
                     <div class="ew-ai__meta">
                         <small>Online</small>
                         <strong>${esc(displayName)}</strong>
