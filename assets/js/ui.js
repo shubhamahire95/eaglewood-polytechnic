@@ -23,19 +23,6 @@ const FOOTER_DEFAULTS = {
     developer_phone: "+91 7249868133",
 };
 
-const FOOTER_QUICK_LINKS = [
-    { label: "About", href: "about.html" },
-    { label: "Courses", href: "courses.html" },
-    { label: "Departments", href: "departments.html" },
-    { label: "Faculty", href: "faculty.html" },
-    { label: "Committee", href: "committee.html" },
-    { label: "Alumni", href: "alumni.html" },
-    { label: "Placements", href: "placements.html" },
-    { label: "Gallery", href: "gallery.html" },
-    { label: "Admissions", href: "admission.html" },
-    { label: "Contact", href: "contact.html" },
-];
-
 const FOOTER_BOTTOM_LINKS = [
     { label: "Privacy", href: "contact.html#privacy" },
     { label: "Terms", href: "contact.html#terms" },
@@ -96,10 +83,12 @@ const siteFooter = `
             </div>
           </a>
         </section>
-        <nav class="epi-ft__quick" aria-label="Quick links">
-          <h2 class="epi-ft__heading">Quick Links</h2>
-          <ul class="epi-ft__quick-list" data-footer-quick-links></ul>
-        </nav>
+        <section class="epi-ft__developer" aria-label="Website developer">
+          <p class="epi-ft__developer-kicker">Designed &amp; Developed by</p>
+          <p class="epi-ft__developer-name" data-footer-developer>Shubham Ahire</p>
+          <p class="epi-ft__developer-role">Web Developer &amp; Digital Solutions</p>
+          <a class="epi-ft__developer-phone" data-footer-dev-phone href="tel:+917249868133">+91 7249868133</a>
+        </section>
         <section class="epi-ft__contact" aria-label="Contact">
           <h2 class="epi-ft__heading">Contact</h2>
           <ul class="epi-ft__contact-list">
@@ -230,12 +219,6 @@ function applyFooterCMS(settings = {}, blocks = {}) {
     document.querySelectorAll("[data-footer-map-link]").forEach((el) => {
         el.href = map;
     });
-
-    const quickLinks = parseLinkList(merged.footer_quick_links || blocks.quick_links?.links, FOOTER_QUICK_LINKS);
-    const quickHost = document.querySelector("[data-footer-quick-links]");
-    if (quickHost) {
-        quickHost.innerHTML = quickLinks.map((link) => `<li><a href="${escAttr(link.href)}">${escHtml(link.label)}</a></li>`).join("");
-    }
 
     const bottomLinks = parseLinkList(merged.footer_bottom_links || blocks.bottom_links?.links, FOOTER_BOTTOM_LINKS);
     const bottomHost = document.querySelector("[data-footer-bottom-links]");
