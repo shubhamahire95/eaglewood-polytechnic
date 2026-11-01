@@ -1,5 +1,5 @@
 import { safeFetch, isCmsAvailable } from "./supabase.js";
-import { renderFacultyPage, renderPlacementsPage, renderAboutPrincipal, renderCommitteePage, renderAlumniPage } from "./pages-cms.js";
+import { renderFacultyPage, renderDepartmentsPage, renderPlacementsPage, renderAboutPrincipal, renderCommitteePage, renderAlumniPage } from "./pages-cms.js";
 import { submitPublicForm } from "./form-store.js";
 import { fetchCmsRows } from "./cms-store.js";
 import { parseContactPhones, parseInstituteEmails, parseSettingValue, telHref } from "./site-settings.js";
@@ -8,6 +8,7 @@ export async function initDynamicPages() {
     const page = location.pathname.split("/").pop() || "index.html";
     if (page === "contact.html") await enhanceContactPage();
     if (page === "admission.html") await enhanceAdmissionPage();
+    if (page === "departments.html") await renderDepartmentsPage();
     if (page === "faculty.html") await renderFacultyPage();
     if (page === "committee.html") await renderCommitteePage();
     if (page === "alumni.html") await renderAlumniPage();

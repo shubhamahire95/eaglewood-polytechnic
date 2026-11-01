@@ -24,6 +24,7 @@
     <link rel="stylesheet" href="assets/css/pages.css">
     <link rel="stylesheet" href="assets/css/ai-assistant.css">
     <link rel="stylesheet" href="assets/css/site-chrome.css">
+    <link rel="stylesheet" href="assets/css/departments-premium.css">
 </head>
 
 <body>
@@ -34,61 +35,116 @@
         </div>
     </div><a class="skip-link" href="#main">Skip to content</a>
     <div data-site-header></div>
-    <main id="main">
-        <section class="page-title">
-            <div class="container">
-                <p class="eyebrow">Academic excellence</p>
-                <h1>Departments</h1>
-                <div class="breadcrumb"><a href="index.html">Home</a><span>/</span><span>Departments</span></div>
-            </div>
-        </section>
-        <section class="section">
-            <div class="container">
-                <div class="section-head">
-                    <div>
-                        <p class="eyebrow">Focused departments</p>
-                        <h2 class="section-title">Specialist learning, shared purpose</h2>
-                        <p class="section-lead">Every department has a separate computer lab and is academically
-                            administered by a Head of Department. Faculty teams prepare academic calendars focused on
-                            academic and personal development.</p>
+    <main id="main" class="departments-page">
+        <section class="department-hero" aria-labelledby="department-hero-title">
+            <div class="container department-hero__layout">
+                <div class="department-hero__copy">
+                    <p class="department-kicker"><span></span> Academic pathways</p>
+                    <h1 id="department-hero-title">Build what<br><em>moves the world.</em></h1>
+                    <p class="department-hero__lead">Explore engineering disciplines grounded in practical learning, supportive faculty and the tools used to solve real problems.</p>
+                    <div class="department-hero__actions">
+                        <a class="department-button department-button--gold" href="#department-catalog">Explore departments <span aria-hidden="true">↓</span></a>
+                        <a class="department-button department-button--quiet" href="faculty.html">Meet our faculty <span aria-hidden="true">↗</span></a>
                     </div>
+                    <nav class="breadcrumb department-hero__breadcrumb" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span aria-current="page">Departments</span></nav>
                 </div>
-                <div class="grid-2">
-                    <article class="photo-card card reveal"><img
+                <div class="department-hero__visual" aria-label="Students learning in Eaglewood engineering laboratories">
+                    <figure class="department-hero__main-image">
+                        <img src="assets/images/uploaded/electrical-practical.jpg" alt="Eaglewood students learning electrical engineering in a guided laboratory practical" fetchpriority="high">
+                        <figcaption><span class="department-hero__live-dot"></span> Learning by doing</figcaption>
+                    </figure>
+                    <figure class="department-hero__side-image">
+                        <img src="assets/images/uploaded/surveying-field-practical.jpg" alt="Civil Engineering students carrying out a surveying field practical" loading="lazy">
+                    </figure>
+                    <div class="department-hero__note"><span class="department-hero__note-icon" aria-hidden="true">✳</span><div><strong>Ideas into practice</strong><span>Labs · workshops · field learning</span></div></div>
+                    <span class="department-hero__orbit department-hero__orbit--one" aria-hidden="true"></span>
+                    <span class="department-hero__orbit department-hero__orbit--two" aria-hidden="true"></span>
+                </div>
+            </div>
+            <div class="department-hero__bottom-line" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+        </section>
+        <section class="section department-catalog-section" id="department-catalog" aria-labelledby="department-catalog-title">
+            <div class="container">
+                <div class="department-section-heading">
+                    <div><p class="department-kicker department-kicker--light"><span></span> Find your direction</p>
+                    <h2 id="department-catalog-title">A discipline for every<br><em>kind of problem solver.</em></h2></div>
+                    <p>Explore the current academic departments and the practical foundations behind each pathway.</p>
+                </div>
+                <div class="department-card-grid">
+                    <article class="department-card reveal" data-department-card="civil-engineering"><div class="department-card__image"><img
                             src="assets/images/uploaded/surveying-field-practical.jpg"
-                            alt="Civil Engineering students using surveying equipment" loading="lazy">
-                        <div class="photo-card-body"><span class="tag">Civil Engineering</span>
-                            <h3>Building the world around us</h3>
+                            alt="Civil Engineering students using surveying equipment" loading="lazy"><span class="department-card__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M3 21h18M5 21V8l7-4 7 4v13M9 21v-7h6v7M8 9h.01M16 9h.01"/></svg></span></div>
+                        <div class="department-card__body"><span class="department-card__eyebrow">01 · Built environment</span><h3>Civil Engineering</h3>
+                            <h4>Building the world around us</h4>
                             <p>The department prepares skilled civil engineers to address modern infrastructure needs
                                 through knowledge of dams, buildings, bridges, roads, surveying and construction.</p><a
-                                class="mini-link" href="courses.html">View course codes →</a>
+                                class="department-card__link" href="#civil-engineering">Explore department <span aria-hidden="true">↗</span></a>
                         </div>
                     </article>
-                    <article class="photo-card card reveal"><img src="assets/images/uploaded/computer-lab-students.jpg"
-                            alt="Computer Engineering students working in the laboratory" loading="lazy">
-                        <div class="photo-card-body"><span class="tag">Computer Engineering</span>
-                            <h3>Hardware, software and IT</h3>
+                    <article class="department-card reveal" data-department-card="computer-engineering"><div class="department-card__image"><img src="assets/images/uploaded/computer-lab-students.jpg"
+                            alt="Computer Engineering students working in the laboratory" loading="lazy"><span class="department-card__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4M7 9l3 3-3 3M13 15h4"/></svg></span></div>
+                        <div class="department-card__body"><span class="department-card__eyebrow">02 · Computing &amp; technology</span><h3>Computer Engineering</h3>
+                            <h4>Hardware, software and IT</h4>
                             <p>Combining electrical engineering and computer science principles, the department develops
                                 knowledge of computer systems, programming languages, hardware, software and the IT
-                                industry.</p><a class="mini-link" href="courses.html">View course codes →</a>
+                                industry.</p><a class="department-card__link" href="#computer-engineering">Explore department <span aria-hidden="true">↗</span></a>
                         </div>
                     </article>
-                    <article class="photo-card card reveal"><img src="assets/images/uploaded/electrical-practical.jpg"
-                            alt="Electrical Engineering practical demonstration" loading="lazy">
-                        <div class="photo-card-body"><span class="tag">Electrical Engineering</span>
-                            <h3>Energy, electronics and systems</h3>
+                    <article class="department-card reveal" data-department-card="electrical-engineering"><div class="department-card__image"><img src="assets/images/uploaded/electrical-practical.jpg"
+                            alt="Electrical Engineering practical demonstration" loading="lazy"><span class="department-card__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M13 2 5 13h6l-1 9 9-12h-6l1-8Z"/></svg></span></div>
+                        <div class="department-card__body"><span class="department-card__eyebrow">03 · Energy &amp; systems</span><h3>Electrical Engineering</h3>
+                            <h4>Energy, electronics and systems</h4>
                             <p>Students study the design and application of electrical systems, electronics and
                                 electromagnetism for industries involving technology, energy and communications.</p><a
-                                class="mini-link" href="courses.html">View course codes →</a>
+                                class="department-card__link" href="#electrical-engineering">Explore department <span aria-hidden="true">↗</span></a>
                         </div>
                     </article>
-                    <article class="photo-card card reveal"><img src="assets/images/uploaded/computer-lab-practical.jpg"
-                            alt="Students completing practical work in a computer lab" loading="lazy">
-                        <div class="photo-card-body"><span class="tag">AI & Machine Learning</span>
-                            <h3>Intelligence powered by data</h3>
+                    <article class="department-card reveal" data-department-card="artificial-intelligence-machine-learning"><div class="department-card__image"><img src="assets/images/uploaded/computer-lab-practical.jpg"
+                            alt="Students completing practical work in a computer lab" loading="lazy"><span class="department-card__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="6" height="6" rx="2"/><rect x="15" y="3" width="6" height="6" rx="2"/><rect x="9" y="15" width="6" height="6" rx="2"/><path d="M9 6h6M18 9v3l-6 3"/></svg></span></div>
+                        <div class="department-card__body"><span class="department-card__eyebrow">04 · Intelligent systems</span><h3>AI &amp; Machine Learning</h3>
+                            <h4>Intelligence powered by data</h4>
                             <p>AI students learn how systems analyse data, recognise patterns and make predictions
                                 through machine learning, natural language processing and database management.</p><a
-                                class="mini-link" href="courses.html">View course codes →</a>
+                                class="department-card__link" href="#artificial-intelligence-machine-learning">Explore department <span aria-hidden="true">↗</span></a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </section>
+        <section class="section department-profiles-section" aria-labelledby="department-profiles-title">
+            <div class="container">
+                <div class="department-section-heading department-section-heading--profiles">
+                    <div><p class="department-kicker department-kicker--light"><span></span> Inside each department</p>
+                    <h2 id="department-profiles-title">Learn where your<br><em>curiosity can lead.</em></h2></div>
+                    <p>From guided practicals to projects and mentoring, each department connects its core subjects with hands-on learning.</p>
+                </div>
+                <div class="department-profile-list">
+                    <article class="department-profile" id="civil-engineering" data-department-profile="Civil Engineering">
+                        <div class="department-profile__media"><img src="assets/images/uploaded/surveying-field-practical.jpg" alt="Civil Engineering students practising land surveying on campus" loading="lazy"><span class="department-profile__index">01</span></div>
+                        <div class="department-profile__content"><p class="department-profile__eyebrow">Civil Engineering · Built environment</p><h2>Plan, measure and build with confidence.</h2><p class="department-profile__intro">Develop practical understanding of infrastructure through surveying, construction materials, site practice and the study of buildings, bridges, roads and dams.</p>
+                            <div class="department-profile__details"><section class="department-detail-block"><h3>Department leadership</h3><div class="department-hod" data-hod-slot><span class="department-hod__mark" aria-hidden="true">HOD</span><div><strong data-hod-name>Department Head</strong><span data-hod-role>Academic guidance &amp; mentoring</span></div></div><div class="department-faculty-list" data-faculty-list></div><a class="department-text-link" href="faculty.html">Meet Civil faculty <span aria-hidden="true">↗</span></a></section><section class="department-detail-block"><h3>Labs &amp; possible pathways</h3><ul class="department-lab-list" data-labs-list><li>Surveying and field practice</li><li>Construction materials and testing</li><li>CAD and design fundamentals</li></ul><p class="department-career-label">Potential career areas</p><div class="department-career-tags"><span>Construction</span><span>Surveying</span><span>Infrastructure</span><span>Project support</span></div></section></div>
+                            <a class="department-course-link" href="courses.html">View Civil Engineering courses <span aria-hidden="true">↗</span></a>
+                        </div>
+                    </article>
+                    <article class="department-profile department-profile--reverse" id="computer-engineering" data-department-profile="Computer Engineering">
+                        <div class="department-profile__media"><img src="assets/images/uploaded/computer-lab-students.jpg" alt="Computer Engineering students working in a campus computer laboratory" loading="lazy"><span class="department-profile__index">02</span></div>
+                        <div class="department-profile__content"><p class="department-profile__eyebrow">Computer Engineering · Computing &amp; IT</p><h2>Turn logic into useful technology.</h2><p class="department-profile__intro">Build foundations in computer systems, programming, hardware, software and information technology through coursework and laboratory practice.</p>
+                            <div class="department-profile__details"><section class="department-detail-block"><h3>Department leadership</h3><div class="department-hod" data-hod-slot><span class="department-hod__mark" aria-hidden="true">HOD</span><div><strong data-hod-name>Department Head</strong><span data-hod-role>Academic guidance &amp; mentoring</span></div></div><div class="department-faculty-list" data-faculty-list></div><a class="department-text-link" href="faculty.html">Meet Computer faculty <span aria-hidden="true">↗</span></a></section><section class="department-detail-block"><h3>Labs &amp; possible pathways</h3><ul class="department-lab-list" data-labs-list><li>Programming and software practice</li><li>Networking and computer systems</li><li>Database management</li></ul><p class="department-career-label">Potential career areas</p><div class="department-career-tags"><span>Software</span><span>IT services</span><span>Networking</span><span>Database support</span></div></section></div>
+                            <a class="department-course-link" href="courses.html">View Computer Engineering courses <span aria-hidden="true">↗</span></a>
+                        </div>
+                    </article>
+                    <article class="department-profile" id="electrical-engineering" data-department-profile="Electrical Engineering">
+                        <div class="department-profile__media"><img src="assets/images/uploaded/electrical-practical.jpg" alt="Electrical Engineering students learning with laboratory instruments" loading="lazy"><span class="department-profile__index">03</span></div>
+                        <div class="department-profile__content"><p class="department-profile__eyebrow">Electrical Engineering · Energy &amp; systems</p><h2>Understand the systems that power everyday life.</h2><p class="department-profile__intro">Study electrical systems, electronics and electromagnetism while building practical familiarity with circuits, electrical machines, power systems and communications.</p>
+                            <div class="department-profile__details"><section class="department-detail-block"><h3>Department leadership</h3><div class="department-hod" data-hod-slot><span class="department-hod__mark" aria-hidden="true">HOD</span><div><strong data-hod-name>Department Head</strong><span data-hod-role>Academic guidance &amp; mentoring</span></div></div><div class="department-faculty-list" data-faculty-list></div><a class="department-text-link" href="faculty.html">Meet Electrical faculty <span aria-hidden="true">↗</span></a></section><section class="department-detail-block"><h3>Labs &amp; possible pathways</h3><ul class="department-lab-list" data-labs-list><li>Electrical circuits and measurements</li><li>Electrical machines and power</li><li>Electronics and control systems</li></ul><p class="department-career-label">Potential career areas</p><div class="department-career-tags"><span>Power systems</span><span>Electronics</span><span>Maintenance</span><span>Energy services</span></div></section></div>
+                            <a class="department-course-link" href="courses.html">View Electrical Engineering courses <span aria-hidden="true">↗</span></a>
+                        </div>
+                    </article>
+                    <article class="department-profile department-profile--reverse" id="artificial-intelligence-machine-learning" data-department-profile="AI &amp; Machine Learning">
+                        <div class="department-profile__media"><img src="assets/images/uploaded/computer-lab-practical.jpg" alt="Students working with computers in a practical learning session" loading="lazy"><span class="department-profile__index">04</span></div>
+                        <div class="department-profile__content"><p class="department-profile__eyebrow">AI &amp; Machine Learning · Intelligent systems</p><h2>Find patterns. Create smarter solutions.</h2><p class="department-profile__intro">Explore how software uses data to recognise patterns and make predictions through machine learning, natural language processing and database management.</p>
+                            <div class="department-profile__details"><section class="department-detail-block"><h3>Department leadership</h3><div class="department-hod" data-hod-slot><span class="department-hod__mark" aria-hidden="true">HOD</span><div><strong data-hod-name>Department Head</strong><span data-hod-role>Academic guidance &amp; mentoring</span></div></div><div class="department-faculty-list" data-faculty-list></div><a class="department-text-link" href="faculty.html">Meet AI faculty <span aria-hidden="true">↗</span></a></section><section class="department-detail-block"><h3>Labs &amp; possible pathways</h3><ul class="department-lab-list" data-labs-list><li>Artificial intelligence and data science</li><li>Machine learning and programming</li><li>Natural language and database systems</li></ul><p class="department-career-label">Potential career areas</p><div class="department-career-tags"><span>Data analytics</span><span>Machine learning</span><span>Software</span><span>Intelligent systems</span></div></section></div>
+                            <a class="department-course-link" href="courses.html">View AI &amp; Machine Learning courses <span aria-hidden="true">↗</span></a>
                         </div>
                     </article>
                 </div>

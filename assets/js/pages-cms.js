@@ -115,6 +115,73 @@ export async function renderFacultyPage() {
     }).join("");
 }
 
+export async function renderDepartmentsPage() {
+    const profiles = [...document.querySelectorAll("[data-department-profile]")];
+    if (!profiles.length) return;
+    try {
+        await ensureMediaMap();
+        const [departmentRows, facultyRows] = await Promise.all([
+            loadPublished("departments"),
+            loadPublished("faculty"),
+        ]);
+        for (const profile of profiles) {
+            const key = departmentKey(profile.dataset.departmentProfile);
+            if (!key) continue;
+            const department = departmentRows.find((row) => departmentKey(row.title) === key);
+            if (department) {
+                const name = String(department.hod_name || "").trim();
+                const isPlaceholder = !name || /^(?:hod\b|head of (?:the )?department\b)/i.test(name);
+                if (!isPlaceholder) {
+                    const nameTarget = profile.querySelector("[data-hod-name]");
+                    const roleTarget = profile.querySelector("[data-hod-role]");
+                    if (nameTarget) nameTarget.textContent = name;
+                    if (roleTarget) roleTarget.textContent = "Head of Department";
+                    const photoPath = resolveAdminPreviewUrl(department.hod_photo_url || "");
+                    const mark = profile.querySelector(".department-hod__mark");
+                    if (photoPath && mark) {
+                        mark.outerHTML = `<img class="department-hod__photo" src="${esc(photoPath)}" alt="${esc(name)}" loading="lazy" decoding="async">`;
+                    }
+                }
+
+                const labs = String(department.labs || "")
+                    .replace(/<[^>]*>/g, ",")
+                    .split(/[,;\n•|]+/)
+                    .map((lab) => lab.trim())
+                    .filter(Boolean);
+                const labsTarget = profile.querySelector("[data-labs-list]");
+                if (labsTarget && labs.length) {
+                    labsTarget.innerHTML = labs.map((lab) => `<li>${esc(lab)}</li>`).join("");
+                }
+            }
+
+            const faculty = facultyRows
+                .filter((row) => departmentKey(row.department) === key)
+                .slice(0, 2);
+            const facultyTarget = profile.querySelector("[data-faculty-list]");
+            if (facultyTarget && faculty.length) {
+                facultyTarget.innerHTML = faculty.map((row) => {
+                    const name = String(row.name || "Faculty member").trim();
+                    const qualification = String(row.qualification || row.experience || "Academic faculty").trim();
+                    return `<article class="department-faculty-mini"><span class="department-faculty-mini__initial" aria-hidden="true">${esc(name.charAt(0))}</span><div><strong>${esc(name)}</strong><small>${esc(qualification)}</small></div></article>`;
+                }).join("");
+            }
+        }
+    } catch {
+        // Keep the bundled department descriptions and laboratory summaries visible if CMS data is unavailable.
+    }
+}
+
+function departmentKey(value) {
+    const name = String(value || "").toLowerCase();
+    if (name.includes("civil")) return "civil-engineering";
+    if (name.includes("computer")) return "computer-engineering";
+    if (name.includes("electrical")) return "electrical-engineering";
+    if (name.includes("artificial intelligence") || name.includes("machine learning") || /\bai\b|\bai\s*&\s*ml\b/.test(name)) {
+        return "ai-machine-learning";
+    }
+    return name.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
 export async function renderPlacementsPage() {
     const statsHost = document.getElementById("placement-stats");
     const storiesHost = document.getElementById("placement-stories");
