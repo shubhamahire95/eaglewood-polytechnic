@@ -26,7 +26,7 @@ const MIME = {
 
 const ADMIN_MODULES = [
     "principal_message", "updates", "notices", "courses", "departments",
-    "faculty", "facilities", "placements", "gallery", "footer_blocks", "home_slides",
+    "faculty", "facilities", "placements", "gallery", "footer_blocks", "home_slides", "inquiries",
 ];
 
 const server = await new Promise((resolve) => {
@@ -98,29 +98,23 @@ if (await page.locator("#contact-message-form").count()) {
     }));
 }
 
-// Admission form
+// Admission guidance inquiry
 await page.goto(`http://127.0.0.1:${PORT}/admission.html`, { waitUntil: "networkidle" });
 await page.waitForTimeout(2500);
-if (await page.locator("#admission-multistep-form").count()) {
-    const form = page.locator("#admission-multistep-form");
-    await form.locator('[data-step="1"] [name="student_name"]').fill("QA Student");
-    await form.locator('[data-step="1"] [name="phone"]').fill("9876543210");
-    await form.locator('[data-step="1"] [name="email"]').fill("student@example.com");
-    await form.locator('[data-step="1"] [data-next-step]').click();
-    await page.waitForTimeout(500);
-    const courseSelect = form.locator('[data-step="2"] [name="course"]');
-    if (await courseSelect.count()) {
-        const val = await courseSelect.locator("option").nth(1).getAttribute("value");
-        if (val) await courseSelect.selectOption(val);
-    }
-    await form.locator('[data-step="2"] [data-next-step]').click();
-    await page.waitForTimeout(500);
-    await form.locator('[data-step="3"] button[type="submit"]').click();
+if (await page.locator("#admission-help-form").count()) {
+    const form = page.locator("#admission-help-form");
+    await form.locator('[name="name"]').fill("QA Student");
+    await form.locator('[name="phone"]').fill("9876543210");
+    await form.locator('[name="email"]').fill("student@example.com");
+    const courseValue = await form.locator('[name="course"] option').nth(1).getAttribute("value");
+    if (courseValue) await form.locator('[name="course"]').selectOption(courseValue);
+    await form.locator('[name="qualification"]').selectOption("SSC / 10th passed");
+    await form.locator('[name="message"]').fill("QA CAP admission guidance request.");
+    await form.locator('button[type="submit"]').click();
     await page.waitForTimeout(1500);
     results.forms.admission = await page.evaluate(() => ({
-        success: document.querySelector("#admission-multistep-form .form-status")?.classList.contains("success")
-            || Boolean(document.querySelector(".admission-success")),
-        text: document.querySelector("#admission-multistep-form .form-status")?.textContent || "",
+        success: document.querySelector("#admission-help-form .form-status")?.classList.contains("success"),
+        text: document.querySelector("#admission-help-form .form-status")?.textContent || "",
     }));
 }
 
@@ -139,6 +133,10 @@ for (const key of ADMIN_MODULES) {
     const match = countText.match(/(\d+)/);
     results.admin[key] = match ? Number(match[1]) : 0;
 }
+
+await page.locator('[data-key="inquiries"]').first().click();
+await page.waitForTimeout(800);
+results.admin.inquiryCallLinks = await page.locator('#moduleTable a.record-call-link[href^="tel:"]').count().catch(() => 0);
 
 await page.locator('[data-key="contacts"]').first().click();
 await page.waitForTimeout(800);
@@ -173,7 +171,8 @@ const homeOk = Object.values(results.home).every(Boolean);
 const adminOk = ADMIN_MODULES.every((k) => (results.admin[k] || 0) > 0);
 const formsOk = results.forms.contact?.success && results.forms.admission?.success;
 const contactsAdminOk = results.admin.contactsVisible;
-const allOk = homeOk && adminOk && formsOk && contactsAdminOk && !badRpc.length && !consoleErrors.length;
+const inquiryCallLinkOk = (results.admin.inquiryCallLinks || 0) > 0;
+const allOk = homeOk && adminOk && formsOk && contactsAdminOk && inquiryCallLinkOk && !badRpc.length && !consoleErrors.length;
 
 if (allOk) {
     console.log("\nPASS: Full production verification.");

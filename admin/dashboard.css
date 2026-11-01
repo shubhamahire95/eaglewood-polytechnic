@@ -1450,7 +1450,10 @@ body.sidebar-open .erp-sidebar { transform: translateX(0); }
   .erp-sidebar {
     transform: translateX(-100%);
     width: min(300px, 88vw);
+    z-index: 50;
   }
+
+  .sidebar-overlay { z-index: 45; }
 
   body.sidebar-open .erp-sidebar { transform: translateX(0); }
 
@@ -1475,7 +1478,30 @@ body.sidebar-open .erp-sidebar { transform: translateX(0); }
   .module-header-actions input { flex: 1; min-width: 0; }
   .editor-fields { grid-template-columns: 1fr; }
   .context-card { flex-direction: column; align-items: flex-start; }
-  .erp-topbar { padding: 12px 16px; }
+  .erp-topbar {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding: 12px 16px;
+  }
+  .topbar-left {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .topbar-title-block { min-width: 0; }
+  .topbar-title-block .eyebrow,
+  .topbar-title-block h1 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .topbar-right {
+    flex: 1 1 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .dash-charts-row { grid-template-columns: minmax(0, 1fr); }
+  .dash-charts-row > * { min-width: 0; }
 }
 
 .live-stats-row {

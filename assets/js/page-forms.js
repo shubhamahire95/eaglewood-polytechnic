@@ -68,209 +68,67 @@ async function enhanceContactPage() {
 
 async function enhanceAdmissionPage() {
     const slot = document.getElementById("admission-form-slot");
-    if (!slot || document.getElementById("admission-multistep-form")) return;
+    if (!slot || document.getElementById("admission-help-form")) return;
 
     const courses = await loadCourses();
     const options = courses.map((c) => `<option value="${escapeHtml(c.title)}">${escapeHtml(c.title)}</option>`).join("");
 
     slot.innerHTML = `
-        <section class="section admission-form-section" id="admission-form">
-            <div class="container">
-                <div class="admission-form-shell glass-card">
-                    <div class="admission-progress" aria-hidden="true">
-                        <div class="admission-progress-bar"><span id="admissionProgressFill"></span></div>
-                        <ol class="admission-steps-nav">
-                            <li class="active" data-step-nav="1">Personal</li>
-                            <li data-step-nav="2">Academic</li>
-                            <li data-step-nav="3">Review</li>
-                        </ol>
-                    </div>
-                    <form id="admission-multistep-form" class="cms-form route-form admission-multistep" data-table="admissions" novalidate>
-                        <div class="admission-form-step active" data-step="1">
-                            <p class="eyebrow">Step 1 of 3</p>
-                            <h2>Student Details</h2>
-                            <div class="form-field-grid">
-                                <label class="field-block"><span>Student Name</span><input name="student_name" type="text" autocomplete="name" required data-label="Student Name"></label>
-                                <label class="field-block"><span>Phone</span><input name="phone" type="tel" autocomplete="tel" required inputmode="tel" data-label="Phone"></label>
-                                <label class="field-block"><span>Email</span><input name="email" type="email" autocomplete="email" data-label="Email"></label>
-                                <label class="field-block"><span>Address</span><input name="address" type="text" autocomplete="street-address" data-label="Address"></label>
-                            </div>
-                            <p class="form-step-status" aria-live="polite"></p>
-                            <button class="btn btn-primary" type="button" data-next-step>Continue</button>
-                        </div>
-                        <div class="admission-form-step" data-step="2">
-                            <p class="eyebrow">Step 2 of 3</p>
-                            <h2>Academic Information</h2>
-                            <div class="form-field-grid">
-                                <label class="field-block field-block--course">
-                                    <span>Select Course</span>
-                                    <select name="course" required data-label="Course">
-                                        <option value="">Select Course</option>
-                                        ${options}
-                                    </select>
-                                    <small class="field-hint">Choose the diploma or degree program you wish to apply for.</small>
-                                </label>
-                                <label class="field-block"><span>Previous School / College</span><input name="previous_school" type="text" data-label="Previous School"></label>
-                                <label class="field-block full"><span>Additional Notes</span><textarea name="message" placeholder="Eligibility, category, scholarship or other details" data-label="Notes"></textarea></label>
-                            </div>
-                            <p class="form-step-status" aria-live="polite"></p>
-                            <div class="admission-step-actions">
-                                <button class="btn btn-secondary" type="button" data-prev-step>Back</button>
-                                <button class="btn btn-primary" type="button" data-next-step>Preview Application</button>
-                            </div>
-                        </div>
-                        <div class="admission-form-step" data-step="3">
-                            <p class="eyebrow">Step 3 of 3</p>
-                            <h2>Review & Submit</h2>
-                            <div id="admissionPreview" class="admission-preview"></div>
-                            <p class="form-step-status" aria-live="polite"></p>
-                            <div class="admission-step-actions">
-                                <button class="btn btn-secondary" type="button" data-prev-step>Back</button>
-                                <button class="btn btn-primary" type="submit">Submit Application</button>
-                            </div>
-                        </div>
-                        <p class="form-status" aria-live="polite"></p>
-                    </form>
-                </div>
+        <section class="admission-form-card" id="admission-form">
+            <div class="admission-form-card__intro">
+                <p class="admission-kicker">Guidance request</p>
+                <h3>How can we help you?</h3>
+                <p>Share your contact details and question. This is an enquiry to the college, not a CAP application.</p>
             </div>
+            <form id="admission-help-form" class="admission-help-form route-form" novalidate>
+                <div class="admission-form-grid">
+                    <label class="admission-form-field">
+                        <span>Student Name <b aria-hidden="true">*</b></span>
+                        <input name="name" type="text" autocomplete="name" maxlength="120" placeholder="Your full name" required>
+                    </label>
+                    <label class="admission-form-field">
+                        <span>Mobile Number <b aria-hidden="true">*</b></span>
+                        <input name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" pattern="[0-9]{10}" maxlength="10" placeholder="10-digit mobile number" aria-describedby="admission-phone-hint" required>
+                        <small id="admission-phone-hint">Enter a 10-digit number so our team can call you.</small>
+                    </label>
+                    <label class="admission-form-field">
+                        <span>Email</span>
+                        <input name="email" type="email" autocomplete="email" maxlength="254" placeholder="you@example.com">
+                    </label>
+                    <label class="admission-form-field">
+                        <span>Interested Course <b aria-hidden="true">*</b></span>
+                        <select name="course" required>
+                            <option value="">Choose a course</option>
+                            ${options}
+                        </select>
+                    </label>
+                    <label class="admission-form-field admission-form-field--full">
+                        <span>10th/12th Qualification <b aria-hidden="true">*</b></span>
+                        <select name="qualification" required>
+                            <option value="">Select your latest qualification</option>
+                            <option value="SSC / 10th passed">SSC / 10th passed</option>
+                            <option value="HSC / 12th passed">HSC / 12th passed</option>
+                            <option value="Diploma completed">Diploma completed</option>
+                            <option value="Currently appearing / result awaited">Currently appearing / result awaited</option>
+                            <option value="Other / need help confirming eligibility">Other / need help confirming eligibility</option>
+                        </select>
+                    </label>
+                    <label class="admission-form-field admission-form-field--full">
+                        <span>Message <b aria-hidden="true">*</b></span>
+                        <textarea name="message" rows="4" maxlength="1200" placeholder="Tell us what you would like guidance about." required></textarea>
+                    </label>
+                </div>
+                <p class="admission-form-card__privacy"><span aria-hidden="true">●</span> We use these details only to respond to your enquiry. Please do not include Aadhaar numbers or attach document copies.</p>
+                <div class="admission-form-card__actions">
+                    <button class="admission-submit" type="submit">Send guidance request <span aria-hidden="true">→</span></button>
+                    <span class="admission-submit-note">Our admission team will contact you.</span>
+                </div>
+                <p class="form-status admission-form-status" role="status" aria-live="polite"></p>
+            </form>
         </section>
     `;
 
-    initAdmissionMultistep();
-    bindForm("admission-multistep-form", "admissions");
-}
-
-function initAdmissionMultistep() {
-    const form = document.getElementById("admission-multistep-form");
-    if (!form) return;
-    let step = 1;
-
-    const showStep = (next) => {
-        step = Math.min(3, Math.max(1, next));
-        form.querySelectorAll(".admission-form-step").forEach((panel) => {
-            panel.classList.toggle("active", Number(panel.dataset.step) === step);
-        });
-        form.querySelectorAll("[data-step-nav]").forEach((item) => {
-            item.classList.toggle("active", Number(item.dataset.stepNav) === step);
-            item.classList.toggle("done", Number(item.dataset.stepNav) < step);
-        });
-        const fill = document.getElementById("admissionProgressFill");
-        if (fill) fill.style.width = `${(step / 3) * 100}%`;
-        if (step === 3) renderAdmissionPreview(form);
-        clearFieldErrors(form);
-    };
-
-    form.querySelectorAll("[data-next-step]").forEach((btn) => btn.addEventListener("click", () => {
-        const panel = form.querySelector(`.admission-form-step[data-step="${step}"]`);
-        const result = validatePanel(panel, { focus: true });
-        if (!result.valid) return;
-        showStep(step + 1);
-    }));
-
-    form.querySelectorAll("[data-prev-step]").forEach((btn) => btn.addEventListener("click", () => showStep(step - 1)));
-
-    form.__admissionGoToStep = showStep;
-    showStep(1);
-}
-
-function validateAdmissionForm(form, options = {}) {
-    const panels = [...form.querySelectorAll(".admission-form-step")];
-    for (const panel of panels) {
-        const result = validatePanel(panel, options);
-        if (!result.valid) {
-            return { valid: false, step: Number(panel.dataset.step), field: result.field, message: result.message };
-        }
-    }
-    return { valid: true };
-}
-
-function validatePanel(panel, options = {}) {
-    if (!panel) return { valid: true };
-    clearFieldErrors(panel.closest("form") || panel);
-
-    const fields = [...panel.querySelectorAll("input, select, textarea")].filter((el) => el.hasAttribute("required"));
-    for (const field of fields) {
-        const message = fieldValidationMessage(field);
-        if (message) {
-            markFieldInvalid(field, message);
-            const status = panel.querySelector(".form-step-status");
-            if (status) status.textContent = message;
-            if (options.focus) focusField(field);
-            return { valid: false, field, message };
-        }
-    }
-
-    const emailField = panel.querySelector('input[type="email"]');
-    if (emailField?.value.trim() && !emailField.checkValidity()) {
-        const message = "Enter a valid email address.";
-        markFieldInvalid(emailField, message);
-        const status = panel.querySelector(".form-step-status");
-        if (status) status.textContent = message;
-        if (options.focus) focusField(emailField);
-        return { valid: false, field: emailField, message };
-    }
-
-    const status = panel.querySelector(".form-step-status");
-    if (status) status.textContent = "";
-    return { valid: true };
-}
-
-function fieldValidationMessage(field) {
-    const label = field.dataset.label || field.name || "This field";
-    const value = String(field.value || "").trim();
-
-    if (field.hasAttribute("required") && !value) {
-        return `${label} is required.`;
-    }
-
-    if (field.type === "tel" && value && value.replace(/\D/g, "").length < 10) {
-        return "Enter a valid 10-digit phone number.";
-    }
-
-    return "";
-}
-
-function markFieldInvalid(field, message) {
-    const label = field.closest(".field-block") || field.closest("label");
-    label?.classList.add("is-invalid");
-    field.setAttribute("aria-invalid", "true");
-    let hint = label?.querySelector(".field-error");
-    if (!hint && label) {
-        hint = document.createElement("small");
-        hint.className = "field-error";
-        label.appendChild(hint);
-    }
-    if (hint) hint.textContent = message;
-}
-
-function clearFieldErrors(root) {
-    root.querySelectorAll(".is-invalid").forEach((el) => el.classList.remove("is-invalid"));
-    root.querySelectorAll("[aria-invalid]").forEach((el) => el.removeAttribute("aria-invalid"));
-    root.querySelectorAll(".field-error").forEach((el) => el.remove());
-    root.querySelectorAll(".form-step-status").forEach((el) => { el.textContent = ""; });
-}
-
-function focusField(field) {
-    if (!field) return;
-    field.scrollIntoView({ behavior: "smooth", block: "center" });
-    window.setTimeout(() => field.focus({ preventScroll: true }), 280);
-}
-
-function renderAdmissionPreview(form) {
-    const data = Object.fromEntries(new FormData(form).entries());
-    const preview = document.getElementById("admissionPreview");
-    if (!preview) return;
-    preview.innerHTML = `
-        <dl class="preview-grid">
-            <div><dt>Student Name</dt><dd>${escapeHtml(data.student_name || "—")}</dd></div>
-            <div><dt>Phone</dt><dd>${escapeHtml(data.phone || "—")}</dd></div>
-            <div><dt>Email</dt><dd>${escapeHtml(data.email || "—")}</dd></div>
-            <div><dt>Course</dt><dd>${escapeHtml(data.course || "—")}</dd></div>
-            <div><dt>Previous School</dt><dd>${escapeHtml(data.previous_school || "—")}</dd></div>
-            <div class="full"><dt>Address</dt><dd>${escapeHtml(data.address || "—")}</dd></div>
-            <div class="full"><dt>Notes</dt><dd>${escapeHtml(data.message || "—")}</dd></div>
-        </dl>
-    `;
+    bindForm("admission-help-form", "inquiries");
 }
 
 async function loadSettings() {
@@ -343,19 +201,10 @@ function bindForm(id, table) {
         event.preventDefault();
         if (form.dataset.submitting === "true") return;
 
-        if (form.id === "admission-multistep-form") {
-            const check = validateAdmissionForm(form, { focus: true });
-            if (!check.valid) {
-                form.__admissionGoToStep?.(check.step);
-                if (check.field) focusField(check.field);
-                return;
-            }
-        } else {
-            const firstInvalid = form.querySelector(":invalid");
-            if (firstInvalid) {
-                firstInvalid.reportValidity();
-                return;
-            }
+        const firstInvalid = form.querySelector(":invalid");
+        if (firstInvalid) {
+            firstInvalid.reportValidity();
+            return;
         }
 
         const status = form.querySelector(".form-status");
@@ -371,6 +220,12 @@ function bindForm(id, table) {
         }
 
         const payload = Object.fromEntries(new FormData(form).entries());
+        if (form.id === "admission-help-form") {
+            const qualification = payload.qualification;
+            const question = String(payload.message || "").trim();
+            delete payload.qualification;
+            payload.message = `Qualification: ${qualification}\n\n${question}`;
+        }
         if (table === "admissions") {
             payload.status = payload.status || "new";
             payload.application_status = payload.application_status || "pending";
@@ -391,34 +246,29 @@ function bindForm(id, table) {
                 throw new Error(result.reason);
             }
 
-            const toastMessage = form.id === "home-inquiry-form"
+            const toastMessage = form.id === "admission-help-form"
+                ? "Your guidance request has been sent. The admission team will contact you soon."
+                : form.id === "home-inquiry-form"
                 ? "Inquiry submitted successfully. Our team will contact you shortly."
                 : form.id === "contact-message-form"
                     ? "Message sent successfully. Our team will respond soon."
-                    : "Application submitted successfully. Our team will contact you shortly.";
-            status.textContent = result.queued
-                ? "Submitted successfully. Our team will contact you soon."
-                : "Submitted successfully. Our admission team will contact you soon.";
+                    : "Inquiry submitted successfully. Our team will contact you shortly.";
+            status.textContent = form.id === "admission-help-form"
+                ? (result.queued ? "Request received. Our team will contact you soon." : "Request sent securely. Our admission team will contact you soon.")
+                : form.id === "contact-message-form"
+                    ? (result.queued ? "Message received. Our team will respond soon." : "Message sent successfully. Our team will respond soon.")
+                    : result.queued
+                        ? "Inquiry received. Our team will contact you soon."
+                        : "Inquiry submitted successfully. Our team will contact you shortly.";
             status.classList.add("success");
             showFormToast(toastMessage, "success");
 
-            if (form.id === "admission-multistep-form") {
-                form.querySelectorAll(".admission-form-step").forEach((panel) => panel.classList.remove("active"));
-                form.querySelector(".admission-progress")?.setAttribute("hidden", "");
-                const existing = form.querySelector(".admission-success");
-                if (!existing) {
-                    form.insertAdjacentHTML("beforeend", '<div class="admission-success"><strong>Application Received</strong><p>Thank you for applying to Eaglewood Polytechnic Institute. Our admissions office will contact you soon.</p></div>');
-                }
-                form.reset();
-                form.classList.add("submitted");
-            } else {
-                form.reset();
-                form.classList.add("submitted");
-            }
+            form.reset();
+            form.classList.add("submitted");
         } catch (err) {
             const message = err?.message === "CMS not configured"
                 ? "Online submission is not configured yet. Please call +91 94237 16230."
-                : "Could not submit online. Please call +91 94237 16230.";
+                : "Could not send your request. Please try again or call +91 94237 16230.";
             status.textContent = message;
             status.classList.add("error");
             showFormToast(message, "error");

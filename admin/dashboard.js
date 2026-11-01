@@ -182,6 +182,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateSystemStatus();
     setInterval(updateLiveClock, 1000);
     updateLiveClock();
+    setInterval(() => {
+        if (document.visibilityState !== "visible") return;
+        void refreshPendingBar();
+        if (currentModule?.key === "dashboard") void loadDashboard().catch(handleModuleLoadError);
+        else if (currentModule?.key === "inquiries" && !editorDirty && !isModalOpen()) void loadModule().catch(handleModuleLoadError);
+    }, 60000);
 
     document.addEventListener("visibilitychange", () => {
         if (document.visibilityState !== "visible") return;
@@ -193,14 +199,24 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
             await refreshPendingBar();
             if (currentModule?.key === "dashboard") void loadDashboard();
+            else if (currentModule?.key === "inquiries" && !editorDirty && !isModalOpen()) void loadModule();
             else updateSystemStatus();
         }, 500);
+    });
+
+    window.addEventListener("storage", (event) => {
+        if (event.key !== "ew_cms_updated_at" || document.visibilityState !== "visible") return;
+        clearTimeout(dashboardVisibilityTimer);
+        dashboardVisibilityTimer = setTimeout(async () => {
+            await refreshPendingBar();
+            if (currentModule?.key === "dashboard") void loadDashboard().catch(handleModuleLoadError);
+            else if (currentModule?.key === "inquiries" && !editorDirty && !isModalOpen()) void loadModule().catch(handleModuleLoadError);
+        }, 300);
     });
 });
 
 async function refreshPendingBar() {
-    const bar = $("pendingBar");
-    if (bar) bar.hidden = true;
+    await updatePendingBar();
 }
 
 function updateConnectionBanner() {
@@ -949,9 +965,17 @@ function renderPendingInquiries(inquiries, probe, cmsReady) {
     target.innerHTML = inquiries.slice(0, 6).map((row) => `
         <div class="list-item">
             <strong>${esc(row.name || "Inquiry")}</strong>
-            <span class="muted">${esc(row.course || row.phone || row.email || "No contact")} · ${esc(row.reply_status || row.status || "pending")} · ${formatDate(row.created_at)}</span>
+            <span class="muted">${esc(row.course || row.email || "Admission enquiry")} · ${esc(row.reply_status || row.status || "pending")} · ${formatDate(row.created_at)}${renderPhoneCallLink(row)}</span>
         </div>
     `).join("");
+}
+
+function renderPhoneCallLink(row) {
+    const phone = String(row?.phone || "").trim();
+    const dialable = phone.replace(/[^\d+]/g, "");
+    if (!/^\+?\d{10,15}$/.test(dialable)) return "";
+    const name = row.name || row.student_name || "student";
+    return `<a class="record-call-link" href="tel:${esc(dialable)}" aria-label="Call ${esc(name)} at ${esc(phone)}"> · Call ${esc(phone)}</a>`;
 }
 
 async function fetchMediaStorage() {
@@ -1505,7 +1529,7 @@ function renderTableRow(row) {
     return `<tr class="${row._queued ? "row-queued" : ""} ${selected ? "is-selected" : ""}" data-row-id="${row.id}">
         <td class="col-check"><input class="row-check" type="checkbox" data-select="${row.id}" ${selected ? "checked" : ""} aria-label="Select ${esc(title)}"></td>
         <td class="col-image">${image ? `<img class="thumb" src="${esc(resolvePreviewUrl(image))}" alt="" loading="lazy" onerror="this.style.opacity='0.35'">` : `<span class="thumb-placeholder" aria-hidden="true">◌</span>`}</td>
-        <td class="row-title-cell">${highlightMatch(title)}</td>
+        <td class="row-title-cell">${highlightMatch(title)}${currentModule?.key === "inquiries" ? renderPhoneCallLink(row) : ""}</td>
         <td class="hide-tablet"><span class="status-pill ${tone}">${esc(row._queued ? `${status} · queued` : status)}</span></td>
         <td class="col-published hide-mobile"><span class="${published ? "published-yes" : "published-no"}">${published ? "Published ✓" : "Draft"}</span></td>
         <td class="col-updated hide-tablet">${esc(updated)}</td>
@@ -1524,7 +1548,7 @@ function renderMobileCard(row) {
         <label class="record-card__check"><input class="row-check" type="checkbox" data-select="${row.id}" ${selected ? "checked" : ""}><span class="muted">Select</span></label>
         ${image ? `<img class="thumb" src="${esc(resolvePreviewUrl(image))}" alt="" loading="lazy" onerror="this.style.opacity='0.35'">` : `<span class="thumb-placeholder" aria-hidden="true">◌</span>`}
         <div>
-            <div class="mobile-card-title row-title-cell">${highlightMatch(title)}</div>
+            <div class="mobile-card-title row-title-cell">${highlightMatch(title)}${currentModule?.key === "inquiries" ? renderPhoneCallLink(row) : ""}</div>
             <div class="record-card__meta">
                 <span class="${published ? "published-yes" : "published-no"}">${published ? "Published ✓" : "Draft"}</span>
                 <span>${esc(updated)}</span>
