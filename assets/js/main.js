@@ -6,6 +6,7 @@
 import { dismissPageLoader, preloadSiteLogo } from "./page-loader.js";
 import { applyStorageImageMapToDom } from "./media-url.js";
 import { installGlobalErrorHandlers } from "./errors.js";
+import { initSiteNavigation } from "./site-navigation.js";
 
 preloadSiteLogo();
 void applyStorageImageMapToDom();
@@ -35,6 +36,7 @@ function runWhenDocumentReady(fn) {
 }
 
 runWhenDocumentReady(async () => {
+    initSiteNavigation();
     const isHomePage = document.body.hasAttribute("data-home");
     try {
         const { initLegacyUI } = await import("./ui.js");

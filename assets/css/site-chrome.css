@@ -351,9 +351,12 @@ body[data-home] .navbar {
     .navbar > .nav-links {
         position: absolute !important;
         z-index: 520;
+        grid-column: 1 / -1;
+        grid-row: 1;
         top: calc(100% + 8px);
         right: 0;
         left: 0;
+        box-sizing: border-box;
         display: none !important;
         width: 100%;
         max-height: min(72vh, 560px);
@@ -363,6 +366,9 @@ body[data-home] .navbar {
         gap: 4px;
         overflow-x: hidden;
         overflow-y: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-y;
         padding: 10px;
         border: 1px solid rgba(16, 42, 56, .13);
         border-radius: 12px;
@@ -375,6 +381,7 @@ body[data-home] .navbar {
         opacity: 1;
         visibility: visible;
         pointer-events: auto;
+        isolation: isolate;
     }
 
     .navbar > .nav-links:not(.open) {

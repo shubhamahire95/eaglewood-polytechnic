@@ -250,6 +250,16 @@ function bindForm(id, table) {
                 throw new Error(result.reason);
             }
 
+            if (result.queued) {
+                const message = form.id === "admission-help-form"
+                    ? "Your request is saved only on this device and has not reached the admission team. Please call +91 94237 16230 while we restore online submission."
+                    : "Your message is saved only on this device and has not reached the college. Please call +91 94237 16230 while we restore online submission.";
+                status.textContent = message;
+                status.classList.add("error");
+                showFormToast("Online delivery is unavailable. Your message remains saved on this device.", "error");
+                return;
+            }
+
             const toastMessage = form.id === "admission-help-form"
                 ? "Your guidance request has been sent. The admission team will contact you soon."
                 : form.id === "home-inquiry-form"
@@ -258,12 +268,10 @@ function bindForm(id, table) {
                     ? "Message sent successfully. Our team will respond soon."
                     : "Inquiry submitted successfully. Our team will contact you shortly.";
             status.textContent = form.id === "admission-help-form"
-                ? (result.queued ? "Request received. Our team will contact you soon." : "Request sent securely. Our admission team will contact you soon.")
+                ? "Request sent securely. Our admission team will contact you soon."
                 : form.id === "contact-message-form"
-                    ? (result.queued ? "Message received. Our team will respond soon." : "Message sent successfully. Our team will respond soon.")
-                    : result.queued
-                        ? "Inquiry received. Our team will contact you soon."
-                        : "Inquiry submitted successfully. Our team will contact you shortly.";
+                    ? "Message sent successfully. Our team will respond soon."
+                    : "Inquiry submitted successfully. Our team will contact you shortly.";
             status.classList.add("success");
             showFormToast(toastMessage, "success");
 

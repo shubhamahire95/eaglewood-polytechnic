@@ -6,9 +6,8 @@
 import CONFIG from "./config.js";
 import { debounce, throttle } from "./utils.js";
 import { safeFetch, ensureCmsReady, isCmsAvailable, isCmsStrictMode } from "./supabase.js";
+import { injectSiteHeader, initSiteNavigation } from "./site-navigation.js";
 import { getSiteLogoUrl } from "./page-loader.js";
-
-const NAV_COLLAPSE_WIDTH = 1280;
 
 const FOOTER_DEFAULTS = {
     institute_name: "Eaglewood Polytechnic Institute",
@@ -46,50 +45,6 @@ const FOOTER_ICONS = {
 
 let footerInitPromise;
 let footerEventsBound = false;
-
-const siteHeader = `
-  <div id="top-bar" class="top-bar premium-topbar" aria-label="College information">
-    <div class="epi-info-viewport"><div class="epi-info-track">
-      <div class="epi-info-set">
-        <span class="epi-info-item epi-info-approval">Approved by AICTE, DTE &amp; Govt. of Maharashtra</span>
-        <span class="epi-info-item epi-info-affiliation">Affiliated to MSBTE &amp; DBATU</span>
-        <span class="epi-info-item epi-info-codes">DTE 2634 | MSBTE 51307</span>
-        <a class="epi-info-item epi-info-phone" href="tel:+919765543454">+91 97655 43454</a>
-        <a class="epi-info-item epi-info-phone" href="tel:+919028185454">+91 90281 85454</a>
-        <a class="epi-info-item epi-info-phone" href="tel:+919049344003">+91 90493 44003</a>
-        <a class="epi-info-item epi-info-email" href="mailto:eaglewoodpoly@gmail.com">eaglewoodpoly@gmail.com</a>
-        <a class="epi-info-item epi-info-email" href="mailto:eaglewoodcoe@gmail.com">eaglewoodcoe@gmail.com</a>
-        <a class="epi-info-item epi-info-office" href="contact.html">Contact Office</a>
-      </div>
-      <div class="epi-info-set epi-info-set-copy" aria-hidden="true">
-        <span class="epi-info-item epi-info-approval">Approved by AICTE, DTE &amp; Govt. of Maharashtra</span>
-        <span class="epi-info-item epi-info-affiliation">Affiliated to MSBTE &amp; DBATU</span>
-        <span class="epi-info-item epi-info-codes">DTE 2634 | MSBTE 51307</span>
-        <a class="epi-info-item epi-info-phone" tabindex="-1" href="tel:+919765543454">+91 97655 43454</a>
-        <a class="epi-info-item epi-info-phone" tabindex="-1" href="tel:+919028185454">+91 90281 85454</a>
-        <a class="epi-info-item epi-info-phone" tabindex="-1" href="tel:+919049344003">+91 90493 44003</a>
-        <a class="epi-info-item epi-info-email" tabindex="-1" href="mailto:eaglewoodpoly@gmail.com">eaglewoodpoly@gmail.com</a>
-        <a class="epi-info-item epi-info-email" tabindex="-1" href="mailto:eaglewoodcoe@gmail.com">eaglewoodcoe@gmail.com</a>
-        <a class="epi-info-item epi-info-office" tabindex="-1" href="contact.html">Contact Office</a>
-      </div>
-    </div></div>
-  </div>
-  <header class="site-header">
-    <nav class="container navbar" aria-label="Main navigation">
-      <a class="brand" href="index.html" aria-label="Eaglewood Polytechnic Institute home">
-        <img src="${getSiteLogoUrl()}" alt="Eaglewood Polytechnic Institute official logo">
-        <span><small>Venkateshwara Manav Vikas Mandal's</small><strong>Eaglewood Polytechnic Institute</strong><em>Affiliated to MSBTE &amp; DBATU · DTE 2634 | MSBTE 51307</em></span>
-      </a>
-      <ul class="nav-links" id="site-navigation">
-        <li><a href="index.html">Home</a></li><li><a href="about.html">About</a></li><li><a href="courses.html">Courses</a></li><li><a href="departments.html">Departments</a></li><li><a href="faculty.html">Faculty</a></li><li><a href="committee.html">Committee</a></li><li><a href="alumni.html">Alumni</a></li><li><a href="placements.html">Placements</a></li><li><a href="infrastructure.html">Infrastructure</a></li><li><a href="gallery.html">Gallery</a></li><li class="nav-admission-link"><a href="admission.html">Admission</a></li><li><a href="contact.html">Contact</a></li>
-      </ul>
-      <div class="nav-actions">
-        <a class="btn btn-sm nav-apply" href="admission.html">Admission <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10h12m-5-5 5 5-5 5"/></svg></a>
-        <div class="nav-ai-slot" data-nav-ai-slot></div>
-        <button class="nav-toggle" type="button" aria-label="Open navigation menu" aria-controls="site-navigation" aria-expanded="false"><span></span><span></span><span></span></button>
-      </div>
-    </nav>
-  </header>`;
 
 const siteFooter = `
   <footer class="epi-ft" id="site-footer">
@@ -141,7 +96,7 @@ const siteFooter = `
 
 /** Inject global header and footer templates. */
 export function injectSiteChrome() {
-    document.querySelector("[data-site-header]")?.insertAdjacentHTML("afterbegin", siteHeader);
+    injectSiteHeader();
     const footerHost = document.querySelector("[data-site-footer]");
     if (footerHost && !footerHost.querySelector("#site-footer")) {
         footerHost.insertAdjacentHTML("afterbegin", siteFooter);
@@ -339,59 +294,6 @@ export function initFooterSettings() {
         footerInitPromise = loadFooterCMS().catch(() => applyFooterCMS({}, {}));
     }
     return footerInitPromise;
-}
-
-/** Mobile navigation toggle. */
-function initNavigation() {
-    const navToggle = document.querySelector(".nav-toggle");
-    const navLinks = document.querySelector(".nav-links");
-    const currentPage = location.pathname.split("/").pop() || "index.html";
-
-    navToggle?.addEventListener("click", () => {
-        const open = navLinks.classList.toggle("open");
-        navToggle.classList.toggle("open", open);
-        navToggle.setAttribute("aria-expanded", String(open));
-        navToggle.setAttribute("aria-label", open ? "Close navigation menu" : "Open navigation menu");
-        document.body.classList.toggle("no-scroll", open && window.matchMedia(`(max-width: ${NAV_COLLAPSE_WIDTH}px)`).matches);
-    });
-
-    const closeMobileNav = () => {
-        navLinks?.classList.remove("open");
-        navToggle?.classList.remove("open");
-        navToggle?.setAttribute("aria-expanded", "false");
-        navToggle?.setAttribute("aria-label", "Open navigation menu");
-        document.body.classList.remove("no-scroll");
-    };
-
-    navLinks?.querySelectorAll("a").forEach((link) =>
-        link.addEventListener("click", closeMobileNav)
-    );
-
-    window.addEventListener("resize", () => {
-        if (window.innerWidth > NAV_COLLAPSE_WIDTH && navLinks?.classList.contains("open")) {
-            closeMobileNav();
-        }
-    }, { passive: true });
-
-    document.addEventListener("click", (event) => {
-        if (navLinks?.classList.contains("open") && !event.target.closest(".navbar")) {
-            closeMobileNav();
-        }
-    });
-
-    document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape" && navLinks?.classList.contains("open")) {
-            closeMobileNav();
-            navToggle?.focus();
-        }
-    });
-
-    document.querySelectorAll(".nav-links a").forEach((link) => {
-        if (link.getAttribute("href") === currentPage) {
-            link.classList.add("active");
-            link.setAttribute("aria-current", "page");
-        }
-    });
 }
 
 /** Hero image slider with auto-play. */
@@ -604,7 +506,7 @@ function initPageTransitions() {
 /** Initialize all home page UI behaviors (site chrome must be injected first). */
 export function initHomeUI() {
     document.body.classList.add("home-page");
-    initNavigation();
+    initSiteNavigation();
     initHeroSlider();
     initScrollReveal();
     initCounterAnimation();
@@ -621,7 +523,7 @@ export function initHomeUI() {
 /** Initialize shared UI for non-home pages (legacy support). */
 export function initLegacyUI() {
     injectSiteChrome();
-    initNavigation();
+    initSiteNavigation();
     initScrollReveal();
     initPremiumReveal();
     initLazyImages();
@@ -635,7 +537,7 @@ export function initLegacyUI() {
     initButtonRipple();
 }
 
-export { siteHeader, siteFooter };
+export { siteFooter };
 
 /** Tab panels for courses and similar pages. */
 function initTabGroups() {

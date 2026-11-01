@@ -1130,6 +1130,16 @@ function renderModuleContext() {
     const target = $("moduleContext");
     if (!target) return;
 
+    if (isFormModule()) {
+        const detail = currentModule.key === "contacts"
+            ? "Contact messages from the website contact form."
+            : currentModule.key === "admissions"
+                ? "Admission records received through the existing CAP guidance workflow."
+                : "Website course and admission guidance inquiries. Qualification is shown from the saved message when present.";
+        target.innerHTML = "<div class=\"context-card\"><div><p class=\"eyebrow\">Website submissions</p><h3>" + esc(currentModule.label) + "</h3><p>" + esc(detail) + " Use the row actions to review or update status.</p></div><div><span>Phone &amp; email</span><span>Message details</span><span>Status</span><span>Submitted time</span></div></div>";
+        return;
+    }
+
     if (currentModule.key === "settings") {
         target.innerHTML = `<div class="context-card appearance-card">
             <div>
@@ -1478,8 +1488,17 @@ function updateBulkBar() {
 function syncModuleFilters() {
     const deptFilter = $("departmentFilter");
     const priorityFilter = $("priorityFilter");
+    const statusFilter = $("statusFilter");
     const hasDept = currentModule.fields?.some((f) => f.startsWith("department"));
     const hasPriority = currentModule.fields?.some((f) => f.includes("priority"));
+    if (statusFilter && isFormModule()) {
+        const current = statusFilter.value;
+        statusFilter.innerHTML = '<option value="">All statuses</option><option value="new">New</option><option value="pending">Pending</option><option value="assigned">Assigned</option><option value="read">Read</option><option value="replied">Replied</option><option value="follow-up">Follow-up</option><option value="archived">Archived</option><option value="under_review">Under review</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="closed">Closed</option><option value="waitlisted">Waitlisted</option><option value="paid">Paid</option><option value="failed">Failed</option><option value="refunded">Refunded</option>';
+        statusFilter.value = current;
+    } else if (statusFilter) {
+        statusFilter.innerHTML = '<option value="">All status</option><option value="published">Published</option><option value="draft">Draft</option><option value="new">New</option><option value="read">Read</option>';
+    }
+    if (statusFilter) window.__statusFilter = statusFilter.value;
     if (deptFilter) {
         deptFilter.hidden = !hasDept;
         if (hasDept) {
@@ -1559,6 +1578,90 @@ function renderMobileCard(row) {
     </article>`;
 }
 
+function isFormModule() {
+    return ["inquiries", "contacts", "admissions"].includes(currentModule?.key);
+}
+
+function formRowDetails(row) {
+    const originalMessage = String(row.message || "").trim();
+    const qualificationMatch = originalMessage.match(/(?:^|\r?\n)Qualification:\s*([^\r\n]+)/i);
+    return {
+        title: row.name || row.student_name || "Inquiry",
+        phone: String(row.phone || "").trim(),
+        email: String(row.email || "").trim(),
+        topic: row.course || row.subject || "",
+        qualification: row.qualification || qualificationMatch?.[1]?.trim() || "",
+        message: qualificationMatch ? originalMessage.replace(qualificationMatch[0], "").trim() : originalMessage,
+        submitted: formatDateTime(row.created_at),
+    };
+}
+
+function renderFormContact(row, details) {
+    const phone = details.phone.replace(/[^\d+]/g, "");
+    const phoneLink = /^\+?\d{10,15}$/.test(phone)
+        ? `<a href="tel:${esc(phone)}">${esc(details.phone)}</a>`
+        : esc(details.phone || "—");
+    const emailLink = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(details.email)
+        ? `<a href="mailto:${esc(details.email)}">${esc(details.email)}</a>`
+        : esc(details.email || "—");
+    return `<div class="admin-inquiry-contact"><span>${phoneLink}</span><span>${emailLink}</span></div>`;
+}
+
+function renderFormStatuses(row) {
+    const values = currentModule?.key === "admissions"
+        ? [["application", row.application_status], ["payment", row.payment_status], ["record", row.status]]
+        : [["record", row.status], ["reply", row.reply_status]];
+    const statuses = values.filter(([, value]) => value).length ? values.filter(([, value]) => value) : [["status", "new"]];
+    return `<div class="admin-inquiry-statuses">${statuses.map(([kind, value]) => {
+        const normalized = String(value).toLowerCase();
+        const tone = ["resolved", "closed", "replied", "completed"].includes(normalized)
+            ? "badge-ok"
+            : ["rejected", "cancelled", "failed"].includes(normalized)
+                ? "badge-warn"
+                : "badge-pending";
+        return `<span class="status-pill ${tone}"><span>${esc(kind)}</span> ${esc(value)}</span>`;
+    }).join("")}</div>`;
+}
+
+function renderFormDetails(row, details) {
+    const topicLabel = currentModule?.key === "contacts" ? "Subject" : "Course";
+    return `<div class="admin-inquiry-detail">
+        ${details.topic ? `<div class="admin-inquiry-topic"><span>${topicLabel}</span><strong>${esc(details.topic)}</strong></div>` : ""}
+        ${details.qualification ? `<div class="admin-inquiry-qualification"><span>Qualification</span><strong>${esc(details.qualification)}</strong></div>` : ""}
+        ${details.message ? `<p class="admin-inquiry-message">${esc(details.message)}</p>` : `<p class="admin-inquiry-message is-empty">No message provided.</p>`}
+    </div>`;
+}
+
+function renderFormTableRow(row) {
+    const details = formRowDetails(row);
+    const selected = selectedRowIds.has(String(row.id));
+    return `<tr class="admin-inquiry-row ${row._queued ? "row-queued" : ""} ${selected ? "is-selected" : ""}" data-row-id="${esc(row.id)}">
+        <td class="col-check"><input class="row-check" type="checkbox" data-select="${esc(row.id)}" ${selected ? "checked" : ""} aria-label="Select ${esc(details.title)}"></td>
+        <td class="admin-inquiry-name">${esc(details.title)}</td>
+        <td>${renderFormContact(row, details)}</td>
+        <td>${renderFormDetails(row, details)}</td>
+        <td>${renderFormStatuses(row)}</td>
+        <td class="admin-inquiry-date"><time datetime="${esc(row.created_at || "")}">${esc(details.submitted)}</time>${row._queued ? `<span class="queued-note">Saved on this device</span>` : ""}</td>
+        <td class="col-actions">${renderActionMenu(row)}</td>
+    </tr>`;
+}
+
+function renderFormMobileCard(row) {
+    const details = formRowDetails(row);
+    const selected = selectedRowIds.has(String(row.id));
+    return `<article class="admin-inquiry-card ${row._queued ? "row-queued" : ""} ${selected ? "is-selected" : ""}" data-row-id="${esc(row.id)}">
+        <div class="admin-inquiry-card__top">
+            <label class="record-card__check"><input class="row-check" type="checkbox" data-select="${esc(row.id)}" ${selected ? "checked" : ""} aria-label="Select ${esc(details.title)}"><span class="muted">Select</span></label>
+            ${renderActionMenu(row)}
+        </div>
+        <h3>${esc(details.title)}</h3>
+        ${renderFormContact(row, details)}
+        ${renderFormDetails(row, details)}
+        <div class="admin-inquiry-card__footer">${renderFormStatuses(row)}<time datetime="${esc(row.created_at || "")}">${esc(details.submitted)}</time></div>
+        ${row._queued ? `<span class="queued-note">Saved on this device</span>` : ""}
+    </article>`;
+}
+
 function bindTableInteractions(data) {
     $("moduleTable").querySelectorAll("[data-menu-toggle]").forEach((btn) => btn.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -1600,12 +1703,40 @@ function renderTable() {
     const end = Math.min(page * pageSize, filtered.length);
     $("recordCount") && ($("recordCount").textContent = `${filtered.length} record${filtered.length === 1 ? "" : "s"}`);
     if (!data.length) {
-        $("moduleTable").innerHTML = renderEmptyIllustration();
-        $("emptyAddBtn")?.addEventListener("click", () => openEditor());
+        if (isFormModule()) {
+            $("moduleTable").innerHTML = "<div class=\"empty-illustration\">" + EMPTY_ILLUSTRATION + "<h3>No " + esc(currentModule.label.toLowerCase()) + " received</h3><p>Submissions from the public website appear here with their contact details, status and submitted time.</p></div>";
+        } else {
+            $("moduleTable").innerHTML = renderEmptyIllustration();
+            $("emptyAddBtn")?.addEventListener("click", () => openEditor());
+        }
         updateBulkBar();
         return;
     }
     const allSelected = data.length > 0 && data.every((row) => selectedRowIds.has(String(row.id)));
+    if (isFormModule()) {
+        $("moduleTable").innerHTML = `
+        <div class="desktop-table-wrap table-scroll admin-inquiry-table-wrap">
+            <table class="data-table compact-table admin-inquiry-table">
+                <thead><tr>
+                    <th class="col-check"><input class="row-check" type="checkbox" data-select-all ${allSelected ? "checked" : ""} aria-label="Select all on page"></th>
+                    <th>Student / Name</th><th>Phone &amp; Email</th><th>Inquiry details</th><th>Status</th><th>Submitted</th><th class="col-actions">Actions</th>
+                </tr></thead>
+                <tbody>${data.map((row) => renderFormTableRow(row)).join("")}</tbody>
+            </table>
+        </div>
+        <div class="mobile-card-list admin-inquiry-list">${data.map((row) => renderFormMobileCard(row)).join("")}</div>
+        <div class="pagination modern">
+            <span class="pagination-info">Showing ${start}–${end} of ${filtered.length}</span>
+            <div class="pagination-controls">
+                <button class="btn-ghost" id="prevPage" type="button" ${page === 1 ? "disabled" : ""}>Previous</button>
+                <span class="muted">Page ${page} / ${totalPages}</span>
+                <button class="btn-ghost" id="nextPage" type="button" ${page === totalPages ? "disabled" : ""}>Next</button>
+            </div>
+        </div>`;
+        bindTableInteractions(data);
+        updateBulkBar();
+        return;
+    }
     $("moduleTable").innerHTML = `
     <div class="desktop-table-wrap table-scroll">
         <table class="data-table compact-table">
@@ -1647,6 +1778,11 @@ function filterRows(source) {
         if (department && String(row.department || "") !== department) return false;
         if (priority && String(row.priority || "") !== priority) return false;
         if (!status) return true;
+        if (isFormModule()) {
+            const formStatuses = [row.status, row.reply_status, row.application_status, row.payment_status]
+                .filter(Boolean).map((value) => String(value).toLowerCase());
+            return formStatuses.includes(String(status).toLowerCase());
+        }
         if (status === "published") return row.published !== false;
         if (status === "draft") return row.published === false;
         return row.status === status || String(row.published) === status;
@@ -2111,6 +2247,12 @@ function showSkeleton(id, count) { $(id).innerHTML = Array.from({ length: count 
 function skeletonTable() { return `<div class="skeleton table-skeleton"></div><div class="skeleton table-skeleton"></div><div class="skeleton table-skeleton"></div>`; }
 function defaultValue(name, type) { if (type === "select") return "published"; if (type === "boolean") return true; if (type === "number") return name === "display_order" ? 0 : ""; if (type === "date") return new Date().toISOString().slice(0, 10); if (type === "color") return "#005b5b"; return ""; }
 function formatDate(value) { return value ? new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "-"; }
+function formatDateTime(value) {
+    if (!value) return "Date unavailable";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "Date unavailable";
+    return date.toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
 function label(key) {
     if (currentModule?.key === "principal_message") {
         const map = {
