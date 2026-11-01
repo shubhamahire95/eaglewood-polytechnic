@@ -195,7 +195,12 @@ function renderAssistant() {
                         <button class="ew-ai__tool" id="ewAiMinimize" type="button" title="Minimize" aria-label="Minimize assistant">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14"/></svg>
                         </button>
-                        <button class="ew-ai__close" id="ewAiClose" type="button" aria-label="Close assistant">×</button>
+                        <button class="ew-ai__tool ew-ai__maximize" id="ewAiMaximize" type="button" title="Expand assistant" aria-label="Expand assistant" aria-pressed="false">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                        </button>
+                        <button class="ew-ai__close" id="ewAiClose" type="button" title="Close assistant" aria-label="Close assistant">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+                        </button>
                     </div>
                 </header>
                 <div class="ew-ai__quick-actions">
@@ -236,6 +241,7 @@ function bindAssistant() {
     const backdrop = document.getElementById("ewAiBackdrop");
     const input = document.getElementById("ewAiInput");
     const fab = document.getElementById("ewAiFab");
+    const maximize = document.getElementById("ewAiMaximize");
 
     const open = async () => {
         await loadKnowledgeBase();
@@ -282,6 +288,7 @@ function bindAssistant() {
         root.classList.remove("open");
         state.isOpen = false;
         fab.setAttribute("aria-expanded", "false");
+        document.body.classList.remove("no-scroll");
         setTimeout(() => {
             panel.hidden = true;
             backdrop.hidden = true;
@@ -289,10 +296,18 @@ function bindAssistant() {
         }, 280);
     };
 
+    const toggleMaximize = () => {
+        const isMaximized = panel.classList.toggle("is-maximized");
+        maximize.setAttribute("aria-pressed", String(isMaximized));
+        maximize.setAttribute("aria-label", isMaximized ? "Restore assistant size" : "Expand assistant");
+        maximize.title = isMaximized ? "Restore size" : "Expand assistant";
+    };
+
     fab.addEventListener("click", () => (state.isOpen ? close() : open()));
     document.querySelector(".ask-ai-nav")?.addEventListener("click", () => (state.isOpen ? close() : open()));
     document.getElementById("ewAiClose").addEventListener("click", close);
     document.getElementById("ewAiMinimize").addEventListener("click", minimize);
+    maximize.addEventListener("click", toggleMaximize);
     backdrop.addEventListener("click", close);
     root.addEventListener("click", handleAssistantClick);
     input.addEventListener("input", debounce(() => {
@@ -311,6 +326,12 @@ function bindAssistant() {
             submitQuestion();
         }
     });
+    window.addEventListener("resize", () => {
+        if (!state.isOpen) return;
+        const mobile = isMobileView();
+        document.body.classList.toggle("no-scroll", mobile);
+        if (mobile) bindMobileViewport();
+    });
     document.addEventListener("keydown", (event) => { if (event.key === "Escape" && state.isOpen) close(); });
     bindPanelResize();
 }
@@ -320,22 +341,22 @@ function isMobileView() {
 }
 
 function bindMobileViewport() {
-    if (mobileViewportBound || !window.visualViewport) return;
-    mobileViewportBound = true;
+    if (!window.visualViewport) return;
     const sync = () => {
         if (!state.isOpen || !isMobileView()) return;
         const vv = window.visualViewport;
         const height = vv ? vv.height : window.innerHeight;
         document.documentElement.style.setProperty("--ew-ai-vh", `${height}px`);
-        const offset = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
+        const top = vv ? Math.max(0, vv.offsetTop) : 0;
         const panel = document.getElementById("ewAiPanel");
-        const composer = document.getElementById("ewAiComposer");
-        if (panel) panel.style.setProperty("--ew-ai-kb-offset", `${offset}px`);
-        if (composer) composer.style.marginBottom = offset > 0 ? `${offset}px` : "";
+        if (panel) panel.style.setProperty("--ew-ai-vv-top", `${top}px`);
         scrollToBottom();
     };
-    window.visualViewport.addEventListener("resize", sync);
-    window.visualViewport.addEventListener("scroll", sync);
+    if (!mobileViewportBound) {
+        mobileViewportBound = true;
+        window.visualViewport.addEventListener("resize", sync);
+        window.visualViewport.addEventListener("scroll", sync);
+    }
     sync();
 }
 
