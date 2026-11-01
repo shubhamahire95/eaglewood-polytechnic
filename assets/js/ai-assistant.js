@@ -149,6 +149,7 @@ async function loadKnowledgeBase() {
 }
 
 function renderHeaderButton() {
+    const slot = document.querySelector("[data-nav-ai-slot]");
     const nav = document.querySelector(".nav-links") || document.querySelector("nav ul") || document.querySelector("header nav");
     if (!nav || document.querySelector(".ask-ai-nav")) return;
     const button = document.createElement("button");
@@ -157,7 +158,9 @@ function renderHeaderButton() {
     button.innerHTML = `<span class="ask-ai-mark" aria-hidden="true"><img src="${getSiteLogoUrl()}" alt="" loading="eager" decoding="async"></span><span>Ask Eaglewood</span>`;
     button.setAttribute("aria-label", "Open Eaglewood Smart Assistant");
     button.title = "Eaglewood Smart Assistant";
-    if (nav.tagName === "UL") {
+    if (slot) {
+        slot.appendChild(button);
+    } else if (nav.tagName === "UL") {
         const item = document.createElement("li");
         item.className = "ask-ai-item";
         item.appendChild(button);

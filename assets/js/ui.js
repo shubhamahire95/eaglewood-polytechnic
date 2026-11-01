@@ -8,7 +8,7 @@ import { debounce, throttle } from "./utils.js";
 import { safeFetch, ensureCmsReady, isCmsAvailable, isCmsStrictMode } from "./supabase.js";
 import { getSiteLogoUrl } from "./page-loader.js";
 
-const NAV_COLLAPSE_WIDTH = 1700;
+const NAV_COLLAPSE_WIDTH = 1280;
 
 const FOOTER_DEFAULTS = {
     institute_name: "Eaglewood Polytechnic Institute",
@@ -48,24 +48,20 @@ let footerInitPromise;
 let footerEventsBound = false;
 
 const siteHeader = `
-  <div class="topbar">
-    <div class="container topbar-inner">
-      <span>Approved by AICTE, DTE & Govt. of Maharashtra</span>
-      <span class="topbar-affiliation">Affiliated to MSBTE & DBATU</span>
-      <div class="topbar-links"><a href="mailto:eaglewoodpoly@gmail.com">eaglewoodpoly@gmail.com</a><a href="tel:+919423716230">+91 94237 16230</a></div>
-    </div>
-  </div>
   <header class="site-header">
     <nav class="container navbar" aria-label="Main navigation">
       <a class="brand" href="index.html" aria-label="Eaglewood Polytechnic Institute home">
         <img src="${getSiteLogoUrl()}" alt="Eaglewood Polytechnic Institute official logo">
-        <span><small>Venkateshwara Manav Vikas Mandal's</small><strong>Eaglewood Polytechnic Institute</strong><em>DTE 2634 | MSBTE 51307</em></span>
+        <span><small>Venkateshwara Manav Vikas Mandal's</small><strong>Eaglewood Polytechnic Institute</strong><em>Affiliated to MSBTE &amp; DBATU · DTE 2634 | MSBTE 51307</em></span>
       </a>
-      <button class="nav-toggle" type="button" aria-label="Toggle navigation" aria-expanded="false"><span></span><span></span><span></span></button>
-      <ul class="nav-links">
-        <li><a href="index.html">Home</a></li><li><a href="about.html">About</a></li><li><a href="courses.html">Courses</a></li><li><a href="departments.html">Departments</a></li><li><a href="faculty.html">Faculty</a></li><li><a href="committee.html">Committee</a></li><li><a href="alumni.html">Alumni</a></li><li><a href="placements.html">Placements</a></li><li><a href="infrastructure.html">Infrastructure</a></li><li><a href="gallery.html">Gallery</a></li><li><a href="admission.html">Admission</a></li><li><a href="contact.html">Contact</a></li>
+      <ul class="nav-links" id="site-navigation">
+        <li><a href="index.html">Home</a></li><li><a href="about.html">About</a></li><li><a href="courses.html">Courses</a></li><li><a href="departments.html">Departments</a></li><li><a href="faculty.html">Faculty</a></li><li><a href="committee.html">Committee</a></li><li><a href="alumni.html">Alumni</a></li><li><a href="placements.html">Placements</a></li><li><a href="infrastructure.html">Infrastructure</a></li><li><a href="gallery.html">Gallery</a></li><li class="nav-admission-link"><a href="admission.html">Admission</a></li><li><a href="contact.html">Contact</a></li>
       </ul>
-      <a class="btn btn-sm nav-apply" href="admission.html">Admission <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10h12m-5-5 5 5-5 5"/></svg></a>
+      <div class="nav-actions">
+        <a class="btn btn-sm nav-apply" href="admission.html">Admission <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 10h12m-5-5 5 5-5 5"/></svg></a>
+        <div class="nav-ai-slot" data-nav-ai-slot></div>
+        <button class="nav-toggle" type="button" aria-label="Open navigation menu" aria-controls="site-navigation" aria-expanded="false"><span></span><span></span><span></span></button>
+      </div>
     </nav>
   </header>`;
 
@@ -329,6 +325,7 @@ function initNavigation() {
         const open = navLinks.classList.toggle("open");
         navToggle.classList.toggle("open", open);
         navToggle.setAttribute("aria-expanded", String(open));
+        navToggle.setAttribute("aria-label", open ? "Close navigation menu" : "Open navigation menu");
         document.body.classList.toggle("no-scroll", open && window.matchMedia(`(max-width: ${NAV_COLLAPSE_WIDTH}px)`).matches);
     });
 
@@ -336,6 +333,7 @@ function initNavigation() {
         navLinks?.classList.remove("open");
         navToggle?.classList.remove("open");
         navToggle?.setAttribute("aria-expanded", "false");
+        navToggle?.setAttribute("aria-label", "Open navigation menu");
         document.body.classList.remove("no-scroll");
     };
 
@@ -352,6 +350,13 @@ function initNavigation() {
     document.addEventListener("click", (event) => {
         if (navLinks?.classList.contains("open") && !event.target.closest(".navbar")) {
             closeMobileNav();
+        }
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && navLinks?.classList.contains("open")) {
+            closeMobileNav();
+            navToggle?.focus();
         }
     });
 
