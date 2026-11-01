@@ -1,0 +1,1091 @@
+/* Page-specific design system for the courses, people, outcomes, campus and contact pages. */
+:root {
+  --ew-ink: #102c3a;
+  --ew-teal: #087d78;
+  --ew-deep: #073d46;
+  --ew-gold: #e5b84b;
+  --ew-paper: #f5f8f8;
+  --ew-line: rgba(16, 44, 58, .1);
+  --ew-shadow: 0 22px 60px rgba(7, 39, 51, .1);
+}
+
+main.catalog-page,
+main.outcomes-page,
+main.campus-page,
+main.contact-page,
+main.people-page {
+  color: var(--ew-ink);
+  background: var(--ew-paper);
+}
+
+/* Photographic hero bands use the site's own campus and learning images. */
+.catalog-page--courses .page-title,
+.people-page--faculty .people-title,
+.people-page--committee .people-title,
+.people-page--alumni .people-title,
+.outcomes-page .page-title,
+.campus-page--infrastructure .page-title,
+.campus-page--gallery .page-title,
+.contact-page .page-title {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: clamp(370px, 43vw, 520px);
+  overflow: hidden;
+  isolation: isolate;
+  padding: clamp(74px, 9vw, 116px) 0 clamp(88px, 10vw, 130px);
+  color: #fff;
+  border: 0;
+  background-color: #073d46;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center 46%;
+}
+
+.catalog-page--courses .page-title {
+  background-image: linear-gradient(90deg, rgba(3, 32, 44, .91), rgba(4, 55, 62, .74) 52%, rgba(4, 42, 50, .25)), url("../images/uploaded/computer-lab-wide.jpg");
+}
+
+.people-page--faculty .people-title {
+  background-image: linear-gradient(90deg, rgba(3, 32, 44, .91), rgba(4, 55, 62, .74) 52%, rgba(4, 42, 50, .25)), url("../images/uploaded/computer-lab-students.jpg");
+}
+
+.people-page--committee .people-title {
+  background-image: linear-gradient(90deg, rgba(3, 32, 44, .91), rgba(4, 55, 62, .76) 54%, rgba(4, 42, 50, .28)), url("../images/campus.jpg");
+}
+
+.people-page--alumni .people-title {
+  background-image: linear-gradient(90deg, rgba(3, 32, 44, .9), rgba(4, 55, 62, .72) 54%, rgba(4, 42, 50, .26)), url("../images/uploaded/industrial-visit-group.jpg");
+}
+
+.outcomes-page .page-title {
+  background-image: linear-gradient(90deg, rgba(3, 32, 44, .92), rgba(4, 55, 62, .74) 55%, rgba(4, 42, 50, .2)), url("../images/placement-guidance.jpg");
+}
+
+.campus-page--infrastructure .page-title {
+  background-image: linear-gradient(90deg, rgba(3, 32, 44, .91), rgba(4, 55, 62, .72) 52%, rgba(4, 42, 50, .22)), url("../images/uploaded/workshop-interior.jpg");
+}
+
+.campus-page--gallery .page-title {
+  background-image: linear-gradient(90deg, rgba(3, 32, 44, .9), rgba(4, 55, 62, .7) 53%, rgba(4, 42, 50, .2)), url("../images/campus.jpg");
+}
+
+.contact-page .page-title {
+  background-image: linear-gradient(90deg, rgba(3, 32, 44, .92), rgba(4, 55, 62, .72) 54%, rgba(4, 42, 50, .23)), url("../images/campus.jpg");
+}
+
+.catalog-page--courses .page-title::before,
+.people-page--faculty .people-title::before,
+.people-page--committee .people-title::before,
+.people-page--alumni .people-title::before,
+.outcomes-page .page-title::before,
+.campus-page--infrastructure .page-title::before,
+.campus-page--gallery .page-title::before,
+.contact-page .page-title::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  content: "";
+  background: radial-gradient(circle at 82% 22%, rgba(229, 184, 75, .16), transparent 23rem), linear-gradient(0deg, rgba(4, 24, 33, .2), transparent 42%);
+}
+
+.catalog-page--courses .page-title::after,
+.people-page--faculty .people-title::after,
+.people-page--committee .people-title::after,
+.people-page--alumni .people-title::after,
+.outcomes-page .page-title::after,
+.campus-page--infrastructure .page-title::after,
+.campus-page--gallery .page-title::after,
+.contact-page .page-title::after {
+  height: 56px;
+  background: linear-gradient(176deg, transparent 49%, var(--ew-paper) 50%);
+}
+
+.catalog-page .page-title .container,
+.people-page .people-title .container,
+.outcomes-page .page-title .container,
+.campus-page .page-title .container,
+.contact-page .page-title .container {
+  position: relative;
+  z-index: 1;
+  width: min(1240px, calc(100% - 64px));
+  max-width: 1240px;
+  margin-inline: auto;
+}
+
+.catalog-page .page-title .eyebrow,
+.people-page .people-title .eyebrow,
+.outcomes-page .page-title .eyebrow,
+.campus-page .page-title .eyebrow,
+.contact-page .page-title .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  color: #f2cf73;
+  font-size: .74rem;
+  font-weight: 900;
+  letter-spacing: .17em;
+  text-transform: uppercase;
+}
+
+.catalog-page .page-title .eyebrow::before,
+.people-page .people-title .eyebrow::before,
+.outcomes-page .page-title .eyebrow::before,
+.campus-page .page-title .eyebrow::before,
+.contact-page .page-title .eyebrow::before {
+  width: 27px;
+  height: 1px;
+  content: "";
+  background: currentColor;
+}
+
+.catalog-page .page-title h1,
+.people-page .people-title h1,
+.outcomes-page .page-title h1,
+.campus-page .page-title h1,
+.contact-page .page-title h1 {
+  max-width: 850px;
+  margin: 0;
+  color: #fff;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(2.8rem, 6.2vw, 5.2rem);
+  font-weight: 700;
+  line-height: 1.03;
+  letter-spacing: -.035em;
+  text-wrap: balance;
+}
+
+.catalog-page .page-title-lead,
+.people-page .page-title-lead,
+.outcomes-page .page-title-lead,
+.campus-page .page-title-lead,
+.contact-page .page-title-lead {
+  max-width: 660px;
+  margin: 20px 0 0;
+  color: rgba(255, 255, 255, .84);
+  font-size: clamp(1rem, 1.55vw, 1.18rem);
+  line-height: 1.75;
+}
+
+.page-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 27px;
+}
+
+.page-hero-actions .btn {
+  min-height: 48px;
+  padding: 12px 21px;
+  font-size: .9rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.page-hero-actions .btn-gold {
+  color: #1d2d31 !important;
+  background: linear-gradient(135deg, #f3d479, #dfb346) !important;
+  border: 1px solid rgba(255, 255, 255, .28) !important;
+  box-shadow: 0 12px 30px rgba(3, 24, 31, .22);
+}
+
+.page-hero-actions .btn-ghost {
+  color: #fff !important;
+  background: rgba(255, 255, 255, .1) !important;
+  border: 1px solid rgba(255, 255, 255, .34) !important;
+  backdrop-filter: blur(8px);
+}
+
+.catalog-page .page-title .breadcrumb,
+.people-page .people-title .breadcrumb,
+.outcomes-page .page-title .breadcrumb,
+.campus-page .page-title .breadcrumb,
+.contact-page .page-title .breadcrumb {
+  width: fit-content;
+  margin: 24px 0 0;
+  padding: 8px 13px;
+  color: rgba(255, 255, 255, .78);
+  background: rgba(5, 33, 43, .36);
+  border: 1px solid rgba(255, 255, 255, .17);
+  border-radius: 999px;
+  box-shadow: none;
+  backdrop-filter: blur(8px);
+}
+
+.catalog-page .page-title .breadcrumb a,
+.people-page .people-title .breadcrumb a,
+.outcomes-page .page-title .breadcrumb a,
+.campus-page .page-title .breadcrumb a,
+.contact-page .page-title .breadcrumb a {
+  color: #f2cf73;
+}
+
+.catalog-page .section,
+.outcomes-page .section,
+.campus-page .section,
+.contact-page .section,
+.people-page .people-section {
+  padding-block: clamp(58px, 7vw, 92px);
+}
+
+.catalog-page .section-head,
+.outcomes-page .section-head,
+.campus-page .section-head,
+.contact-page .section-head,
+.people-page .people-section-head {
+  max-width: 780px;
+  margin-bottom: clamp(28px, 4vw, 44px);
+}
+
+.catalog-page .section-title,
+.outcomes-page .section-title,
+.campus-page .section-title,
+.contact-page .section-title,
+.people-page .section-title {
+  color: var(--ew-ink);
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(2rem, 3.5vw, 3rem);
+  line-height: 1.12;
+  letter-spacing: -.025em;
+}
+
+.catalog-page .section-lead,
+.outcomes-page .section-lead,
+.campus-page .section-lead,
+.contact-page .section-lead,
+.people-page .section-lead {
+  max-width: 70ch;
+  color: #60727b;
+  font-size: 1rem;
+  line-height: 1.78;
+}
+
+.catalog-page .section-head .eyebrow,
+.outcomes-page .section-head .eyebrow,
+.campus-page .section-head .eyebrow,
+.contact-page .section-head .eyebrow,
+.people-page .section-head .eyebrow {
+  color: var(--ew-teal);
+}
+
+/* Course prospectus tables and department cards. */
+.course-options .section-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 30px;
+}
+
+.course-options .tabs {
+  display: inline-flex;
+  gap: 7px;
+  padding: 7px;
+  border: 1px solid var(--ew-line);
+  border-radius: 17px;
+  background: #eaf1f1;
+}
+
+.course-options .tab-btn {
+  min-height: 46px;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 12px;
+  color: #536972;
+  font-weight: 800;
+  transition: color .2s ease, background .2s ease, box-shadow .2s ease;
+}
+
+.course-options .tab-btn.active,
+.course-options .tab-btn[aria-selected="true"] {
+  color: #fff;
+  background: linear-gradient(135deg, #07505a, #0d8b83);
+  box-shadow: 0 9px 20px rgba(7, 78, 85, .2);
+}
+
+.course-options .table-wrap {
+  overflow-x: auto;
+  border: 1px solid rgba(18, 54, 66, .1);
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: var(--ew-shadow);
+  scrollbar-color: #8bb9b8 #edf3f3;
+}
+
+.course-options .data-table {
+  min-width: 720px;
+  margin: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.course-options .data-table th {
+  padding: 17px 19px;
+  color: #fff;
+  background: linear-gradient(120deg, #073d46, #0b6d70);
+  font-size: .78rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.course-options .data-table td {
+  padding: 15px 19px;
+  color: #53656e;
+  border-bottom: 1px solid #e9eeee;
+  font-size: .9rem;
+}
+
+.course-options .data-table td strong {
+  color: var(--ew-ink);
+}
+
+.course-options .data-table tbody tr:nth-child(even) td {
+  background: #f7faf9;
+}
+
+.course-options .table-note {
+  margin: 16px 0 0;
+  color: #687b82;
+  font-size: .84rem;
+  line-height: 1.7;
+}
+
+.catalog-page .grid-2,
+.campus-page--infrastructure .grid-3 {
+  gap: clamp(18px, 2.4vw, 28px);
+}
+
+.catalog-page .photo-card,
+.campus-page--infrastructure .photo-card {
+  height: 100%;
+  overflow: hidden;
+  padding: 0 !important;
+  border: 1px solid rgba(17, 54, 64, .09) !important;
+  border-radius: 23px !important;
+  background: #fff !important;
+  box-shadow: 0 18px 46px rgba(7, 39, 51, .08) !important;
+}
+
+.catalog-page .photo-card img,
+.campus-page--infrastructure .photo-card img {
+  display: block;
+  width: 100%;
+  height: clamp(210px, 22vw, 290px);
+  object-fit: cover;
+}
+
+.catalog-page .photo-card-body,
+.campus-page--infrastructure .photo-card-body {
+  padding: clamp(21px, 2.6vw, 29px);
+}
+
+.catalog-page .photo-card-body .tag {
+  display: inline-flex;
+  margin-bottom: 12px;
+  padding: 6px 10px;
+  color: #08716d;
+  border: 1px solid rgba(8, 125, 120, .16);
+  border-radius: 999px;
+  background: #ecf7f5;
+  font-size: .7rem;
+  font-weight: 900;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.catalog-page .photo-card h3,
+.campus-page--infrastructure .photo-card h3 {
+  margin: 0 0 9px;
+  color: var(--ew-ink);
+  font-size: 1.2rem;
+}
+
+.catalog-page .photo-card p,
+.campus-page--infrastructure .photo-card p {
+  margin: 0;
+  color: #65777f;
+  line-height: 1.7;
+}
+
+/* Profiles retain their CMS-provided names, descriptions and uploaded photos. */
+.people-page--faculty .faculty-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 245px), 1fr));
+  gap: clamp(18px, 2.2vw, 26px);
+  align-items: stretch;
+}
+
+.people-page--faculty .faculty-card {
+  align-content: start;
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid rgba(17, 54, 64, .1) !important;
+  border-radius: 22px !important;
+  background: #fff !important;
+  box-shadow: 0 18px 46px rgba(7, 39, 51, .08) !important;
+}
+
+.people-page--faculty .faculty-photo {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 4 / 3.25;
+  background: linear-gradient(135deg, #e4f1ef, #f4f7f7);
+}
+
+.people-page--faculty .faculty-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 28%;
+  border-radius: 0;
+}
+
+.people-page--faculty .faculty-photo-fallback {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(145deg, #07505a, #0d8b83 65%, #d4a94b);
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 4rem;
+}
+
+.people-page--faculty .faculty-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 23px;
+}
+
+.people-page--faculty .faculty-dept {
+  max-width: 100%;
+  padding: 6px 10px;
+  color: #08716d;
+  border: 1px solid rgba(8, 125, 120, .16);
+  border-radius: 999px;
+  background: #ecf7f5;
+  font-size: .67rem;
+  letter-spacing: .07em;
+}
+
+.people-page--faculty .faculty-body h3 {
+  margin: 0;
+  color: var(--ew-ink);
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 1.35rem;
+  line-height: 1.25;
+}
+
+.people-page--faculty .faculty-body p {
+  margin: 0;
+  color: #60727b;
+  font-size: .9rem;
+  line-height: 1.65;
+}
+
+.people-page--faculty .faculty-body a {
+  color: #08716d;
+  font-size: .87rem;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
+.people-page--committee .committee-grid,
+.people-page--alumni .alumni-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  gap: clamp(18px, 2.2vw, 26px);
+}
+
+.people-page--committee .committee-card,
+.people-page--alumni .alumni-card {
+  border-radius: 22px;
+  box-shadow: 0 18px 46px rgba(7, 39, 51, .08);
+}
+
+.people-page .empty-state {
+  border-color: rgba(8, 125, 120, .2);
+  background: linear-gradient(145deg, #fff, #f4f9f8);
+  box-shadow: 0 16px 40px rgba(7, 39, 51, .06);
+}
+
+/* Placement information appears only when the published CMS record contains it. */
+.outcomes-page .highlight-stats {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  gap: 18px;
+}
+
+.outcomes-page .highlight-stat {
+  min-height: 140px;
+  display: grid;
+  align-content: center;
+  gap: 9px;
+  padding: 24px;
+  border: 1px solid rgba(17, 54, 64, .1);
+  border-radius: 22px;
+  background: linear-gradient(145deg, #fff, #f1f8f7);
+  box-shadow: 0 17px 44px rgba(7, 39, 51, .08);
+}
+
+.outcomes-page .highlight-stat strong {
+  color: #08716d;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(1.7rem, 3vw, 2.35rem);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.outcomes-page .highlight-stat span {
+  color: #667981;
+  font-size: .76rem;
+  font-weight: 850;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.outcomes-page .placement-stories {
+  gap: 20px;
+}
+
+.outcomes-page .placement-story {
+  grid-template-columns: minmax(190px, 280px) minmax(0, 1fr);
+  gap: clamp(20px, 3vw, 36px);
+  padding: clamp(18px, 2.6vw, 28px);
+  border: 1px solid rgba(17, 54, 64, .1) !important;
+  border-radius: 23px !important;
+  background: #fff !important;
+  box-shadow: 0 18px 46px rgba(7, 39, 51, .08) !important;
+}
+
+.outcomes-page .placement-story img {
+  height: 190px;
+  border-radius: 17px;
+}
+
+.outcomes-page .placement-story h3 {
+  margin: 0 0 10px;
+  color: var(--ew-ink);
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 1.45rem;
+}
+
+.outcomes-page .placement-story blockquote,
+.outcomes-page .placement-story p {
+  margin: 0;
+  color: #60727b;
+  line-height: 1.75;
+}
+
+.outcomes-page .placement-story footer,
+.outcomes-page .placement-package {
+  margin-top: 14px;
+  color: #08716d;
+  font-size: .86rem;
+  font-weight: 750;
+}
+
+.outcomes-page .recruiter-strip {
+  margin: 0 0 2px;
+}
+
+.outcomes-page .recruiter-strip span {
+  padding: 9px 14px;
+  color: #31515b;
+  border-color: rgba(8, 125, 120, .14);
+  border-radius: 999px;
+  background: #edf6f4;
+}
+
+.outcomes-page #placement-stats > .empty-state {
+  grid-column: 1 / -1;
+}
+
+/* Gallery filters and image lightbox keep the existing controls and selectors. */
+.campus-page--gallery .gallery-filters {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 24px;
+  padding: 8px;
+  border: 1px solid rgba(17, 54, 64, .1);
+  border-radius: 18px;
+  background: #eaf1f1;
+}
+
+.campus-page--gallery .gallery-filters .filter-btn {
+  min-height: 42px;
+  padding: 9px 15px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: #506770;
+  background: transparent;
+  font-weight: 800;
+  transition: color .2s ease, background .2s ease, box-shadow .2s ease;
+}
+
+.campus-page--gallery .gallery-filters .filter-btn:hover,
+.campus-page--gallery .gallery-filters .filter-btn.active {
+  color: #fff;
+  background: linear-gradient(135deg, #07505a, #0d8b83);
+  box-shadow: 0 8px 20px rgba(7, 78, 85, .18);
+}
+
+.campus-page--gallery .gallery-grid {
+  grid-auto-rows: clamp(190px, 19vw, 260px);
+  gap: 16px;
+}
+
+.campus-page--gallery .gallery-item {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, .72);
+  border-radius: 20px;
+  background: #dfe9e8;
+  box-shadow: 0 15px 36px rgba(7, 39, 51, .1);
+}
+
+.campus-page--gallery .gallery-item:focus-visible,
+.campus-page--gallery .filter-btn:focus-visible,
+.course-options .tab-btn:focus-visible {
+  outline: 3px solid rgba(8, 125, 120, .36);
+  outline-offset: 3px;
+}
+
+.campus-page--gallery .gallery-item:after {
+  background: linear-gradient(0deg, rgba(4, 28, 38, .86), rgba(4, 28, 38, .08) 64%);
+}
+
+.campus-page--gallery .gallery-caption {
+  left: 18px;
+  right: 18px;
+  bottom: 16px;
+  font-size: .95rem;
+  font-weight: 800;
+  letter-spacing: .01em;
+}
+
+.campus-page--gallery .lightbox {
+  z-index: 1500;
+  padding: 24px;
+  background: rgba(3, 19, 27, .94);
+  backdrop-filter: blur(12px);
+}
+
+.campus-page--gallery .lightbox figure {
+  width: min(1120px, 100%);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .15);
+  border-radius: 20px;
+  background: #081c24;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, .42);
+}
+
+.campus-page--gallery .lightbox img {
+  max-height: min(78vh, 860px);
+}
+
+.campus-page--gallery .lightbox p {
+  padding: 15px 20px;
+  color: rgba(255, 255, 255, .86);
+}
+
+/* Contact details, map and the existing dynamically inserted message form. */
+.contact-page .contact-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(0, .92fr);
+  gap: clamp(20px, 3vw, 36px);
+}
+
+.contact-page .contact-panel {
+  padding: clamp(25px, 3.4vw, 42px);
+  border: 1px solid rgba(17, 54, 64, .1);
+  border-radius: 25px;
+  background: #fff;
+  box-shadow: var(--ew-shadow);
+}
+
+.contact-page .contact-list {
+  gap: 12px;
+  margin-top: 25px;
+}
+
+.contact-page .contact-item {
+  align-items: flex-start;
+  padding: 16px !important;
+  border: 1px solid #e8eeee !important;
+  border-radius: 16px !important;
+  background: #f8fbfa !important;
+  box-shadow: none !important;
+}
+
+.contact-page .contact-item:hover {
+  transform: none;
+  border-color: rgba(8, 125, 120, .25) !important;
+  box-shadow: 0 9px 24px rgba(7, 39, 51, .06) !important;
+}
+
+.contact-page .contact-item strong {
+  color: var(--ew-ink);
+}
+
+.contact-page .contact-item span,
+.contact-page .contact-item a {
+  color: #60727b;
+  overflow-wrap: anywhere;
+}
+
+.contact-page .contact-icon {
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  color: #fff;
+  background: linear-gradient(135deg, #07505a, #0d8b83);
+}
+
+.contact-page .map-embed {
+  min-height: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(17, 54, 64, .1);
+  border-radius: 25px;
+  background: #eaf1f1;
+  box-shadow: var(--ew-shadow);
+}
+
+.contact-page .map-embed iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 560px;
+  border: 0;
+}
+
+.contact-page .contact-actions {
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.contact-page .contact-form-section {
+  background: linear-gradient(180deg, #eef4f3, #f8faf9);
+}
+
+.contact-page .contact-form-grid {
+  grid-template-columns: minmax(240px, .72fr) minmax(0, 1.28fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.contact-page .contact-form-cards {
+  display: grid;
+  gap: 13px;
+}
+
+.contact-page .contact-mini-card,
+.contact-page .route-form {
+  border: 1px solid rgba(17, 54, 64, .1) !important;
+  border-radius: 22px !important;
+  background: #fff !important;
+  box-shadow: 0 18px 46px rgba(7, 39, 51, .08) !important;
+}
+
+.contact-page .contact-mini-card {
+  display: grid;
+  gap: 8px;
+  padding: 19px;
+}
+
+.contact-page .contact-mini-card span {
+  color: #73848a;
+  font-size: .75rem;
+  font-weight: 850;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.contact-page .contact-mini-card strong {
+  color: var(--ew-ink);
+  overflow-wrap: anywhere;
+}
+
+.contact-page .contact-mini-card a {
+  color: #08716d;
+  font-size: .86rem;
+  font-weight: 800;
+}
+
+.contact-page .route-form h2 {
+  color: var(--ew-ink);
+  font-family: "Playfair Display", Georgia, serif;
+}
+
+.contact-page .content-copy {
+  max-width: 930px;
+  padding: clamp(24px, 4vw, 40px);
+  border: 1px solid rgba(17, 54, 64, .08);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, .82);
+  box-shadow: 0 12px 34px rgba(7, 39, 51, .05);
+}
+
+.contact-page .content-copy h2 {
+  color: var(--ew-ink);
+  font-family: "Playfair Display", Georgia, serif;
+}
+
+.contact-page .content-copy p:last-child {
+  margin-bottom: 0;
+  color: #60727b;
+  line-height: 1.8;
+}
+
+@media (max-width: 1050px) {
+  .contact-page .contact-layout,
+  .contact-page .contact-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .contact-page .map-embed iframe {
+    min-height: 400px;
+  }
+
+  .contact-page .contact-form-cards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .catalog-page .page-title,
+  .people-page .people-title,
+  .outcomes-page .page-title,
+  .campus-page .page-title,
+  .contact-page .page-title {
+    min-height: 0;
+    padding: 64px 0 82px;
+    background-position: center;
+  }
+
+  .catalog-page .page-title .container,
+  .people-page .people-title .container,
+  .outcomes-page .page-title .container,
+  .campus-page .page-title .container,
+  .contact-page .page-title .container {
+    width: min(100% - 36px, 620px);
+  }
+
+  .catalog-page .page-title h1,
+  .people-page .people-title h1,
+  .outcomes-page .page-title h1,
+  .campus-page .page-title h1,
+  .contact-page .page-title h1 {
+    font-size: clamp(2.55rem, 10.5vw, 4rem);
+  }
+
+  .course-options .section-head {
+    display: grid;
+    align-items: start;
+  }
+
+  .course-options .section-head .actions,
+  .course-options .section-head .actions .btn {
+    width: 100%;
+  }
+
+  .campus-page--gallery .gallery-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 190px;
+  }
+
+  .campus-page--gallery .gallery-item.wide {
+    grid-column: span 2;
+  }
+
+  .campus-page--gallery .gallery-item.tall {
+    grid-row: span 2;
+  }
+}
+
+@media (max-width: 600px) {
+  .page-hero-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    max-width: 350px;
+  }
+
+  .page-hero-actions .btn {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .catalog-page .section,
+  .outcomes-page .section,
+  .campus-page .section,
+  .contact-page .section,
+  .people-page .people-section {
+    padding-block: 54px;
+  }
+
+  .course-options .tabs {
+    display: grid;
+    width: 100%;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .course-options .tab-btn {
+    padding-inline: 9px;
+    font-size: .84rem;
+  }
+
+  .campus-page--gallery .gallery-filters {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .campus-page--gallery .gallery-filters .filter-btn {
+    padding-inline: 8px;
+    font-size: .79rem;
+  }
+
+  .campus-page--gallery .gallery-grid {
+    grid-template-columns: 1fr;
+    grid-auto-rows: 230px;
+  }
+
+  .campus-page--gallery .gallery-item.wide,
+  .campus-page--gallery .gallery-item.tall {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .outcomes-page .placement-story {
+    grid-template-columns: 1fr;
+  }
+
+  .outcomes-page .placement-story img {
+    height: 220px;
+  }
+
+  .contact-page .contact-form-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .contact-page .map-embed iframe {
+    min-height: 350px;
+  }
+
+  .campus-page--gallery .lightbox {
+    padding: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .catalog-page *,
+  .outcomes-page *,
+  .campus-page *,
+  .contact-page *,
+  .people-page * {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+/* Win against the shared body:not([data-home]) hero rules in style.css. */
+body:not([data-home]) main.catalog-page.catalog-page--courses > .page-title {
+  min-height: clamp(370px, 43vw, 520px) !important;
+  padding: clamp(74px, 9vw, 116px) 0 clamp(88px, 10vw, 130px) !important;
+  background-image: linear-gradient(90deg, rgba(3, 32, 44, .91), rgba(4, 55, 62, .74) 52%, rgba(4, 42, 50, .25)), url("../images/uploaded/computer-lab-wide.jpg") !important;
+  background-size: cover !important;
+  background-position: center 46% !important;
+}
+
+body:not([data-home]) main.people-page.people-page--faculty > .people-title {
+  min-height: clamp(370px, 43vw, 520px) !important;
+  padding: clamp(74px, 9vw, 116px) 0 clamp(88px, 10vw, 130px) !important;
+  background-image: linear-gradient(90deg, rgba(3, 32, 44, .91), rgba(4, 55, 62, .74) 52%, rgba(4, 42, 50, .25)), url("../images/uploaded/computer-lab-students.jpg") !important;
+  background-size: cover !important;
+  background-position: center 46% !important;
+}
+
+body:not([data-home]) main.people-page.people-page--committee > .people-title {
+  min-height: clamp(370px, 43vw, 520px) !important;
+  padding: clamp(74px, 9vw, 116px) 0 clamp(88px, 10vw, 130px) !important;
+  background-image: linear-gradient(90deg, rgba(3, 32, 44, .91), rgba(4, 55, 62, .76) 54%, rgba(4, 42, 50, .28)), url("../images/campus.jpg") !important;
+  background-size: cover !important;
+  background-position: center 46% !important;
+}
+
+body:not([data-home]) main.people-page.people-page--alumni > .people-title {
+  min-height: clamp(370px, 43vw, 520px) !important;
+  padding: clamp(74px, 9vw, 116px) 0 clamp(88px, 10vw, 130px) !important;
+  background-image: linear-gradient(90deg, rgba(3, 32, 44, .9), rgba(4, 55, 62, .72) 54%, rgba(4, 42, 50, .26)), url("../images/uploaded/industrial-visit-group.jpg") !important;
+  background-size: cover !important;
+  background-position: center 46% !important;
+}
+
+body:not([data-home]) main.outcomes-page > .page-title {
+  min-height: clamp(370px, 43vw, 520px) !important;
+  padding: clamp(74px, 9vw, 116px) 0 clamp(88px, 10vw, 130px) !important;
+  background-image: linear-gradient(90deg, rgba(3, 32, 44, .92), rgba(4, 55, 62, .74) 55%, rgba(4, 42, 50, .2)), url("../images/placement-guidance.jpg") !important;
+  background-size: cover !important;
+  background-position: center 46% !important;
+}
+
+body:not([data-home]) main.campus-page.campus-page--infrastructure > .page-title {
+  min-height: clamp(370px, 43vw, 520px) !important;
+  padding: clamp(74px, 9vw, 116px) 0 clamp(88px, 10vw, 130px) !important;
+  background-image: linear-gradient(90deg, rgba(3, 32, 44, .91), rgba(4, 55, 62, .72) 52%, rgba(4, 42, 50, .22)), url("../images/uploaded/workshop-interior.jpg") !important;
+  background-size: cover !important;
+  background-position: center 46% !important;
+}
+
+body:not([data-home]) main.campus-page.campus-page--gallery > .page-title {
+  min-height: clamp(370px, 43vw, 520px) !important;
+  padding: clamp(74px, 9vw, 116px) 0 clamp(88px, 10vw, 130px) !important;
+  background-image: linear-gradient(90deg, rgba(3, 32, 44, .9), rgba(4, 55, 62, .7) 53%, rgba(4, 42, 50, .2)), url("../images/campus.jpg") !important;
+  background-size: cover !important;
+  background-position: center 46% !important;
+}
+
+body:not([data-home]) main.contact-page > .page-title {
+  min-height: clamp(370px, 43vw, 520px) !important;
+  padding: clamp(74px, 9vw, 116px) 0 clamp(88px, 10vw, 130px) !important;
+  background-image: linear-gradient(90deg, rgba(3, 32, 44, .92), rgba(4, 55, 62, .72) 54%, rgba(4, 42, 50, .23)), url("../images/campus.jpg") !important;
+  background-size: cover !important;
+  background-position: center 46% !important;
+}
+
+body:not([data-home]) main.catalog-page.catalog-page--courses > .page-title::after,
+body:not([data-home]) main.people-page.people-page--faculty > .people-title::after,
+body:not([data-home]) main.people-page.people-page--committee > .people-title::after,
+body:not([data-home]) main.people-page.people-page--alumni > .people-title::after,
+body:not([data-home]) main.outcomes-page > .page-title::after,
+body:not([data-home]) main.campus-page.campus-page--infrastructure > .page-title::after,
+body:not([data-home]) main.campus-page.campus-page--gallery > .page-title::after,
+body:not([data-home]) main.contact-page > .page-title::after {
+  inset: auto 0 -1px;
+  width: auto;
+  height: 54px;
+  border-radius: 0;
+  background: linear-gradient(176deg, transparent 49%, var(--ew-paper) 50%);
+  filter: none;
+  pointer-events: none;
+}
+
+@media (max-width: 760px) {
+  body:not([data-home]) main.catalog-page.catalog-page--courses > .page-title,
+  body:not([data-home]) main.people-page.people-page--faculty > .people-title,
+  body:not([data-home]) main.people-page.people-page--committee > .people-title,
+  body:not([data-home]) main.people-page.people-page--alumni > .people-title,
+  body:not([data-home]) main.outcomes-page > .page-title,
+  body:not([data-home]) main.campus-page.campus-page--infrastructure > .page-title,
+  body:not([data-home]) main.campus-page.campus-page--gallery > .page-title,
+  body:not([data-home]) main.contact-page > .page-title {
+    min-height: 0 !important;
+    padding: 64px 0 82px !important;
+    background-position: center !important;
+  }
+}

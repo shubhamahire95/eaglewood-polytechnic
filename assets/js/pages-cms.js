@@ -1,7 +1,7 @@
 /**
  * CMS-driven inner pages: Faculty, Placements, About Principal
  */
-import { ensureCmsReady, isCmsStrictMode } from "./supabase.js";
+import { ensureCmsReady } from "./supabase.js";
 import { fetchCmsRows, isContentTable } from "./cms-store.js";
 import { ensureMediaMap, resolveAdminPreviewUrl } from "./media-url.js";
 import {
@@ -14,10 +14,11 @@ import {
 } from "./principal-content.js";
 import { instituteLabel } from "./site-settings.js";
 
-async function loadPublished(table) {
+async function loadPublished(table, { allowSeed = true } = {}) {
     await ensureCmsReady({ verifyFull: true });
     if (isContentTable(table)) {
         const result = await fetchCmsRows(table, { admin: false, publishedOnly: true, limit: 500 });
+        if (!allowSeed && result.source === "seed") return [];
         return result.data || [];
     }
     return [];
@@ -95,9 +96,9 @@ export async function renderAboutPrincipal() {
 export async function renderFacultyPage() {
     const host = document.getElementById("faculty-grid");
     if (!host) return;
-    const rows = await loadPublished("faculty");
+    const rows = await loadPublished("faculty", { allowSeed: false });
     if (!rows.length) {
-        host.innerHTML = isCmsStrictMode() ? emptyState("faculty") : host.innerHTML;
+        host.innerHTML = emptyState("faculty");
         return;
     }
     host.innerHTML = rows.map((f) => {
@@ -105,7 +106,7 @@ export async function renderFacultyPage() {
         return `<article class="faculty-card card reveal">
         <div class="faculty-photo">${photo ? `<img loading="lazy" decoding="async" src="${esc(photo)}" alt="${esc(f.name)}">` : `<div class="faculty-photo-fallback" aria-hidden="true">${esc((f.name || "F").charAt(0))}</div>`}</div>
         <div class="faculty-body">
-            <span class="faculty-dept">${esc(f.department || "Engineering")}</span>
+            ${f.department ? `<span class="faculty-dept">${esc(f.department)}</span>` : ""}
             <h3>${esc(f.name)}</h3>
             <p class="faculty-qual">${esc(f.qualification || "")}${f.experience ? ` · ${esc(f.experience)}` : ""}</p>
             ${f.subjects ? `<p>${esc(stripHtml(f.subjects))}</p>` : ""}
@@ -186,35 +187,36 @@ export async function renderPlacementsPage() {
     const statsHost = document.getElementById("placement-stats");
     const storiesHost = document.getElementById("placement-stories");
     if (!statsHost || !storiesHost) return;
-    const rows = await loadPublished("placements");
+    const rows = await loadPublished("placements", { allowSeed: false });
     if (!rows.length) {
         const empty = emptyState("placement highlights");
-        statsHost.innerHTML = isCmsStrictMode() ? empty : statsHost.innerHTML;
-        storiesHost.innerHTML = isCmsStrictMode() ? empty : storiesHost.innerHTML;
+        statsHost.innerHTML = empty;
+        storiesHost.innerHTML = empty;
         return;
     }
     const top = rows[0] || {};
     const stats = [
-        [top.highest_package || "—", "Highest Package"],
-        [top.average_package || "—", "Average Package"],
-        [`${top.placed_students || 0}+`, "Students Trained"],
-        [top.package || "—", "Placement Focus"],
-    ];
+        [top.highest_package, "Highest Package"],
+        [top.average_package, "Average Package"],
+        [top.placed_students, "Students Placed"],
+    ].filter(([value]) => value !== null && value !== undefined && String(value).trim() !== "");
     statsHost.innerHTML = stats.map(([value, label]) => `<article class="highlight-stat"><strong>${esc(value)}</strong><span>${esc(label)}</span></article>`).join("");
     const recruiters = [...new Set(rows.map((r) => r.recruiter).filter(Boolean))];
     const recruiterHtml = recruiters.length
         ? `<div class="recruiter-strip">${recruiters.map((r) => `<span>${esc(r)}</span>`).join("")}</div>`
         : "";
-    storiesHost.innerHTML = `${recruiterHtml}${rows.map((p) => {
+    const stories = rows.filter((p) => p.title || p.testimonial || p.training_activities || p.image_url || p.company_logo_url || p.package);
+    storiesHost.innerHTML = `${recruiterHtml}${stories.length ? stories.map((p) => {
         const image = resolveAdminPreviewUrl(p.image_url || p.company_logo_url || "");
         return `<article class="placement-story card reveal">
         ${image ? `<img loading="lazy" decoding="async" src="${esc(image)}" alt="${esc(p.title)}">` : ""}
         <div>
-            <h3>${esc(p.title || "Placement Highlight")}</h3>
-            ${p.testimonial ? `<blockquote>${esc(stripHtml(p.testimonial))}</blockquote><footer><strong>${esc(p.student_name || "Student")}</strong> · ${esc(p.course || "Alumni")}</footer>` : `<p>${esc(stripHtml(p.training_activities || ""))}</p>`}
+            ${p.title ? `<h3>${esc(p.title)}</h3>` : ""}
+            ${p.package ? `<p class="placement-package">Package: ${esc(p.package)}</p>` : ""}
+            ${p.testimonial ? `<blockquote>${esc(stripHtml(p.testimonial))}</blockquote>${p.student_name || p.course ? `<footer>${p.student_name ? `<strong>${esc(p.student_name)}</strong>` : ""}${p.student_name && p.course ? " · " : ""}${p.course ? esc(p.course) : ""}</footer>` : ""}` : p.training_activities ? `<p>${esc(stripHtml(p.training_activities))}</p>` : ""}
         </div>
     </article>`;
-    }).join("")}`;
+    }).join("") : emptyState("placement stories")}`;
 }
 
 function stripHtml(value) {
@@ -231,11 +233,10 @@ export async function renderCommitteePage() {
     const host = document.getElementById("committee-grid");
     if (!host) return;
     try {
-        const rows = await loadPublished("committee_members");
-        host.innerHTML = rows.length ? rows.map((member, index) => {
+        const rows = await loadPublished("committee_members", { allowSeed: false });
+        host.innerHTML = rows.length ? rows.map((member) => {
             const photo = resolveAdminPreviewUrl(member.photo_url || "");
-            const senior = index < 2 ? " committee-card--senior" : "";
-            return `<article class="committee-card${senior} reveal">
+            return `<article class="committee-card reveal">
                 <div class="committee-portrait">${photo ? `<img loading="lazy" decoding="async" src="${esc(photo)}" alt="${esc(member.full_name)}">` : `<span aria-hidden="true">${esc((member.full_name || "M").charAt(0))}</span>`}</div>
                 <div class="committee-card__body"><p class="committee-role">${esc(member.designation || "Committee Member")}</p><h2>${esc(member.full_name)}</h2>${member.qualification ? `<p class="committee-qualification">${esc(member.qualification)}</p>` : ""}${member.description ? `<p>${esc(stripHtml(member.description))}</p>` : ""}</div>
             </article>`;
@@ -249,7 +250,7 @@ export async function renderAlumniPage() {
     const yearFilter = document.getElementById("alumni-year");
     if (!host) return;
     try {
-        const rows = await loadPublished("alumni");
+        const rows = await loadPublished("alumni", { allowSeed: false });
         const render = () => {
             const department = departmentFilter?.value || "";
             const year = yearFilter?.value || "";
@@ -257,7 +258,9 @@ export async function renderAlumniPage() {
             host.innerHTML = visible.length ? visible.map((alumnus) => {
                 const photo = resolveAdminPreviewUrl(alumnus.photo_url || "");
                 return `<article class="alumni-card reveal"><div class="alumni-portrait">${photo ? `<img loading="lazy" decoding="async" src="${esc(photo)}" alt="${esc(alumnus.full_name)}">` : `<span aria-hidden="true">${esc((alumnus.full_name || "A").charAt(0))}</span>`}</div><div class="alumni-card__body"><p class="alumni-meta">${esc(alumnus.department || "Eaglewood Alumni")}${alumnus.passing_year ? ` <span>&middot;</span> ${esc(alumnus.passing_year)}` : ""}</p><h2>${esc(alumnus.full_name)}</h2>${alumnus.current_designation ? `<p class="alumni-title">${esc(alumnus.current_designation)}${alumnus.company ? `, ${esc(alumnus.company)}` : ""}</p>` : alumnus.company ? `<p class="alumni-title">${esc(alumnus.company)}</p>` : ""}${alumnus.biography ? `<p>${esc(stripHtml(alumnus.biography))}</p>` : ""}</div></article>`;
-            }).join("") : `<div class="empty-state"><strong>No alumni match these filters</strong><p>Try selecting a different department or passing year.</p></div>`;
+            }).join("") : rows.length
+                ? `<div class="empty-state"><strong>No alumni match these filters</strong><p>Try selecting a different department or passing year.</p></div>`
+                : emptyState("alumni profiles");
         };
         const departments = [...new Set(rows.map((row) => row.department).filter(Boolean))].sort();
         const years = [...new Set(rows.map((row) => row.passing_year).filter(Boolean))].sort((a, b) => b - a);

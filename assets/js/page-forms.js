@@ -27,7 +27,7 @@ async function enhanceContactPage() {
     const emails = parseInstituteEmails(settings);
     const primaryEmail = emails[0]?.value || parseSettingValue(settings.email) || "eaglewoodpoly@gmail.com";
 
-    main.insertAdjacentHTML("beforeend", `
+    const contactFormMarkup = `
         <section class="section contact-form-section" id="contact-form">
             <div class="container contact-form-grid">
                 <div class="contact-form-cards">
@@ -63,7 +63,10 @@ async function enhanceContactPage() {
                 </form>
             </div>
         </section>
-    `);
+    `;
+    const contactSection = main.querySelector("#contact-details");
+    if (contactSection) contactSection.insertAdjacentHTML("afterend", contactFormMarkup);
+    else main.insertAdjacentHTML("beforeend", contactFormMarkup);
     bindForm("contact-message-form", "contacts");
 }
 
@@ -158,13 +161,13 @@ function updateContactText(settings) {
     const phones = parseContactPhones(settings);
     const emails = parseInstituteEmails(settings);
 
-    if (phonesHost) {
+    if (phonesHost && phones.length) {
         phonesHost.innerHTML = phones.map((phone) =>
             `<a href="${telHref(phone)}">${escapeHtml(phone)}</a>`
         ).join("");
     }
 
-    if (emailsHost) {
+    if (emailsHost && emails.length) {
         emailsHost.innerHTML = emails.map((row) =>
             `<div><span class="contact-email-label">${escapeHtml(row.label)}</span><a href="mailto:${escapeHtml(row.value)}">${escapeHtml(row.value)}</a></div>`
         ).join("");
