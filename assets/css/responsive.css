@@ -1635,6 +1635,60 @@ body[data-home] .site-header {
     -webkit-backdrop-filter: blur(18px) saturate(1.2);
 }
 
+/* Shared institutional information bar, directly above the shared navbar. */
+#top-bar.premium-topbar,
+body[data-home] #top-bar.premium-topbar {
+    display: block !important;
+    width: 100%;
+    min-height: 40px;
+    overflow: hidden;
+    color: #f5f8f7;
+    background: linear-gradient(105deg, #092d3a 0%, #0d4952 58%, #123b4c 100%);
+    border-bottom: 1px solid rgba(210, 177, 104, .55);
+    font-size: 11px;
+    line-height: 1.35;
+}
+
+.epi-info-viewport { width: min(1760px, calc(100% - clamp(32px, 5vw, 88px))); margin-inline: auto; overflow: hidden; }
+.epi-info-track { display: flex; width: max-content; min-height: 40px; align-items: center; }
+.epi-info-set { display: flex; flex: 0 0 auto; align-items: center; white-space: nowrap; }
+.epi-info-item, .premium-topbar .epi-info-item { display: inline-flex; align-items: center; min-height: 18px; padding: 0 12px; color: inherit; font-size: inherit; text-decoration: none; }
+.epi-info-item + .epi-info-item { border-left: 1px solid rgba(255,255,255,.22); }
+.epi-info-item::before { display: inline-block; margin-right: 7px; color: #d8b56e; font-size: 11px; font-weight: 700; }
+.epi-info-approval::before { content: "◆"; font-size: 8px; }
+.epi-info-affiliation::before { content: "▤"; }
+.epi-info-codes::before { content: "⌑"; }
+.epi-info-phone::before { content: "☎"; }
+.epi-info-email::before { content: "✉"; }
+.epi-info-office::before { content: "↗"; }
+.epi-info-item:is(a):hover, .epi-info-item:is(a):focus-visible { color: #f1cf83; }
+.epi-info-set-copy { display: none; }
+
+@media (min-width: 1281px) and (max-width: 1500px) {
+    #top-bar.premium-topbar, body[data-home] #top-bar.premium-topbar { font-size: 9.7px; }
+    .epi-info-viewport { width: 100%; }
+    .epi-info-item { padding-inline: 0; }
+    .epi-info-item::before { margin-right: 3px; }
+}
+
+@media (max-width: 1280px) {
+    #top-bar.premium-topbar, body[data-home] #top-bar { display: block !important; min-height: 38px; }
+    .epi-info-viewport { width: 100%; }
+    .epi-info-track { min-height: 38px; animation: epi-info-marquee 38s linear infinite; }
+    .epi-info-set-copy { display: flex; }
+    #top-bar.premium-topbar:hover .epi-info-track,
+    #top-bar.premium-topbar:focus-within .epi-info-track { animation-play-state: paused; }
+}
+
+@keyframes epi-info-marquee { to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .epi-info-track { animation: none !important; } }
+
+@media (max-width: 600px) {
+    #top-bar.premium-topbar, body[data-home] #top-bar { display: block !important; min-height: 36px; font-size: 10px; }
+    .epi-info-track { min-height: 36px; animation-duration: 32s; }
+    .epi-info-item { padding-inline: 10px; }
+}
+
 .navbar,
 .home-page .navbar,
 body[data-home] .navbar {

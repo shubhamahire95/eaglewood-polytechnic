@@ -291,10 +291,22 @@ function renderTopUtility(settings, cmsOnly = false) {
         top.remove();
         return;
     }
-    const phoneLinks = phones.map((p) => `<a href="${esc(telHref(p))}">${esc(p)}</a>`).join("");
-    const emailLinks = emails.map((e) => `<a href="mailto:${esc(e.value)}">${esc(e.value)}</a>`).join("");
+    const defaults = ["+91 97655 43454", "+91 90281 85454", "+91 90493 44003"];
+    const phoneItems = [...new Set([...phones, ...defaults])].map((p) => `<a class="epi-info-item epi-info-phone" href="${esc(telHref(p))}">${esc(p)}</a>`);
+    const defaultEmails = ["eaglewoodpoly@gmail.com", "eaglewoodcoe@gmail.com"];
+    const emailItems = [...new Set([...emails.map((e) => e.value), ...defaultEmails])].map((e) => `<a class="epi-info-item epi-info-email" href="mailto:${esc(e)}">${esc(e)}</a>`);
+    const coreItems = [
+        `<span class="epi-info-item epi-info-approval">${esc(approval)}</span>`,
+        `<span class="epi-info-item epi-info-affiliation">${esc(affiliation)}</span>`,
+        `<span class="epi-info-item epi-info-codes">DTE ${esc(dte)} | MSBTE ${esc(msbte)}</span>`,
+        ...phoneItems,
+        ...emailItems,
+        `<a class="epi-info-item epi-info-office" href="contact.html">Contact Office</a>`,
+    ].join("");
+    const duplicateItems = coreItems.replace(/<a\b/g, '<a tabindex="-1"').replace(/<span\b/g, '<span');
     top.className = "top-bar premium-topbar";
-    top.innerHTML = `<div class="container top-inner"><div class="top-mobile-info"><div class="top-mobile-meta"><span>${esc(approval)}</span><span>${esc(affiliation)}</span><span>DTE ${esc(dte)} | MSBTE ${esc(msbte)}</span></div><div class="top-mobile-contact">${phoneLinks}${emailLinks}<a class="top-mobile-cta" href="contact.html">Contact Office</a></div></div></div>`;
+    top.setAttribute("aria-label", "College information");
+    top.innerHTML = `<div class="epi-info-viewport"><div class="epi-info-track"><div class="epi-info-set">${coreItems}</div><div class="epi-info-set epi-info-set-copy" aria-hidden="true">${duplicateItems}</div></div></div>`;
 }
 
 function sectionHead(kicker, title, lead = "") {

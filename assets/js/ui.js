@@ -48,6 +48,32 @@ let footerInitPromise;
 let footerEventsBound = false;
 
 const siteHeader = `
+  <div id="top-bar" class="top-bar premium-topbar" aria-label="College information">
+    <div class="epi-info-viewport"><div class="epi-info-track">
+      <div class="epi-info-set">
+        <span class="epi-info-item epi-info-approval">Approved by AICTE, DTE &amp; Govt. of Maharashtra</span>
+        <span class="epi-info-item epi-info-affiliation">Affiliated to MSBTE &amp; DBATU</span>
+        <span class="epi-info-item epi-info-codes">DTE 2634 | MSBTE 51307</span>
+        <a class="epi-info-item epi-info-phone" href="tel:+919765543454">+91 97655 43454</a>
+        <a class="epi-info-item epi-info-phone" href="tel:+919028185454">+91 90281 85454</a>
+        <a class="epi-info-item epi-info-phone" href="tel:+919049344003">+91 90493 44003</a>
+        <a class="epi-info-item epi-info-email" href="mailto:eaglewoodpoly@gmail.com">eaglewoodpoly@gmail.com</a>
+        <a class="epi-info-item epi-info-email" href="mailto:eaglewoodcoe@gmail.com">eaglewoodcoe@gmail.com</a>
+        <a class="epi-info-item epi-info-office" href="contact.html">Contact Office</a>
+      </div>
+      <div class="epi-info-set epi-info-set-copy" aria-hidden="true">
+        <span class="epi-info-item epi-info-approval">Approved by AICTE, DTE &amp; Govt. of Maharashtra</span>
+        <span class="epi-info-item epi-info-affiliation">Affiliated to MSBTE &amp; DBATU</span>
+        <span class="epi-info-item epi-info-codes">DTE 2634 | MSBTE 51307</span>
+        <a class="epi-info-item epi-info-phone" tabindex="-1" href="tel:+919765543454">+91 97655 43454</a>
+        <a class="epi-info-item epi-info-phone" tabindex="-1" href="tel:+919028185454">+91 90281 85454</a>
+        <a class="epi-info-item epi-info-phone" tabindex="-1" href="tel:+919049344003">+91 90493 44003</a>
+        <a class="epi-info-item epi-info-email" tabindex="-1" href="mailto:eaglewoodpoly@gmail.com">eaglewoodpoly@gmail.com</a>
+        <a class="epi-info-item epi-info-email" tabindex="-1" href="mailto:eaglewoodcoe@gmail.com">eaglewoodcoe@gmail.com</a>
+        <a class="epi-info-item epi-info-office" tabindex="-1" href="contact.html">Contact Office</a>
+      </div>
+    </div></div>
+  </div>
   <header class="site-header">
     <nav class="container navbar" aria-label="Main navigation">
       <a class="brand" href="index.html" aria-label="Eaglewood Polytechnic Institute home">
